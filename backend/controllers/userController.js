@@ -11,15 +11,31 @@ async function getUsers(req, res) {
   }
 }
 
+function getRankLabel(elo) {
+  if (elo < 1000) return 'Железо';
+  if (elo < 1100) return 'Бронза';
+  if (elo < 1200) return 'Серебро';
+  if (elo < 1300) return 'Золото';
+  if (elo < 1400) return 'Платина';
+  if (elo < 1500) return 'Алмаз';
+  return 'Global Elite';
+}
+
 // --- НОВЫЙ РОУТ: Таблица лидеров по ELO-рейтингу ---
 // GET /api/leaderboard
 async function getLeaderboard(req, res) {
   try {
     const users = await User.find({})
-      .select('name email eloRating coins')
+      .select('name username email eloRating coins karma avatar activeProfileSkin activeProfileFrame')
       .sort({ eloRating: -1 }); // Сортируем по убыванию ELO
 
-    res.status(200).json(users);
+    const enrichedUsers = users.map(u => {
+      const obj = u.toObject();
+      obj.rank = getRankLabel(obj.eloRating);
+      return obj;
+    });
+
+    res.status(200).json(enrichedUsers);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Ошибка получения таблицы лидеров' });

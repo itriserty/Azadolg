@@ -158,14 +158,33 @@ async function payDebt(req, res) {
     transaction.resolvedAt = now;
     await transaction.save();
 
-    const [debtor, creditor] = await Promise.all([
-      User.findByIdAndUpdate(transaction.debtor,   { $inc: { eloRating: finalDebtorElo, coins: finalCoinsReward, karma: finalCoinsReward } }, { new: true }),
-      User.findByIdAndUpdate(transaction.creditor, { $inc: { eloRating: finalCreditorElo } }, { new: true })
-    ]);
+    // Разрешаем ставки на тотализаторе, если они были
+    try {
+      const { resolveBetsForDebt } = require('./betController');
+      await resolveBetsForDebt(transactionId, isOverdue);
+    } catch (err) {
+      console.error('Ошибка расчета ставок тотализатора:', err);
+    }
 
-    // ELO не ниже 100
-    if (debtor && debtor.eloRating < 100)
-      await User.findByIdAndUpdate(transaction.debtor, { eloRating: 100 });
+    const debtor = await User.findById(transaction.debtor);
+    const creditor = await User.findById(transaction.creditor);
+
+    if (debtor) {
+      debtor.eloRating += finalDebtorElo;
+      if (debtor.eloRating < 100) debtor.eloRating = 100;
+      debtor.coins += finalCoinsReward;
+      debtor.karma += finalCoinsReward;
+      
+      // Начисление XP Боевого Пропуска
+      const { addXP } = require('../utils/battlePassHelper');
+      const xpReward = isOverdue ? 10 : 25;
+      await addXP(debtor, xpReward);
+    }
+
+    if (creditor) {
+      creditor.eloRating += finalCreditorElo;
+      await creditor.save();
+    }
 
     // 📣 Telegram: уведомление о закрытии долга
     tg.notifyDebtPaid({

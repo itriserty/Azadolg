@@ -5,6 +5,10 @@ import Leaderboard    from './components/Leaderboard';
 import DebtForm       from './components/DebtForm';
 import DebtList       from './components/DebtList';
 import CaseRoulette   from './components/CaseRoulette';
+import Shop           from './components/Shop';
+import DuelsAndBets   from './components/DuelsAndBets';
+import SocialBoard    from './components/SocialBoard';
+import BattlePass     from './components/BattlePass';
 import { LogOut, Lock, Mail, User as UserIcon, HelpCircle } from 'lucide-react';
 
 export default function App() {
@@ -16,6 +20,7 @@ export default function App() {
   const [debts, setDebts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('debts');
 
   // Состояния для форм авторизации
   const [isLogin, setIsLogin] = useState(true);
@@ -458,19 +463,94 @@ export default function App() {
             <Leaderboard users={users} currentUser={currentUser} />
           </div>
 
-          {/* ── Правая колонка (Форма + Списки долгов) ───────────── */}
-          <div className="lg:col-span-7 space-y-8">
-            <DebtForm
-              users={debtFormUsers}
-              currentUser={currentUser}
-              onSubmit={handleCreateDebt}
-            />
+          {/* ── Правая колонка (Табы + Их контент) ───────────── */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Панель вкладок */}
+            <div className="flex flex-wrap bg-[#151c2c]/85 border border-gray-800 p-1.5 rounded-2xl gap-1">
+              <button
+                onClick={() => setActiveTab('debts')}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                  activeTab === 'debts'
+                    ? 'bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-gray-250 border border-transparent'
+                }`}
+              >
+                💸 Долги
+              </button>
+              <button
+                onClick={() => setActiveTab('duels')}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                  activeTab === 'duels'
+                    ? 'bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-gray-250 border border-transparent'
+                }`}
+              >
+                ⚔️ Дуэли и Ставки
+              </button>
+              <button
+                onClick={() => setActiveTab('social')}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                  activeTab === 'social'
+                    ? 'bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-gray-250 border border-transparent'
+                }`}
+              >
+                🏺 Община
+              </button>
+              <button
+                onClick={() => setActiveTab('battlepass')}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                  activeTab === 'battlepass'
+                    ? 'bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-gray-250 border border-transparent'
+                }`}
+              >
+                🎒 Battle Pass
+              </button>
+              <button
+                onClick={() => setActiveTab('shop')}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                  activeTab === 'shop'
+                    ? 'bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-gray-250 border border-transparent'
+                }`}
+              >
+                🛒 Магазин
+              </button>
+            </div>
 
-            <DebtList
-              debts={debts}
-              currentUser={currentUser}
-              onPay={handlePayDebt}
-            />
+            {/* Контент активной вкладки */}
+            {activeTab === 'debts' && (
+              <div className="space-y-8 animate-fadeIn">
+                <DebtForm
+                  users={debtFormUsers}
+                  currentUser={currentUser}
+                  onSubmit={handleCreateDebt}
+                />
+
+                <DebtList
+                  debts={debts}
+                  currentUser={currentUser}
+                  onPay={handlePayDebt}
+                />
+              </div>
+            )}
+
+            {activeTab === 'duels' && (
+              <DuelsAndBets user={currentUser} onUpdateUser={handleUserUpdate} />
+            )}
+
+            {activeTab === 'social' && (
+              <SocialBoard user={currentUser} onUpdateUser={handleUserUpdate} />
+            )}
+
+            {activeTab === 'battlepass' && (
+              <BattlePass user={currentUser} />
+            )}
+
+            {activeTab === 'shop' && (
+              <Shop user={currentUser} onUpdateUser={handleUserUpdate} />
+            )}
           </div>
         </div>
       </main>

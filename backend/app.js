@@ -8,7 +8,14 @@ const userRoutes = require('./routes/userRoutes');
 const debtRoutes = require('./routes/debtRoutes');
 const caseRoutes = require('./routes/caseRoutes');
 const friendRoutes = require('./routes/friendRoutes');
+const shopRoutes = require('./routes/shopRoutes');
+const gachaRoutes = require('./routes/gachaRoutes');
+const duelRoutes = require('./routes/duelRoutes');
+const betRoutes = require('./routes/betRoutes');
+const fundRoutes = require('./routes/fundRoutes');
+const questRoutes = require('./routes/questRoutes');
 const { startReminderScheduler } = require('./services/reminderService');
+const { startCronScheduler } = require('./services/cronService');
 
 const { getLeaderboard } = require('./controllers/userController');
 const { openCase }       = require('./controllers/caseController');
@@ -29,6 +36,12 @@ app.use('/api/users',  userRoutes);
 app.use('/api/debts',  debtRoutes);
 app.use('/api/cases',  caseRoutes);
 app.use('/api/friends', friendRoutes);
+app.use('/api/shop', shopRoutes);
+app.use('/api/gacha', gachaRoutes);
+app.use('/api/duel', duelRoutes);
+app.use('/api/bets', betRoutes);
+app.use('/api/fund', fundRoutes);
+app.use('/api/quests', questRoutes);
 
 // Верхнеуровневые роуты (требуемые по заданию)
 const authMiddleware = require('./middlewares/authMiddleware');
@@ -127,6 +140,7 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
     console.log('✅ MongoDB Atlas: подключено.');
     await seedDatabase();
     startReminderScheduler();
+    startCronScheduler();
     app.listen(PORT, () => console.log(`🚀 Сервер запущен на порту ${PORT}`));
   })
   .catch(err => {

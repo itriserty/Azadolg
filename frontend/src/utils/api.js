@@ -45,5 +45,30 @@ export const api = {
   payDebt:    (transactionId) => request(`/debts/${transactionId}/pay`, { method: 'POST' }),
 
   // Кейсы
-  openCase:   (userId)        => request('/open-case', { method: 'POST', body: JSON.stringify({ userId }) })
+  openCase:   (userId)        => request('/open-case', { method: 'POST', body: JSON.stringify({ userId }) }),
+
+  // Магазин и Гача
+  getShopItems:      () => request('/shop/items'),
+  buyShopItem:       (itemId) => request('/shop/buy', { method: 'POST', body: JSON.stringify({ itemId }) }),
+  getUserInventory:  () => request('/shop/inventory'),
+  activateCosmetic:  (itemId, itemType) => request('/shop/activate', { method: 'POST', body: JSON.stringify({ itemId, itemType }) }),
+  pullGacha:         () => request('/gacha/pull', { method: 'POST' }),
+
+  // Дуэли и Ставки
+  createDuelChallenge: (opponentId, debtId, wager) => request('/duel/challenge', { method: 'POST', body: JSON.stringify({ opponentId, debtId, wager }) }),
+  respondToDuel:       (duelId, action) => request('/duel/respond', { method: 'POST', body: JSON.stringify({ duelId, action }) }),
+  getMyDuels:          () => request('/duel/my'),
+  placeBet:            (debtId, prediction, wager) => request('/bets/create', { method: 'POST', body: JSON.stringify({ debtId, prediction, wager }) }),
+  getMyBets:           () => request('/bets/my'),
+
+  // Краудфандинг и Квесты
+  createFund:       (title, targetAmount) => request('/fund/create', { method: 'POST', body: JSON.stringify({ title, targetAmount }) }),
+  contributeToFund: (fundId, amount) => request('/fund/contribute', { method: 'POST', body: JSON.stringify({ fundId, amount }) }),
+  getFunds:         () => request('/fund'),
+  createQuest:      (title, description, karmaReward) => request('/quests/create', { method: 'POST', body: JSON.stringify({ title, description, karmaReward }) }),
+  takeQuest:        (questId) => request('/quests/take', { method: 'POST', body: JSON.stringify({ questId }) }),
+  completeQuest:    (questId) => request('/quests/complete', { method: 'POST', body: JSON.stringify({ questId }) }),
+  verifyQuest:      (questId, action) => request('/quests/verify', { method: 'POST', body: JSON.stringify({ questId, action }) }),
+  cancelQuest:      (questId) => request('/quests/cancel', { method: 'POST', body: JSON.stringify({ questId }) }),
+  getQuests:        () => request('/quests')
 };
