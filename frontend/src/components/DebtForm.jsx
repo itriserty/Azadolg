@@ -111,7 +111,7 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
         {/* Сумма и Описание */}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Сумма (₽)</label>
+            <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Сумма (₸)</label>
             <input
               type="number"
               value={amount}

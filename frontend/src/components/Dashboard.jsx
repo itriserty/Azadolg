@@ -163,7 +163,7 @@ export default function Dashboard({
               : netBalance < 0 ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]'
               : 'text-gray-400'
             }`}>
-              {netBalance > 0 ? '+' : ''}{netBalance} ₽
+              {netBalance > 0 ? '+' : ''}{netBalance} ₸
             </span>
             {netBalance > 0 && <TrendingUp className="w-5 h-5 text-green-400" />}
             {netBalance < 0 && <TrendingDown className="w-5 h-5 text-red-400" />}
@@ -172,11 +172,11 @@ export default function Dashboard({
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div className="bg-green-500/5 border border-green-500/20 p-2.5 rounded-lg">
               <div className="text-gray-500 mb-0.5">Вам должны</div>
-              <div className="font-bold text-green-400">+{totalOwesMe} ₽</div>
+              <div className="font-bold text-green-400">+{totalOwesMe} ₸</div>
             </div>
             <div className="bg-red-500/5 border border-red-500/20 p-2.5 rounded-lg">
               <div className="text-gray-500 mb-0.5">Вы должны</div>
-              <div className="font-bold text-red-400">-{totalIOwe} ₽</div>
+              <div className="font-bold text-red-400">-{totalIOwe} ₸</div>
             </div>
           </div>
         </div>

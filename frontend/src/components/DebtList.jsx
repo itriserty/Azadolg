@@ -72,20 +72,20 @@ export default function DebtList({ debts, currentUser, onPay }) {
             <div class={`text-base font-black ${
               isOwe ? 'text-neonRed' : 'text-neonGreen'
             }`}>
-              {isOwe ? '-' : '+'}{debt.amount} ₽
+              {isOwe ? '-' : '+'}{debt.amount} ₸
             </div>
 
             {/* Пеня */}
             {debt.penaltyAccrued > 0 && (
               <div class="text-[10px] text-neonRed font-semibold flex items-center gap-0.5 justify-end">
-                <span>(из них пеня: +{debt.penaltyAccrued} ₽)</span>
+                <span>(из них пеня: +{debt.penaltyAccrued} ₸)</span>
               </div>
             )}
             
             {/* Исходная сумма */}
             {debt.penaltyAccrued > 0 && (
               <div class="text-[9px] text-gray-500">
-                Исходно: {debt.originalAmount} ₽
+                Исходно: {debt.originalAmount} ₸
               </div>
             )}
           </div>

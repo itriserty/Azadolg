@@ -36,6 +36,36 @@ const UserSchema = new mongoose.Schema({
     type: Number, 
     default: 200 // Стартовое количество монет
   },
+  karma: {
+    type: Number,
+    default: 200 // Игровая Карма (основная валюта магазина)
+  },
+  winStreak: {
+    type: Number,
+    default: 0 // Серия закрытия долгов вовремя
+  },
+  stats: {
+    totalDebtsCreated: { type: Number, default: 0 },
+    totalDebtsPaid: { type: Number, default: 0 },
+    debtsPaidOnTime: { type: Number, default: 0 },
+    totalKarmaEarned: { type: Number, default: 0 }
+  },
+  battlePassLevel: {
+    type: Number,
+    default: 1
+  },
+  battlePassXP: {
+    type: Number,
+    default: 0 // 100 XP на уровень
+  },
+  activeProfileSkin: {
+    type: String,
+    default: 'default' // Косметический скин профиля
+  },
+  activeProfileFrame: {
+    type: String,
+    default: 'none' // Рамка профиля
+  },
   friends: [{ 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User' 

@@ -62,7 +62,7 @@ async function openCase(req, res) {
           const disc = Number((debt.amount * prize.value).toFixed(2));
           debt.amount = Number((debt.amount - disc).toFixed(2));
           await debt.save();
-          description = `Прощено 5% долга (-${disc} ₽) перед ${debt.creditor.name}!`;
+           description = `Прощено 5% долга (-${disc} ₸) перед ${debt.creditor.name}!`;
           detail = { debtId: debt._id, discount: disc, newAmount: debt.amount, creditorName: debt.creditor.name };
         } else {
           user.eloRating += 50;

@@ -39,7 +39,7 @@ function notifyDebtCreated({ creditorName, debtorName, amount, description, dueD
   const text = `💸 <b>Новый долг зарегистрирован!</b>\n\n` +
     `👤 Кредитор: <b>${creditorName}</b>\n` +
     `🎯 Должник: <b>${debtorName}</b>\n` +
-    `💰 Сумма: <b>${amount} ₽</b>\n` +
+    `💰 Сумма: <b>${amount} ₸</b>\n` +
     `📝 Описание: ${description}\n` +
     `📅 Вернуть до: <b>${date}</b>\n\n` +
     `⚡ Открыто в <a href="https://azadolg.onrender.com">Azadolg</a>`;
@@ -61,7 +61,7 @@ function notifyDebtPaid({ debtorName, creditorName, amount, eloChangeDebtor, coi
   const text = `${icon} <b>Долг закрыт${isOverdue ? ' (с просрочкой)' : ' вовремя'}!</b>\n\n` +
     `🎯 Должник: <b>${debtorName}</b>\n` +
     `👤 Кредитор: <b>${creditorName}</b>\n` +
-    `💰 Сумма: <b>${amount} ₽</b>\n\n` +
+    `💰 Сумма: <b>${amount} ₸</b>\n\n` +
     `${eloEmoji} ELO Должника: <b>${eloChangeDebtor >= 0 ? '+' : ''}${eloChangeDebtor}</b>\n` +
     `🪙 Coins получено: <b>+${coinsEarned}</b>`;
 
@@ -97,8 +97,8 @@ function notifyPenaltyApplied({ debtorName, creditorName, originalAmount, newAmo
   const text = `⏰ <b>Штраф за просрочку!</b>\n\n` +
     `🎯 Должник: <b>${debtorName}</b>\n` +
     `👤 Кредитор: <b>${creditorName}</b>\n` +
-    `💸 Штраф +5%: <b>+${penalty} ₽</b>\n` +
-    `💰 Новая сумма: <b>${newAmount} ₽</b>\n\n` +
+    `💸 Штраф +5%: <b>+${penalty} ₸</b>\n` +
+    `💰 Новая сумма: <b>${newAmount} ₸</b>\n\n` +
     `❗ Закройте долг скорее в <a href="https://azadolg.onrender.com">Azadolg</a>!`;
 
   if (debtorTelegramId) {

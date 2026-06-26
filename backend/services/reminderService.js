@@ -21,7 +21,7 @@ async function checkOverdueDebts() {
         const dateStr = new Date(tx.dueDate).toLocaleDateString('ru-RU');
         const text = `⚠️ <b>Внимание: Долг просрочен!</b>\n\n` +
           `👤 Кредитор: <b>${tx.creditor ? tx.creditor.name : 'Неизвестно'}</b>\n` +
-          `💰 Оригинальная сумма: <b>${tx.originalAmount} ₽</b>\n` +
+          `💰 Оригинальная сумма: <b>${tx.originalAmount} ₸</b>\n` +
           `📝 Описание: ${tx.description}\n` +
           `📅 Срок возврата истек: <b>${dateStr}</b>\n\n` +
           `‼️ С 8-го дня просрочки начнет начисляться штраф 5%. Пожалуйста, верните долг как можно скорее!`;
