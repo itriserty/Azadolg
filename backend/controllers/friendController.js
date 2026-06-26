@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const FriendRequest = require('../models/FriendRequest');
+const tg = require('../services/telegramService');
 
 // Отправить запрос в друзья (или автоматически принять, если взаимно)
 async function addFriend(req, res) {
@@ -73,6 +74,14 @@ async function addFriend(req, res) {
     });
     await newRequest.save();
 
+    // 📣 Telegram-уведомление
+    const challengeText = `👥 <b>Запрос в друзья!</b>\n\n` +
+      `Пользователь <b>${senderUser.name}</b> (@${senderUser.username}) отправил запрос в друзья <b>${receiver.name}</b> (@${receiver.username}).`;
+    tg.sendMessage(challengeText);
+    if (receiver.telegramId) {
+      tg.sendMessage(`👥 <b>Новый запрос в друзья!</b>\n\nПользователь <b>${senderUser.name}</b> (@${senderUser.username}) хочет добавить вас в друзья. Одобрите запрос в приложении.`, receiver.telegramId);
+    }
+
     res.status(201).json({
       message: `Запрос в друзья отправлен пользователю ${receiver.name} (@${receiver.username})`,
       status: 'pending'
@@ -106,8 +115,17 @@ async function acceptFriendRequest(req, res) {
     await request.save();
 
     // Добавляем друзей взаимно
-    await User.findByIdAndUpdate(request.sender,   { $addToSet: { friends: request.receiver } });
-    await User.findByIdAndUpdate(request.receiver, { $addToSet: { friends: request.sender } });
+    const [sender, receiver] = await Promise.all([
+      User.findByIdAndUpdate(request.sender,   { $addToSet: { friends: request.receiver } }, { new: true }),
+      User.findByIdAndUpdate(request.receiver, { $addToSet: { friends: request.sender } }, { new: true })
+    ]);
+
+    // 📣 Telegram-уведомление
+    const text = `👥 <b>Дружба подтверждена!</b>\n\n` +
+      `<b>${receiver.name}</b> (@${receiver.username}) и <b>${sender.name}</b> (@${sender.username}) теперь официально друзья!`;
+    tg.sendMessage(text);
+    if (sender.telegramId) tg.sendMessage(text, sender.telegramId);
+    if (receiver.telegramId) tg.sendMessage(text, receiver.telegramId);
 
     res.status(200).json({ message: 'Запрос в друзья успешно принят!' });
   } catch (error) {

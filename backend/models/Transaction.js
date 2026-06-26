@@ -36,8 +36,13 @@ const TransactionSchema = new mongoose.Schema({
   },
   status: { 
     type: String, 
-    enum: ['active', 'paid', 'declined'], 
-    default: 'active' 
+    enum: ['pending_approval', 'active', 'paid', 'declined'], 
+    default: 'pending_approval' 
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
   overdueReminderSent: {
     type: Boolean,

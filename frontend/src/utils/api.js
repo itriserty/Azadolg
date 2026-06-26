@@ -25,6 +25,8 @@ export const api = {
   // Авторизация
   register:          (name, username, email, password) => request('/users/register', { method: 'POST', body: JSON.stringify({ name, username, email, password }) }),
   login:             (username, password) => request('/users/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  forgotPassword:    (username) => request('/users/forgot-password', { method: 'POST', body: JSON.stringify({ username }) }),
+  resetPassword:     (username, code, newPassword) => request('/users/reset-password', { method: 'POST', body: JSON.stringify({ username, code, newPassword }) }),
   getMe:             () => request('/users/me'),
   updateTelegramId:  (telegramId) => request('/users/telegram', { method: 'PUT', body: JSON.stringify({ telegramId }) }),
   updateAvatar:      (avatar) => request('/users/avatar', { method: 'PUT', body: JSON.stringify({ avatar }) }),
@@ -40,9 +42,11 @@ export const api = {
   getPendingRequests: () => request('/friends/requests'),
 
   // Долги
-  getDebts:   (userId)        => request(`/debts/user/${userId}`),
-  createDebt: (debtData)      => request('/debts/create', { method: 'POST', body: JSON.stringify(debtData) }),
-  payDebt:    (transactionId) => request(`/debts/${transactionId}/pay`, { method: 'POST' }),
+  getDebts:    (userId)        => request(`/debts/user/${userId}`),
+  createDebt:  (debtData)      => request('/debts/create', { method: 'POST', body: JSON.stringify(debtData) }),
+  payDebt:     (transactionId) => request(`/debts/${transactionId}/pay`, { method: 'POST' }),
+  confirmDebt: (transactionId) => request(`/debts/${transactionId}/confirm`, { method: 'POST' }),
+  declineDebt: (transactionId) => request(`/debts/${transactionId}/decline`, { method: 'POST' }),
 
   // Кейсы
   openCase:   (userId)        => request('/open-case', { method: 'POST', body: JSON.stringify({ userId }) }),

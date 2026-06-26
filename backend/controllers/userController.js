@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const tg = require('../services/telegramService');
 
 // Получение списка всех пользователей (для выпадающих списков)
 async function getUsers(req, res) {
@@ -106,6 +107,12 @@ async function updateTelegramId(req, res) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
+    // 📣 Telegram-уведомление
+    if (user.telegramId) {
+      tg.sendMessage(`🔔 <b>Уведомления привязаны!</b>\n\nВы успешно привязали свой Telegram аккаунт к системе Azadolg ELO. Теперь вы будете получать отчеты о долгах и активности сюда!`, user.telegramId);
+    }
+    tg.sendMessage(`🔔 <b>Telegram привязан!</b>\n\nПользователь <b>${user.name}</b> (@${user.username}) привязал свой Telegram ID.`);
+
     res.status(200).json({ message: 'Telegram ID успешно обновлен!', user });
   } catch (error) {
     console.error('Ошибка обновления telegramId:', error);
@@ -127,6 +134,12 @@ async function updateAvatar(req, res) {
 
     if (!user) {
       return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+
+    // 📣 Telegram-уведомление
+    tg.sendMessage(`🖼️ <b>Новое фото профиля!</b>\n\nПользователь <b>${user.name}</b> (@${user.username}) загрузил новый аватар.`);
+    if (user.telegramId) {
+      tg.sendMessage(`🖼️ Вы успешно обновили свой аватар в Azadolg!`, user.telegramId);
     }
 
     res.status(200).json({ message: 'Аватар профиля успешно обновлен!', user });

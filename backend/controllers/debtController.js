@@ -19,6 +19,7 @@ function calculateEloChange(transaction, now = new Date()) {
 async function createDebt(req, res) {
   try {
     const { creditor, debtor, amount, description, dueDate, penaltyRate } = req.body;
+    const createdBy = req.user;
 
     if (!creditor || !debtor || !amount || !description || !dueDate)
       return res.status(400).json({ error: 'Заполните обязательные поля: creditor, debtor, amount, description, dueDate' });
@@ -40,17 +41,28 @@ async function createDebt(req, res) {
       description,
       dueDate:      new Date(dueDate),
       penaltyRate:  penaltyRate !== undefined ? penaltyRate : 0.01,
-      status:       'active'
+      status:       'pending_approval',
+      createdBy
     });
     await transaction.save();
 
-    // 📣 Telegram: уведомление о новом долге
-    tg.notifyDebtCreated({
-      creditorName: creditorUser.name,
-      debtorName:   debtorUser.name,
-      amount, description, dueDate,
-      debtorTelegramId: debtorUser.telegramId
-    });
+    // 📣 Telegram: уведомление о новом долге (требующем одобрения)
+    const creatorUser = createdBy.toString() === creditor ? creditorUser : debtorUser;
+    const targetUser = createdBy.toString() === creditor ? debtorUser : creditorUser;
+    
+    const text = `💸 <b>Создан новый долг (ожидает подтверждения)!</b>\n\n` +
+      `👤 Заказчик: <b>${creatorUser.name}</b>\n` +
+      `👤 Получатель: <b>${targetUser.name}</b>\n` +
+      `💰 Сумма: <b>${amount} ₸</b>\n` +
+      `📝 Описание: ${description}\n` +
+      `📅 Срок: ${new Date(dueDate).toLocaleDateString('ru-RU')}\n\n` +
+      `⚠️ Пожалуйста, подтвердите или отклоните этот долг в приложении Azadolg!`;
+
+    if (targetUser.telegramId) {
+      tg.sendMessage(text, targetUser.telegramId);
+    } else {
+      tg.sendMessage(text);
+    }
 
     res.status(201).json(transaction);
   } catch (error) {
@@ -67,11 +79,21 @@ async function getDebts(req, res) {
 
     const transactions = await Transaction.find({
       $or: [{ creditor: userId }, { debtor: userId }],
-      status: 'active'
-    }).populate('creditor debtor', 'name email eloRating telegramId');
+      status: { $in: ['active', 'pending_approval'] }
+    }).populate('creditor debtor', 'name email username eloRating telegramId');
 
     const now = new Date();
     const result = await Promise.all(transactions.map(async t => {
+      if (t.status === 'pending_approval') {
+        return {
+          ...t.toObject(),
+          amount: t.originalAmount,
+          penaltyAccrued: 0,
+          isOverdue: false,
+          daysSinceCreation: 0
+        };
+      }
+
       const currentAmount = getCalculatedAmount(t, now); // 5% если > 7 дней
       const penaltyAccrued = Number((currentAmount - t.originalAmount).toFixed(2));
       const diffDays = Math.floor((now - new Date(t.createdAt)) / (1000 * 60 * 60 * 24));
@@ -213,4 +235,84 @@ async function payDebt(req, res) {
   }
 }
 
-module.exports = { createDebt, getDebts, payDebt };
+// ── Подтверждение долга ────────────────────────────────────────────────────────
+async function confirmDebt(req, res) {
+  try {
+    const { transactionId } = req.params;
+    const userId = req.user;
+
+    const transaction = await Transaction.findById(transactionId).populate('creditor debtor');
+    if (!transaction) return res.status(404).json({ error: 'Долг не найден' });
+
+    if (transaction.status !== 'pending_approval') {
+      return res.status(400).json({ error: 'Этот долг уже подтвержден или отклонен' });
+    }
+
+    const isParticipant = transaction.debtor._id.toString() === userId.toString() || transaction.creditor._id.toString() === userId.toString();
+    if (!isParticipant) {
+      return res.status(403).json({ error: 'Вы не являетесь участником этого долга' });
+    }
+
+    transaction.status = 'active';
+    await transaction.save();
+
+    // 📣 Telegram: уведомление о подтверждении
+    const text = `✅ <b>Долг подтвержден!</b>\n\n` +
+      `👤 Кредитор: <b>${transaction.creditor.name}</b>\n` +
+      `👤 Должник: <b>${transaction.debtor.name}</b>\n` +
+      `💰 Сумма: <b>${transaction.amount} ₸</b>\n` +
+      `📝 Описание: ${transaction.description}\n\n` +
+      `Долг теперь официально АКТИВЕН и участвует в ELO-системе.`;
+
+    tg.sendMessage(text);
+    if (transaction.debtor.telegramId) tg.sendMessage(text, transaction.debtor.telegramId);
+    if (transaction.creditor.telegramId) tg.sendMessage(text, transaction.creditor.telegramId);
+
+    res.status(200).json({ message: 'Долг успешно подтвержден!', transaction });
+  } catch (error) {
+    console.error('Ошибка подтверждения долга:', error);
+    res.status(500).json({ error: 'Ошибка сервера при подтверждении долга' });
+  }
+}
+
+// ── Отклонение долга ───────────────────────────────────────────────────────────
+async function declineDebt(req, res) {
+  try {
+    const { transactionId } = req.params;
+    const userId = req.user;
+
+    const transaction = await Transaction.findById(transactionId).populate('creditor debtor');
+    if (!transaction) return res.status(404).json({ error: 'Долг не найден' });
+
+    if (transaction.status !== 'pending_approval') {
+      return res.status(400).json({ error: 'Этот долг уже подтвержден или отклонен' });
+    }
+
+    const isParticipant = transaction.debtor._id.toString() === userId.toString() || transaction.creditor._id.toString() === userId.toString();
+    if (!isParticipant) {
+      return res.status(403).json({ error: 'Вы не являетесь участником этого долга' });
+    }
+
+    transaction.status = 'declined';
+    await transaction.save();
+
+    // 📣 Telegram: уведомление об отклонении
+    const text = `❌ <b>Долг отклонен!</b>\n\n` +
+      `👤 Кредитор: <b>${transaction.creditor.name}</b>\n` +
+      `👤 Должник: <b>${transaction.debtor.name}</b>\n` +
+      `💰 Сумма: <b>${transaction.amount} ₸</b>\n` +
+      `📝 Описание: ${transaction.description}\n\n` +
+      `Этот долг был отклонен одной из сторон и аннулирован.`;
+
+    tg.sendMessage(text);
+    if (transaction.debtor.telegramId) tg.sendMessage(text, transaction.debtor.telegramId);
+    if (transaction.creditor.telegramId) tg.sendMessage(text, transaction.creditor.telegramId);
+
+    res.status(200).json({ message: 'Долг успешно отклонен', transaction });
+  } catch (error) {
+    console.error('Ошибка отклонения долга:', error);
+    res.status(500).json({ error: 'Ошибка сервера при отклонении долга' });
+  }
+}
+
+module.exports = { createDebt, getDebts, payDebt, confirmDebt, declineDebt };

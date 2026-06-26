@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Landmark, ArrowUpRight, ArrowDownLeft, Calendar, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
-export default function DebtList({ debts, currentUser, onPay }) {
+export default function DebtList({ debts, currentUser, onPay, onConfirm, onDecline }) {
   // Разделяем долги на категории
   const iOwe = debts.filter(d => d.debtor._id === currentUser?._id);
   const owesMe = debts.filter(d => d.creditor._id === currentUser?._id);
@@ -91,7 +91,7 @@ export default function DebtList({ debts, currentUser, onPay }) {
           </div>
 
           {/* Кнопка оплаты (только для долгов, которые ДОЛЖЕН я) */}
-          {isOwe && (
+          {isOwe && debt.status === 'active' && (
             <button
               onClick={() => onPay(debt._id)}
               class="bg-neonPurple hover:bg-neonPurple/90 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-neonPurple/20 shadow-md transition-all flex items-center gap-1.5 shrink-0"
@@ -99,6 +99,32 @@ export default function DebtList({ debts, currentUser, onPay }) {
               <CheckCircle2 class="w-3.5 h-3.5" />
               Вернуть
             </button>
+          )}
+
+          {/* Кнопки подтверждения / отклонения долга */}
+          {debt.status === 'pending_approval' && (
+            <div className="flex items-center gap-2 shrink-0">
+              {debt.createdBy === currentUser._id ? (
+                <span className="text-[9px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2.5 py-1.5 rounded-xl uppercase tracking-wider font-extrabold animate-pulse">
+                  Ожидает одобрения
+                </span>
+              ) : (
+                <>
+                  <button
+                    onClick={() => onConfirm(debt._id)}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] py-2 px-3 rounded-xl transition-all shadow-md shadow-emerald-500/10"
+                  >
+                    Одобрить
+                  </button>
+                  <button
+                    onClick={() => onDecline(debt._id)}
+                    className="bg-red-600/20 border border-red-500/30 text-red-400 font-bold text-[10px] py-2 px-3 rounded-xl hover:bg-red-600/30 transition-all"
+                  >
+                    Отклонить
+                  </button>
+                </>
+              )}
+            </div>
           )}
         </div>
       </motion.div>

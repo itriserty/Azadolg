@@ -70,6 +70,14 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: null // URL или Base64 строка фотографии профиля
   },
+  resetCode: {
+    type: String,
+    default: null
+  },
+  resetCodeExpires: {
+    type: Date,
+    default: null
+  },
   friends: [{ 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User' 

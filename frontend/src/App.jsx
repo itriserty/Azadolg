@@ -23,13 +23,16 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('debts');
 
   // Состояния для форм авторизации
-  const [isLogin, setIsLogin] = useState(true);
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot' | 'reset'
   const [authError, setAuthError] = useState('');
+  const [authSuccess, setAuthSuccess] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
 
   const [showRoulette, setShowRoulette] = useState(false);
 
@@ -86,25 +89,36 @@ export default function App() {
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
+    setAuthSuccess('');
     setAuthLoading(true);
 
     try {
-      if (isLogin) {
+      if (authMode === 'login') {
         // Вход
         const data = await api.login(username, password);
         localStorage.setItem('token', data.token);
         setToken(data.token);
-      } else {
+      } else if (authMode === 'register') {
         // Регистрация
         const data = await api.register(name, username, email, password);
         localStorage.setItem('token', data.token);
         setToken(data.token);
+      } else if (authMode === 'forgot') {
+        // Запрос кода
+        const data = await api.forgotPassword(username);
+        setAuthSuccess(data.message);
+        setAuthMode('reset');
+      } else if (authMode === 'reset') {
+        // Сброс
+        const data = await api.resetPassword(username, resetCode, newPassword);
+        setAuthSuccess(data.message);
+        setAuthMode('login');
+        setResetCode('');
+        setNewPassword('');
+        setPassword('');
       }
-      // Очистка полей формы
       setName('');
-      setUsername('');
       setEmail('');
-      setPassword('');
     } catch (err) {
       setAuthError(err.message || 'Ошибка авторизации');
     } finally {
@@ -225,6 +239,36 @@ export default function App() {
     }
   };
 
+  const handleConfirmDebt = async (transactionId) => {
+    try {
+      const res = await api.confirmDebt(transactionId);
+      alert(res.message || 'Долг успешно подтвержден!');
+      if (currentUser) {
+        const debtsData = await api.getDebts(currentUser._id);
+        setDebts(debtsData);
+      }
+      const leaderData = await api.getLeaderboard();
+      setUsers(leaderData);
+    } catch (err) {
+      alert(err.message || 'Ошибка подтверждения');
+    }
+  };
+
+  const handleDeclineDebt = async (transactionId) => {
+    try {
+      const res = await api.declineDebt(transactionId);
+      alert(res.message || 'Долг успешно отклонен');
+      if (currentUser) {
+        const debtsData = await api.getDebts(currentUser._id);
+        setDebts(debtsData);
+      }
+      const leaderData = await api.getLeaderboard();
+      setUsers(leaderData);
+    } catch (err) {
+      alert(err.message || 'Ошибка отклонения');
+    }
+  };
+
   const handleUserUpdate = (updatedUser) => {
     setCurrentUser(updatedUser);
     setUsers(prev => prev.map(u => u._id === updatedUser._id ? { ...u, ...updatedUser } : u));
@@ -281,25 +325,41 @@ export default function App() {
             <p className="text-xs text-gray-400 mt-1">Закрытая финансовая ELO-система для друзей ⚔️</p>
           </div>
 
-          {/* Переключатель вкладок */}
-          <div className="flex bg-[#0b0f19] p-1.5 rounded-xl border border-gray-850 mb-6">
-            <button
-              onClick={() => { setIsLogin(true); setAuthError(''); }}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
-                isLogin ? 'bg-[#151c2c] text-cyan-400 shadow-md border border-gray-800' : 'text-gray-400 hover:text-gray-255'
-              }`}
-            >
-              Войти
-            </button>
-            <button
-              onClick={() => { setIsLogin(false); setAuthError(''); }}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
-                !isLogin ? 'bg-[#151c2c] text-cyan-400 shadow-md border border-gray-800' : 'text-gray-400 hover:text-gray-255'
-              }`}
-            >
-              Регистрация
-            </button>
-          </div>
+          {/* Переключатель вкладок (показываем только для Входа / Регистрации) */}
+          {(authMode === 'login' || authMode === 'register') && (
+            <div className="flex bg-[#0b0f19] p-1.5 rounded-xl border border-gray-850 mb-6">
+              <button
+                onClick={() => { setAuthMode('login'); setAuthError(''); setAuthSuccess(''); }}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
+                  authMode === 'login' ? 'bg-[#151c2c] text-cyan-400 shadow-md border border-gray-800' : 'text-gray-400 hover:text-gray-255'
+                }`}
+              >
+                Войти
+              </button>
+              <button
+                onClick={() => { setAuthMode('register'); setAuthError(''); setAuthSuccess(''); }}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
+                  authMode === 'register' ? 'bg-[#151c2c] text-cyan-400 shadow-md border border-gray-800' : 'text-gray-400 hover:text-gray-255'
+                }`}
+              >
+                Регистрация
+              </button>
+            </div>
+          )}
+
+          {authMode === 'forgot' && (
+            <div className="mb-6 text-center">
+              <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-wider">Восстановление доступа</h3>
+              <p className="text-xs text-gray-400 mt-1">Код сброса пароля будет отправлен вашему Telegram-боту</p>
+            </div>
+          )}
+
+          {authMode === 'reset' && (
+            <div className="mb-6 text-center">
+              <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">Ввод кода сброса</h3>
+              <p className="text-xs text-gray-400 mt-1">Введите 6-значный код из Telegram и новый пароль</p>
+            </div>
+          )}
 
           {authError && (
             <div className="p-3 bg-red-600/10 border border-red-600/30 rounded-xl text-xs text-red-400 mb-4 font-semibold text-center">
@@ -307,8 +367,14 @@ export default function App() {
             </div>
           )}
 
+          {authSuccess && (
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400 mb-4 font-semibold text-center">
+              {authSuccess}
+            </div>
+          )}
+
           <form onSubmit={handleAuthSubmit} className="space-y-4 text-sm">
-            {!isLogin && (
+            {authMode === 'register' && (
               <div>
                 <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Полное Имя</label>
                 <div className="relative">
@@ -325,22 +391,24 @@ export default function App() {
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Username (Юзернейм)</label>
-              <div className="relative">
-                <UserIcon className="w-4 h-4 text-gray-500 absolute left-3.5 top-3.5" />
-                <input
-                  type="text"
-                  required
-                  placeholder="alex_ninja"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-gray-250 focus:outline-none focus:border-cyan-500 transition"
-                />
+            {(authMode === 'login' || authMode === 'register' || authMode === 'forgot' || authMode === 'reset') && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Username (Юзернейм)</label>
+                <div className="relative">
+                  <UserIcon className="w-4 h-4 text-gray-500 absolute left-3.5 top-3.5" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="alex_ninja"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            {!isLogin && (
+            {authMode === 'register' && (
               <div>
                 <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Email</label>
                 <div className="relative">
@@ -357,28 +425,89 @@ export default function App() {
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Пароль</label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-3.5" />
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-gray-250 focus:outline-none focus:border-cyan-500 transition"
-                />
+            {authMode === 'reset' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Код подтверждения (6 цифр)</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-3.5" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="123456"
+                    value={resetCode}
+                    onChange={(e) => setResetCode(e.target.value)}
+                    className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {(authMode === 'login' || authMode === 'register') && (
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">Пароль</label>
+                  {authMode === 'login' && (
+                    <button
+                      type="button"
+                      onClick={() => { setAuthMode('forgot'); setAuthError(''); setAuthSuccess(''); }}
+                      className="text-[11px] text-cyan-400 hover:underline font-semibold"
+                    >
+                      Забыли пароль?
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-3.5" />
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                  />
+                </div>
+              </div>
+            )}
+
+            {authMode === 'reset' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Новый Пароль</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-3.5" />
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                  />
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
               disabled={authLoading}
               className="w-full bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-purple-500/20 shadow-md hover:opacity-90 transition disabled:opacity-50 mt-4"
             >
-              {authLoading ? 'Обработка...' : isLogin ? 'Войти в игру' : 'Зарегистрироваться'}
+              {authLoading ? 'Обработка...' 
+                : authMode === 'login' ? 'Войти в игру' 
+                : authMode === 'register' ? 'Зарегистрироваться' 
+                : authMode === 'forgot' ? 'Отправить код на Telegram' 
+                : 'Сохранить новый пароль'}
             </button>
+
+            {(authMode === 'forgot' || authMode === 'reset') && (
+              <button
+                type="button"
+                onClick={() => { setAuthMode('login'); setAuthError(''); setAuthSuccess(''); }}
+                className="w-full text-center text-xs text-gray-500 hover:text-gray-300 mt-2 block hover:underline"
+              >
+                Вернуться к авторизации
+              </button>
+            )}
           </form>
         </div>
       </div>
@@ -532,6 +661,8 @@ export default function App() {
                   debts={debts}
                   currentUser={currentUser}
                   onPay={handlePayDebt}
+                  onConfirm={handleConfirmDebt}
+                  onDecline={handleDeclineDebt}
                 />
               </div>
             )}
