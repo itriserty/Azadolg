@@ -5,10 +5,10 @@ const tg = require('../services/telegramService');
 const CASE_COST = 100;
 
 const PRIZE_POOL = [
-  { type: 'penalty',        value: -10,  weight: 20, label: '-10 ELO',    emoji: '🤬', rarity: 'Ширпотреб'   },
-  { type: 'elo_bonus',      value:  50,  weight: 35, label: '+50 ELO',    emoji: '🔥', rarity: 'Запрещенное' },
-  { type: 'debt_reduction', value: 0.05, weight: 25, label: '-5% Долга',  emoji: '⭐', rarity: 'Тайное'      },
-  { type: 'cashback',       value: 150,  weight: 20, label: '+150 Coins', emoji: '🪙', rarity: 'Армейское'   }
+  { type: 'penalty',           value: -10,  weight: 20, label: '-10 ELO',    emoji: '🤬', rarity: 'Ширпотреб'   },
+  { type: 'elo_bonus',         value:  50,  weight: 35, label: '+50 ELO',    emoji: '🔥', rarity: 'Запрещенное' },
+  { type: 'karma_super_bonus', value: 300,  weight: 25, label: '+300 Кармы & +50 XP', emoji: '💎', rarity: 'Тайное' },
+  { type: 'cashback',          value: 150,  weight: 20, label: '+150 Coins', emoji: '🪙', rarity: 'Армейское'   }
 ];
 
 function selectWeightedPrize() {
@@ -55,20 +55,12 @@ async function openCase(req, res) {
         detail = { coinsChange: prize.value };
         break;
       }
-      case 'debt_reduction': {
-        const debts = await Transaction.find({ debtor: userId, status: 'active' }).populate('creditor', 'name');
-        if (debts.length > 0) {
-          const debt = debts[Math.floor(Math.random() * debts.length)];
-          const disc = Number((debt.amount * prize.value).toFixed(2));
-          debt.amount = Number((debt.amount - disc).toFixed(2));
-          await debt.save();
-           description = `Прощено 5% долга (-${disc} ₸) перед ${debt.creditor.name}!`;
-          detail = { debtId: debt._id, discount: disc, newAmount: debt.amount, creditorName: debt.creditor.name };
-        } else {
-          user.eloRating += 50;
-          description = 'Долгов нет — приз конвертирован в +50 ELO!';
-          detail = { eloChange: 50 };
-        }
+      case 'karma_super_bonus': {
+        user.karma = (user.karma || 0) + prize.value;
+        const { addXP } = require('../utils/battlePassHelper');
+        await addXP(user, 50);
+        description = `Супер-дроп! +300 Кармы и +50 XP Боевого Пропуска!`;
+        detail = { karmaChange: 300, xpChange: 50 };
         break;
       }
     }

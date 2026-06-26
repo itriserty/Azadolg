@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Coins, TrendingUp, TrendingDown, Package, UserPlus, Users, Bell, BellOff, Check, X } from 'lucide-react';
+import { Shield, Coins, TrendingUp, TrendingDown, Package, UserPlus, Users, Bell, BellOff, Check, X, Crown, Trophy } from 'lucide-react';
 
 /**
  * Dashboard.jsx — виджет профиля пользователя с ELO-рейтингом,
@@ -19,7 +19,8 @@ export default function Dashboard({
   onAcceptRequest,
   onRejectRequest,
   onUpdateTelegramId,
-  onUpdateAvatar
+  onUpdateAvatar,
+  isTop3 = false
 }) {
   const [friendUsername, setFriendUsername] = useState('');
   const [tgInput, setTgInput] = useState(user?.telegramId || '');
@@ -52,6 +53,8 @@ export default function Dashboard({
     : user.eloRating >= 1100 ? { label: 'Грандмастер', color: 'text-purple-400 border-purple-500/40 bg-purple-950/30' }
     : user.eloRating >= 1000 ? { label: 'Адепт',       color: 'text-cyan-400   border-cyan-500/40   bg-cyan-950/30'   }
     :                          { label: 'Должник',      color: 'text-gray-400   border-gray-600/40   bg-gray-800/30'   };
+
+  const isVIP = user.eloRating >= 1200 || isTop3;
 
   const handleAddFriendSubmit = async (e) => {
     e.preventDefault();
@@ -87,7 +90,7 @@ export default function Dashboard({
       className="space-y-6"
     >
       {/* 1. КАРТОЧКА ПРОФИЛЯ */}
-      <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-6 shadow-xl shadow-black/40 relative overflow-hidden">
+      <div className={`relative overflow-hidden rounded-2xl p-6 transition-all duration-300 border-2 ${isVIP ? 'border-amber-400 bg-gradient-to-br from-[#241a0d] to-[#151c2c] shadow-[0_0_25px_rgba(245,158,11,0.25)] shadow-amber-500/20' : 'bg-[#151c2c] border-gray-800 shadow-xl shadow-black/40'}`}>
         {/* Декоративный неоновый фон */}
         <div className="absolute -right-20 -top-20 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-16 -bottom-12 w-32 h-32 bg-cyan-500/8 rounded-full blur-3xl pointer-events-none" />
@@ -100,10 +103,10 @@ export default function Dashboard({
                 <img
                   src={user.avatar}
                   alt={user.name}
-                  className="w-12 h-12 rounded-2xl object-cover border border-gray-750 shadow-lg shadow-purple-500/10"
+                  className={`w-12 h-12 rounded-2xl object-cover border shadow-lg ${isVIP ? 'border-amber-400 shadow-amber-500/20' : 'border-gray-750 shadow-purple-500/10'}`}
                 />
               ) : (
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center font-black text-xl text-white shadow-lg shadow-purple-500/20">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl text-white shadow-lg ${isVIP ? 'bg-gradient-to-br from-amber-500 to-yellow-400 border border-amber-300 shadow-amber-500/20' : 'bg-gradient-to-br from-purple-600 to-cyan-500 shadow-purple-500/20'}`}>
                   {user.name.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -113,8 +116,13 @@ export default function Dashboard({
               </label>
             </div>
             <div>
-              <div className="font-bold text-gray-100 flex items-center gap-1.5">
+              <div className="font-bold text-gray-100 flex items-center gap-1.5 flex-wrap">
                 {user.name}
+                {isVIP && (
+                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/30 text-[9px] font-black text-amber-300 uppercase tracking-widest animate-pulse">
+                    <Crown className="w-2.5 h-2.5" /> VIP
+                  </span>
+                )}
                 <span className="text-xs text-gray-500 font-normal">@{user.username}</span>
               </div>
               <div className="text-xs text-gray-500">{user.email}</div>
@@ -209,6 +217,42 @@ export default function Dashboard({
             <div className="bg-red-500/5 border border-red-500/20 p-2.5 rounded-lg">
               <div className="text-gray-500 mb-0.5">Вы должны</div>
               <div className="font-bold text-red-400">-{totalIOwe} ₸</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Игровая Статистика и Достижения */}
+        <div className={`border rounded-xl p-4 mb-4 ${isVIP ? 'border-amber-500/30 bg-amber-500/5' : 'border-gray-850/60 bg-[#0b0f19]/40'}`}>
+          <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-3 flex items-center gap-1.5">
+            <Trophy className="w-3.5 h-3.5 text-yellow-400" />
+            Игровая статистика
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            {/* Серия возвратов вовремя (winStreak) */}
+            <div className="bg-slate-950/40 border border-slate-800/80 p-2.5 rounded-lg flex items-center justify-between">
+              <div>
+                <div className="text-gray-500 text-[10px] uppercase">Серия возвратов</div>
+                <div className="font-black text-white text-base mt-0.5">
+                  {user.winStreak || 0} 🔥
+                </div>
+              </div>
+              <div className="text-2xl">🔥</div>
+            </div>
+
+            {/* Процент успешности возвратов */}
+            <div className="bg-slate-950/40 border border-slate-800/80 p-2.5 rounded-lg flex items-center justify-between">
+              <div>
+                <div className="text-gray-500 text-[10px] uppercase">Успешность</div>
+                <div className="font-black text-emerald-400 text-base mt-0.5">
+                  {user.stats?.totalDebtsPaid > 0 
+                    ? Math.round((user.stats.debtsPaidOnTime / user.stats.totalDebtsPaid) * 100) 
+                    : 0}%
+                </div>
+              </div>
+              <div className="text-xs text-slate-500 leading-tight">
+                {user.stats?.debtsPaidOnTime || 0}/{user.stats?.totalDebtsPaid || 0}
+              </div>
             </div>
           </div>
         </div>

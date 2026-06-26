@@ -38,42 +38,31 @@ async function createDuelChallenge(req, res) {
       return res.status(400).json({ error: 'Бросить вызов можно только другу' });
     }
 
-    // Если дуэль на Карму
-    if (wager && wager > 0) {
-      if (challenger.karma < wager) {
-        return res.status(400).json({ error: `Недостаточно Кармы для ставки. Требуется: ${wager} ₸, у вас: ${challenger.karma} ₸.` });
-      }
+    // Разрешены только ставки на Карму
+    if (debtId) {
+      return res.status(400).json({ error: 'Дуэли на долг запрещены. Разрешены только дуэли на Карму.' });
     }
 
-    // Если дуэль на долг
-    if (debtId) {
-      const debt = await Transaction.findById(debtId);
-      if (!debt) return res.status(404).json({ error: 'Долг не найден' });
-      if (debt.status !== 'active') return res.status(400).json({ error: 'Долг уже закрыт' });
+    if (!wager || wager <= 0) {
+      return res.status(400).json({ error: 'Ставка на Карму обязательна и должна быть больше нуля' });
+    }
 
-      // Проверяем, что дуэлянты — стороны этого долга
-      const isChallengerDebtor = debt.debtor.toString() === challengerId.toString();
-      const isOpponentCreditor = debt.creditor.toString() === opponentId.toString();
-      const isChallengerCreditor = debt.creditor.toString() === challengerId.toString();
-      const isOpponentDebtor = debt.debtor.toString() === opponentId.toString();
-
-      if (!((isChallengerDebtor && isOpponentCreditor) || (isChallengerCreditor && isOpponentDebtor))) {
-        return res.status(400).json({ error: 'Вы можете разыграть долг только с его второй стороной' });
-      }
+    if (challenger.karma < wager) {
+      return res.status(400).json({ error: `Недостаточно Кармы для ставки. Требуется: ${wager} ₸, у вас: ${challenger.karma} ₸.` });
     }
 
     const newDuel = new Duel({
       challenger: challengerId,
       opponent: opponentId,
-      debtId: debtId || null,
-      wager: wager || 0,
+      debtId: null,
+      wager: wager,
       status: 'pending'
     });
     await newDuel.save();
 
     // 📣 Telegram: уведомление о вызове
     const challengeText = `⚔️ <b>${challenger.name}</b> бросил вызов <b>${opponent.name}</b> на дуэль!\n` +
-      (wager ? `🪙 Ставка: <b>${wager} ₸ Кармы</b>\n` : `💸 Ставка: <b>Списание долга (пан или пропал)</b>\n`) +
+      `🪙 Ставка: <b>${wager} ₸ Кармы</b>\n` +
       `🎯 Примите вызов в приложении Azadolg!`;
     
     if (opponent.telegramId) {
@@ -156,26 +145,7 @@ async function respondToDuel(req, res) {
 
       await Promise.all([winner.save(), loser.save()]);
       duelResult = `🪙 Победитель получил <b>+${netWin} ₸ Кармы</b> (с учетом комиссии 1% в Джекпот: ${commission} ₸)`;
-    } else if (duel.debtId) {
-      // Дуэль на долг: Двойной или Ничего!
-      const debt = await Transaction.findById(duel.debtId._id);
-      
-      const isWinnerDebtor = debt.debtor.toString() === winner._id.toString();
 
-      if (isWinnerDebtor) {
-        // Должник победил -> Долг полностью прощается!
-        debt.status = 'paid';
-        debt.amount = 0;
-        debt.resolvedAt = new Date();
-        await debt.save();
-        duelResult = `🎉 Должник выиграл! Долг <b>"${debt.description}"</b> полностью СПИСАН!`;
-      } else {
-        // Кредитор победил -> Долг удваивается!
-        debt.amount = debt.amount * 2;
-        await debt.save();
-        duelResult = `⚡ Кредитор выиграл! Долг <b>"${debt.description}"</b> УДВОЕН! Новая сумма: <b>${debt.amount} ₸</b>.`;
-      }
-    }
 
     duel.status = 'finished';
     duel.winner = winner._id;

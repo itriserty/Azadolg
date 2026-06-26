@@ -83,26 +83,21 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
 
     try {
       setLoading(true);
-      const wagerValue = wagerType === 'karma' ? Number(karmaWager) : 0;
-      const debtValue = wagerType === 'debt' ? selectedDebtId : null;
+      const wagerValue = Number(karmaWager);
 
-      if (wagerType === 'karma' && wagerValue <= 0) {
+      if (wagerValue <= 0) {
         return setError('Ставка кармы должна быть больше нуля');
-      }
-      if (wagerType === 'debt' && !debtValue) {
-        return setError('Выберите долг для розыгрыша');
       }
 
       const res = await api.createDuelChallenge(
         selectedOpponent,
-        debtValue,
+        null,
         wagerValue
       );
       setSuccess(res.message);
       
       // Сброс формы
       setKarmaWager(50);
-      setSelectedDebtId('');
       
       await fetchInitialData();
     } catch (err) {
@@ -275,68 +270,16 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Тип ставки</label>
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setWagerType('karma')}
-                    className={`py-3 rounded-xl font-bold text-sm transition-all border ${
-                      wagerType === 'karma'
-                        ? 'bg-indigo-600/20 border-indigo-500 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    🪙 Карма
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setWagerType('debt')}
-                    className={`py-3 rounded-xl font-bold text-sm transition-all border ${
-                      wagerType === 'debt'
-                        ? 'bg-indigo-600/20 border-indigo-500 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    💸 Долг
-                  </button>
-                </div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Размер ставки (Карма)</label>
+                <input
+                  type="number"
+                  value={karmaWager}
+                  onChange={(e) => setKarmaWager(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:border-indigo-500 focus:outline-none"
+                  placeholder="Например, 100"
+                  min="1"
+                />
               </div>
-
-              {wagerType === 'karma' ? (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Размер ставки (Карма)</label>
-                  <input
-                    type="number"
-                    value={karmaWager}
-                    onChange={(e) => setKarmaWager(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:border-indigo-500 focus:outline-none"
-                    placeholder="Например, 100"
-                    min="1"
-                  />
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Связанный долг</label>
-                  {duelDebts.length === 0 ? (
-                    <div className="text-xs text-slate-500 bg-slate-950/60 p-3 border border-slate-800 rounded-xl">
-                      У вас нет активных взаимных долгов с этим другом.
-                    </div>
-                  ) : (
-                    <select
-                      value={selectedDebtId}
-                      onChange={(e) => setSelectedDebtId(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:border-indigo-500 focus:outline-none"
-                    >
-                      <option value="">Выберите долг...</option>
-                      {duelDebts.map(d => (
-                        <option key={d._id} value={d._id}>
-                          {d.description} ({d.amount} ₸)
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
 
               <button
                 type="submit"
@@ -372,7 +315,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
                           {otherUser.name} (@{otherUser.username})
                         </div>
                         <div className="text-xs text-indigo-400 mt-1">
-                          {duel.wager > 0 ? `Ставка: ${duel.wager} ₸ Кармы` : `Ставка: Розыгрыш долга "${duel.debtId?.description || 'Долг'}"`}
+                          Ставка: {duel.wager} ₸ Кармы
                         </div>
                       </div>
 

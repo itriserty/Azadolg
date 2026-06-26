@@ -577,6 +577,7 @@ export default function App() {
               onRejectRequest={handleRejectRequest}
               onUpdateTelegramId={handleUpdateTelegramId}
               onUpdateAvatar={handleUpdateAvatar}
+              isTop3={users.slice(0, 3).some(u => u._id === currentUser?._id)}
             />
 
             {/* Рулетка кейсов (показываем/скрываем по кнопке в Dashboard) */}

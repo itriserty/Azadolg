@@ -4,10 +4,10 @@ import { Coins, Gift, AlertCircle, RefreshCw, X } from 'lucide-react';
 
 // Полный пул карточек рулетки (должен соответствовать типам с бэкенда)
 const TAPE_POOL = [
-  { type: 'penalty',        label: '-10 ELO',    color: 'border-gray-600  bg-gray-900/80     text-gray-300',             emoji: '🤬', rarity: 'Ширпотреб'   },
-  { type: 'cashback',       label: '+150 Coins',  color: 'border-cyan-500  bg-cyan-950/50     text-cyan-400',             emoji: '🪙', rarity: 'Армейское'   },
-  { type: 'elo_bonus',      label: '+50 ELO',     color: 'border-purple-500 bg-purple-950/50 text-purple-400',            emoji: '🔥', rarity: 'Запрещенное' },
-  { type: 'debt_reduction', label: '-5% Долга',   color: 'border-yellow-400 bg-yellow-950/50 text-yellow-300 shadow-yellow-400/20 shadow-md', emoji: '⭐', rarity: 'Тайное ⭐'   }
+  { type: 'penalty',           label: '-10 ELO',               color: 'border-gray-600  bg-gray-900/80     text-gray-300',             emoji: '🤬', rarity: 'Ширпотреб'   },
+  { type: 'cashback',          label: '+150 Coins',            color: 'border-cyan-500  bg-cyan-950/50     text-cyan-400',             emoji: '🪙', rarity: 'Армейское'   },
+  { type: 'elo_bonus',         label: '+50 ELO',               color: 'border-purple-500 bg-purple-950/50 text-purple-400',            emoji: '🔥', rarity: 'Запрещенное' },
+  { type: 'karma_super_bonus', label: '+300 Кармы & +50 XP',   color: 'border-yellow-400 bg-yellow-950/50 text-yellow-300 shadow-yellow-400/20 shadow-md', emoji: '💎', rarity: 'Тайное ⭐'   }
 ];
 
 const CARD_WIDTH = 130;
@@ -34,7 +34,7 @@ export default function CaseRoulette({ user, onOpenCase, onUserUpdate }) {
       if (i === WIN_INDEX && winType) {
         item = TAPE_POOL.find(p => p.type === winType) || TAPE_POOL[2];
       } else {
-        const weights = [20, 20, 35, 25]; // penalty, cashback, elo_bonus, debt_reduction
+        const weights = [20, 20, 35, 25]; // penalty, cashback, elo_bonus, karma_super_bonus
         const total = weights.reduce((a, b) => a + b, 0);
         let r = Math.random() * total;
         let idx = 0;
@@ -59,7 +59,7 @@ export default function CaseRoulette({ user, onOpenCase, onUserUpdate }) {
       const result = await onOpenCase();
       const winType = result.drop.type === 'penalty' ? 'penalty'
                     : result.drop.type === 'elo_bonus' ? 'elo_bonus'
-                    : result.drop.type === 'debt_reduction' ? 'debt_reduction'
+                    : result.drop.type === 'karma_super_bonus' ? 'karma_super_bonus'
                     : 'cashback';
 
       // 2. Перестраиваем ленту с выигрышем на позиции WIN_INDEX
