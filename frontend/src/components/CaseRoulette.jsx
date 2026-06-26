@@ -48,7 +48,7 @@ export default function CaseRoulette({ user, onOpenCase, onUserUpdate }) {
   };
 
   const handleSpin = async () => {
-    if (spinning || !user || user.coins < 100) return;
+    if (spinning || !user || user.karma < 100) return;
     setError('');
     setSpinning(true);
     setWonPrize(null);
@@ -98,7 +98,7 @@ export default function CaseRoulette({ user, onOpenCase, onUserUpdate }) {
     }
   };
 
-  const coins = user?.coins ?? 0;
+  const karma = user?.karma ?? 0;
 
   return (
     <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-6 shadow-xl shadow-black/40 text-center relative overflow-hidden">
@@ -109,20 +109,20 @@ export default function CaseRoulette({ user, onOpenCase, onUserUpdate }) {
           Azadolg Case — CS2 Style
         </div>
         <p className="text-xs text-gray-500 max-w-xs">
-          Тратьте 100 Coins, крутите рулетку и получайте призы!
+          Тратьте 100 Кармы, крутите рулетку и получайте призы!
         </p>
       </div>
 
       {/* Баланс */}
       <div className="flex justify-center mb-5">
         <div className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border font-black text-sm ${
-          coins >= 100
+          karma >= 100
             ? 'bg-yellow-400/15 text-yellow-300 border-yellow-400/30'
             : 'bg-red-500/10 text-red-400 border-red-500/30'
         }`}>
-          <Coins className="w-4 h-4" />
-          {coins} Coins
-          {coins < 100 && <span className="text-[10px] ml-1 font-normal">(мало)</span>}
+          <Coins className="w-4 h-4 text-emerald-400" />
+          {karma} Карма
+          {karma < 100 && <span className="text-[10px] ml-1 font-normal">(мало)</span>}
         </div>
       </div>
 
@@ -168,12 +168,12 @@ export default function CaseRoulette({ user, onOpenCase, onUserUpdate }) {
       {/* Кнопка открытия кейса */}
       <button
         onClick={handleSpin}
-        disabled={spinning || coins < 100}
+        disabled={spinning || karma < 100}
         className="w-full max-w-[240px] mx-auto block bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-bold py-3 px-6 rounded-xl hover:opacity-90 shadow-purple-500/20 shadow-md transition disabled:opacity-40 disabled:cursor-not-allowed text-sm"
       >
         {spinning
           ? <span className="flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4 animate-spin" />Вращается...</span>
-          : '🎲 Испытать удачу (100 Coins)'
+          : '🎲 Испытать удачу (100 Кармы)'
         }
       </button>
 

@@ -112,7 +112,7 @@ export default function Leaderboard({ users, currentUser }) {
                   </div>
                   <div className="text-[11px] text-gray-500 flex items-center gap-1">
                     <Coins className="w-3 h-3 text-emerald-400" />
-                    {user.karma !== undefined ? user.karma : user.coins} ₸ Кармы
+                    {user.karma} Карма
                   </div>
                 </div>
               </div>

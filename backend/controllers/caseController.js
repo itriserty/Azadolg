@@ -8,7 +8,7 @@ const PRIZE_POOL = [
   { type: 'penalty',           value: -10,  weight: 20, label: '-10 ELO',    emoji: '🤬', rarity: 'Ширпотреб'   },
   { type: 'elo_bonus',         value:  50,  weight: 35, label: '+50 ELO',    emoji: '🔥', rarity: 'Запрещенное' },
   { type: 'karma_super_bonus', value: 300,  weight: 25, label: '+300 Кармы & +50 XP', emoji: '💎', rarity: 'Тайное' },
-  { type: 'cashback',          value: 150,  weight: 20, label: '+150 Coins', emoji: '🪙', rarity: 'Армейское'   }
+  { type: 'cashback',          value: 150,  weight: 20, label: '+150 Кармы', emoji: '🪙', rarity: 'Армейское'   }
 ];
 
 function selectWeightedPrize() {
@@ -26,10 +26,10 @@ async function openCase(req, res) {
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
-    if (user.coins < CASE_COST)
-      return res.status(400).json({ error: `Недостаточно монет. Нужно ${CASE_COST} Coins, у вас ${user.coins}.` });
+    if (user.karma < CASE_COST)
+      return res.status(400).json({ error: `Недостаточно Кармы. Нужно ${CASE_COST} Кармы, у вас ${user.karma}.` });
 
-    user.coins -= CASE_COST;
+    user.karma -= CASE_COST;
 
     const prize = selectWeightedPrize();
     let description = '';
@@ -50,9 +50,9 @@ async function openCase(req, res) {
         break;
       }
       case 'cashback': {
-        user.coins += prize.value;
-        description = `Кэшбек! +${prize.value} Coins!`;
-        detail = { coinsChange: prize.value };
+        user.karma += prize.value;
+        description = `Кэшбек! +${prize.value} Кармы!`;
+        detail = { karmaChange: prize.value };
         break;
       }
       case 'karma_super_bonus': {
@@ -79,7 +79,7 @@ async function openCase(req, res) {
     res.status(200).json({
       message: 'Кейс успешно открыт!',
       drop: { type: prize.type, value: prize.value, label: prize.label, emoji: prize.emoji, rarity: prize.rarity, description, detail },
-      user: { _id: user._id, name: user.name, coins: user.coins, eloRating: user.eloRating }
+      user: { _id: user._id, name: user.name, coins: user.coins, karma: user.karma, eloRating: user.eloRating }
     });
   } catch (error) {
     console.error('Ошибка при открытии кейса:', error);

@@ -257,14 +257,14 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* Нижняя строка: Coins + кнопка кейса */}
+        {/* Нижняя строка: Карма + кнопка кейса */}
         <div className="flex items-center justify-between gap-3">
-          {/* Баланс монет */}
-          <div className="flex items-center gap-2 bg-yellow-400/10 border border-yellow-400/25 px-3 py-2 rounded-xl">
-            <Coins className="w-4 h-4 text-yellow-300" />
+          {/* Баланс Кармы */}
+          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/25 px-3 py-2 rounded-xl">
+            <Coins className="w-4 h-4 text-emerald-400" />
             <div>
-              <div className="text-[10px] text-gray-500 leading-none">Монеты</div>
-              <div className="font-black text-yellow-300 text-sm leading-tight">{user.coins} Coins</div>
+              <div className="text-[10px] text-gray-500 leading-none">Ваша Карма</div>
+              <div className="font-black text-emerald-400 text-sm leading-tight">{user.karma} Карма</div>
             </div>
           </div>
 
@@ -273,12 +273,12 @@ export default function Dashboard({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={onOpenCaseClick}
-            disabled={user.coins < 100}
+            disabled={user.karma < 100}
             className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-bold py-2.5 px-4 rounded-xl text-sm shadow-purple-500/20 shadow-md hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Package className="w-4 h-4" />
             Открыть кейс
-            {user.coins >= 100 && <span className="text-[10px] opacity-75">(-100 Coins)</span>}
+            {user.karma >= 100 && <span className="text-[10px] opacity-75">(-100 Кармы)</span>}
           </motion.button>
         </div>
       </div>
@@ -387,7 +387,7 @@ export default function Dashboard({
                   </div>
                   <div className="text-right">
                     <div className={`text-xs font-bold ${rank}`}>{friend.eloRating} ELO</div>
-                    <div className="text-[9px] text-gray-500 font-mono">{friend.karma !== undefined ? friend.karma : friend.coins} Карма</div>
+                    <div className="text-[9px] text-gray-500 font-mono">{friend.karma} Карма</div>
                   </div>
                 </div>
               );
