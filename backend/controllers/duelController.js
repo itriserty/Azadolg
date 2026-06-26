@@ -145,7 +145,7 @@ async function respondToDuel(req, res) {
 
       await Promise.all([winner.save(), loser.save()]);
       duelResult = `🪙 Победитель получил <b>+${netWin} ₸ Кармы</b> (с учетом комиссии 1% в Джекпот: ${commission} ₸)`;
-
+    }
 
     duel.status = 'finished';
     duel.winner = winner._id;
