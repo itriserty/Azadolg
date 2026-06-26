@@ -7,7 +7,7 @@ services:
     # Команда сборки: ставим все зависимости и собираем React
     buildCommand: |
       npm install --prefix backend &&
-      npm install --prefix frontend &&
+      npm install --prefix frontend --production=false &&
       npm run build --prefix frontend
 
     # Команда запуска: только бэкенд (он сам отдаёт собранный frontend/dist)
