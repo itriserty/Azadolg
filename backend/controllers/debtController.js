@@ -118,14 +118,49 @@ async function payDebt(req, res) {
     const { debtorElo, creditorElo, coinsReward, isOverdue } = calculateEloChange(transaction, now);
     const finalAmount = getCalculatedAmount(transaction, now);
 
+    let finalDebtorElo = debtorElo;
+    let finalCreditorElo = creditorElo;
+    let finalCoinsReward = coinsReward;
+    let note = '';
+    let isFarm = false;
+
+    // Ограничение 1: Минимальная сумма долга 500 ₸
+    if (transaction.originalAmount < 500) {
+      finalDebtorElo = 0;
+      finalCreditorElo = 0;
+      finalCoinsReward = 0;
+      note = 'Сумма долга менее 500 ₸ (защита от накрутки рейтинга). ELO и Карма не изменены.';
+      isFarm = true;
+    }
+
+    // Ограничение 2: Лимит транзакций между друзьями (не более 1 за 24 часа для получения ELO/Кармы)
+    if (!isFarm) {
+      const startOfToday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const recentClosedCount = await Transaction.countDocuments({
+        status: 'paid',
+        resolvedAt: { $gte: startOfToday },
+        $or: [
+          { debtor: transaction.debtor, creditor: transaction.creditor },
+          { debtor: transaction.creditor, creditor: transaction.debtor }
+        ]
+      });
+
+      if (recentClosedCount > 0) {
+        finalDebtorElo = 0;
+        finalCreditorElo = 0;
+        finalCoinsReward = 0;
+        note = 'Превышен лимит (макс. 1 возврат в 24 часа между этими друзьями для ELO/Кармы).';
+      }
+    }
+
     transaction.status     = 'paid';
     transaction.amount     = finalAmount;
     transaction.resolvedAt = now;
     await transaction.save();
 
     const [debtor, creditor] = await Promise.all([
-      User.findByIdAndUpdate(transaction.debtor,   { $inc: { eloRating: debtorElo,  coins: coinsReward } }, { new: true }),
-      User.findByIdAndUpdate(transaction.creditor, { $inc: { eloRating: creditorElo } }, { new: true })
+      User.findByIdAndUpdate(transaction.debtor,   { $inc: { eloRating: finalDebtorElo, coins: finalCoinsReward, karma: finalCoinsReward } }, { new: true }),
+      User.findByIdAndUpdate(transaction.creditor, { $inc: { eloRating: finalCreditorElo } }, { new: true })
     ]);
 
     // ELO не ниже 100
@@ -137,18 +172,20 @@ async function payDebt(req, res) {
       debtorName:     debtor?.name   || 'Неизвестно',
       creditorName:   creditor?.name || 'Неизвестно',
       amount:         finalAmount,
-      eloChangeDebtor: debtorElo,
-      coinsEarned:    coinsReward,
+      eloChangeDebtor: finalDebtorElo,
+      coinsEarned:    finalCoinsReward,
       isOverdue,
-      debtorTelegramId: debtor?.telegramId
+      debtorTelegramId: debtor?.telegramId,
+      note
     });
 
     res.status(200).json({
       message: 'Долг успешно оплачен!',
+      note,
       transaction,
       rewards: {
-        debtor:   { name: debtor?.name,   eloChange: debtorElo,  newElo: debtor?.eloRating,   coinsEarned: coinsReward },
-        creditor: { name: creditor?.name, eloChange: creditorElo, newElo: creditor?.eloRating }
+        debtor:   { name: debtor?.name,   eloChange: finalDebtorElo,  newElo: debtor?.eloRating,   coinsEarned: finalCoinsReward },
+        creditor: { name: creditor?.name, eloChange: finalCreditorElo, newElo: creditor?.eloRating }
       }
     });
   } catch (error) {
