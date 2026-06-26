@@ -41,12 +41,18 @@ export default function Leaderboard({ users, currentUser }) {
                   }
                 </div>
 
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                  isTop
-                    ? 'bg-gradient-to-tr from-yellow-400 to-yellow-500 text-[#0b0f19]'
-                    : 'bg-gray-800 text-gray-300'
-                }`}>
-                  {user.name.charAt(0).toUpperCase()}
+                <div className="w-8 h-8 rounded-full overflow-hidden shrink-0">
+                  {user.avatar ? (
+                    <img src={user.avatar} alt={user.name} className="w-8 h-8 object-cover" />
+                  ) : (
+                    <div className={`w-8 h-8 flex items-center justify-center font-bold text-sm ${
+                      isTop
+                        ? 'bg-gradient-to-tr from-yellow-400 to-yellow-500 text-[#0b0f19]'
+                        : 'bg-gray-800 text-gray-300'
+                    }`}>
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -60,7 +66,7 @@ export default function Leaderboard({ users, currentUser }) {
                   </div>
                   <div className="text-[11px] text-gray-500 flex items-center gap-1">
                     <Coins className="w-3 h-3 text-yellow-400" />
-                    {user.coins} Coins
+                    {user.karma !== undefined ? user.karma : user.coins} Карма
                   </div>
                 </div>
               </div>

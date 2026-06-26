@@ -18,13 +18,31 @@ export default function Dashboard({
   onAddFriend,
   onAcceptRequest,
   onRejectRequest,
-  onUpdateTelegramId
+  onUpdateTelegramId,
+  onUpdateAvatar
 }) {
   const [friendUsername, setFriendUsername] = useState('');
   const [tgInput, setTgInput] = useState(user?.telegramId || '');
   const [isEditingTg, setIsEditingTg] = useState(false);
   const [friendError, setFriendError] = useState('');
   const [friendSuccess, setFriendSuccess] = useState('');
+
+  const handleAvatarUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        if (onUpdateAvatar) {
+          await onUpdateAvatar(reader.result);
+        }
+      } catch (err) {
+        console.error('Ошибка загрузки аватара:', err);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   if (!user) return null;
 
@@ -77,8 +95,22 @@ export default function Dashboard({
         {/* Верхняя строка: аватар + имя + ранг */}
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center font-black text-xl text-white shadow-lg shadow-purple-500/20 shrink-0">
-              {user.name.charAt(0).toUpperCase()}
+            <div className="relative group w-12 h-12 shrink-0">
+              {user.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={user.name}
+                  className="w-12 h-12 rounded-2xl object-cover border border-gray-750 shadow-lg shadow-purple-500/10"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center font-black text-xl text-white shadow-lg shadow-purple-500/20">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <label className="absolute inset-0 rounded-2xl bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity">
+                <span className="text-[9px] font-bold text-gray-255">Сменить</span>
+                <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+              </label>
             </div>
             <div>
               <div className="font-bold text-gray-100 flex items-center gap-1.5">
@@ -295,8 +327,14 @@ export default function Dashboard({
                   className="flex items-center justify-between p-2.5 bg-[#0b0f19]/40 border border-gray-850/40 rounded-xl hover:border-gray-800/80 transition"
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center font-bold text-xs text-gray-300">
-                      {friend.name.charAt(0).toUpperCase()}
+                    <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
+                      {friend.avatar ? (
+                        <img src={friend.avatar} alt={friend.name} className="w-8 h-8 object-cover" />
+                      ) : (
+                        <div className="w-8 h-8 bg-gray-800 flex items-center justify-center font-bold text-xs text-gray-300">
+                          {friend.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <div className="text-xs font-bold text-gray-200">{friend.name}</div>
@@ -305,7 +343,7 @@ export default function Dashboard({
                   </div>
                   <div className="text-right">
                     <div className={`text-xs font-bold ${rank}`}>{friend.eloRating} ELO</div>
-                    <div className="text-[9px] text-gray-500 font-mono">{friend.coins} Coins</div>
+                    <div className="text-[9px] text-gray-500 font-mono">{friend.karma !== undefined ? friend.karma : friend.coins} Карма</div>
                   </div>
                 </div>
               );

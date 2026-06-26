@@ -97,10 +97,34 @@ async function updateTelegramId(req, res) {
   }
 }
 
+// Обновить аватар пользователя (поддерживает URL или Base64)
+async function updateAvatar(req, res) {
+  try {
+    const { avatar } = req.body;
+    const userId = req.user;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { avatar },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+
+    res.status(200).json({ message: 'Аватар профиля успешно обновлен!', user });
+  } catch (error) {
+    console.error('Ошибка обновления аватара:', error);
+    res.status(500).json({ error: 'Ошибка сервера при обновлении аватара' });
+  }
+}
+
 module.exports = {
   getUsers,
   getLeaderboard,
   createUser,
   addFriend,
-  updateTelegramId
+  updateTelegramId,
+  updateAvatar
 };

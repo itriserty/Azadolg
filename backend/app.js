@@ -57,6 +57,19 @@ async function seedDatabase() {
   const Transaction = require('./models/Transaction');
   const bcrypt      = require('bcryptjs');
 
+  // Очистка БД от устаревших учетных записей (без логина/пароля), чтобы не засорять ленту
+  const deletedLegacy = await User.deleteMany({
+    $or: [
+      { username: { $exists: false } },
+      { username: null },
+      { password: { $exists: false } },
+      { password: null }
+    ]
+  });
+  if (deletedLegacy.deletedCount > 0) {
+    console.log(`[SEED] Удалено ${deletedLegacy.deletedCount} устаревших аккаунтов без логина/пароля.`);
+  }
+
   const count = await User.countDocuments();
   if (count > 0) {
     console.log(`[SEED] БД уже содержит ${count} пользователей. Пропускаем seed.`);

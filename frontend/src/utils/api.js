@@ -27,6 +27,7 @@ export const api = {
   login:             (username, password) => request('/users/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   getMe:             () => request('/users/me'),
   updateTelegramId:  (telegramId) => request('/users/telegram', { method: 'PUT', body: JSON.stringify({ telegramId }) }),
+  updateAvatar:      (avatar) => request('/users/avatar', { method: 'PUT', body: JSON.stringify({ avatar }) }),
 
   // Пользователи
   getUsers:       ()              => request('/users'),

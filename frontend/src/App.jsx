@@ -171,6 +171,17 @@ export default function App() {
     alert(res.message || 'Telegram ID успешно обновлен!');
   };
 
+  const handleUpdateAvatar = async (avatarBase64) => {
+    try {
+      const res = await api.updateAvatar(avatarBase64);
+      setCurrentUser(res.user);
+      const leaderData = await api.getLeaderboard();
+      setUsers(leaderData);
+    } catch (err) {
+      alert(err.message || 'Ошибка обновления аватара');
+    }
+  };
+
   const handleCreateDebt = async (debtData) => {
     try {
       await api.createDebt(debtData);
@@ -431,6 +442,7 @@ export default function App() {
               onAcceptRequest={handleAcceptRequest}
               onRejectRequest={handleRejectRequest}
               onUpdateTelegramId={handleUpdateTelegramId}
+              onUpdateAvatar={handleUpdateAvatar}
             />
 
             {/* Рулетка кейсов (показываем/скрываем по кнопке в Dashboard) */}

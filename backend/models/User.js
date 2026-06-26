@@ -66,6 +66,10 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: 'none' // Рамка профиля
   },
+  avatar: {
+    type: String,
+    default: null // URL или Base64 строка фотографии профиля
+  },
   friends: [{ 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User' 
