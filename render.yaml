@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: azadolg
+    runtime: node
+    region: frankfurt          # Ближайший к РФ датацентр Render
+
+    # Команда сборки: ставим все зависимости и собираем React
+    buildCommand: |
+      npm install --prefix backend &&
+      npm install --prefix frontend &&
+      npm run build --prefix frontend
+
+    # Команда запуска: только бэкенд (он сам отдаёт собранный frontend/dist)
+    startCommand: npm start --prefix backend
+
+    # Переменные окружения — задаются в Dashboard Render (не хранятся в git!)
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false            # ← вставить значение вручную в Render Dashboard
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false            # ← токен бота из @BotFather
+      - key: TELEGRAM_CHAT_ID
+        sync: false            # ← ID вашего чата/группы

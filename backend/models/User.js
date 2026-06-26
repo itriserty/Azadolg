@@ -13,13 +13,13 @@ const UserSchema = new mongoose.Schema({
     trim: true,
     lowercase: true
   },
-  karma: { 
+  eloRating: { 
     type: Number, 
-    default: 0 
+    default: 1000 // Стартовый ELO-рейтинг (Карма)
   },
-  balance: { 
+  coins: { 
     type: Number, 
-    default: 10000 // Начальный баланс монет для покупок на маркете
+    default: 200 // Стартовое количество монет
   },
   friends: [{ 
     type: mongoose.Schema.Types.ObjectId, 
