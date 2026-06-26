@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
-  name: { 
-    type: String, 
+  name: {
+    type: String,
     required: true,
     trim: true
   },
@@ -17,73 +17,86 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  email: { 
-    type: String, 
-    required: true, 
+  email: {
+    type: String,
+    required: true,
     unique: true,
     trim: true,
     lowercase: true
   },
+  // ── Роль ─────────────────────────────────────────────────────────────────────
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
+  },
+  // ── Бан ──────────────────────────────────────────────────────────────────────
+  isBanned: {
+    type: Boolean,
+    default: false
+  },
+  bannedReason: {
+    type: String,
+    default: null
+  },
+  bannedAt: {
+    type: Date,
+    default: null
+  },
+  // ── Telegram ──────────────────────────────────────────────────────────────────
   telegramId: {
     type: String,
     default: null
   },
-  eloRating: { 
-    type: Number, 
-    default: 1000 // Стартовый ELO-рейтинг (Карма)
+  // ── Игровые показатели ────────────────────────────────────────────────────────
+  eloRating: {
+    type: Number,
+    default: 1000
   },
-  coins: { 
-    type: Number, 
-    default: 200 // Стартовое количество монет
+  coins: {
+    type: Number,
+    default: 200
   },
   karma: {
     type: Number,
-    default: 200 // Игровая Карма (основная валюта магазина)
+    default: 200
   },
   winStreak: {
     type: Number,
-    default: 0 // Серия закрытия долгов вовремя
+    default: 0
   },
+  // ── Расширенная статистика ────────────────────────────────────────────────────
   stats: {
-    totalDebtsCreated: { type: Number, default: 0 },
-    totalDebtsPaid: { type: Number, default: 0 },
-    debtsPaidOnTime: { type: Number, default: 0 },
-    totalKarmaEarned: { type: Number, default: 0 }
+    totalDebtsCreated:        { type: Number, default: 0 },
+    totalDebtsPaid:           { type: Number, default: 0 },
+    debtsPaidOnTime:          { type: Number, default: 0 },
+    totalKarmaEarned:         { type: Number, default: 0 },
+    totalDebtsForgivenByMe:   { type: Number, default: 0 }, // сколько простил
+    totalKarmaWeeklyReceived: { type: Number, default: 0 }, // итого от еженедельного бонуса
+    totalDebtsWitnessed:      { type: Number, default: 0 }  // сколько раз был свидетелем
   },
-  battlePassLevel: {
-    type: Number,
-    default: 1
-  },
-  battlePassXP: {
-    type: Number,
-    default: 0 // 100 XP на уровень
-  },
-  activeProfileSkin: {
-    type: String,
-    default: 'default' // Косметический скин профиля
-  },
-  activeProfileFrame: {
-    type: String,
-    default: 'none' // Рамка профиля
-  },
-  avatar: {
-    type: String,
-    default: null // URL или Base64 строка фотографии профиля
-  },
-  resetCode: {
-    type: String,
-    default: null
-  },
-  resetCodeExpires: {
+  // ── Battle Pass ───────────────────────────────────────────────────────────────
+  battlePassLevel: { type: Number, default: 1 },
+  battlePassXP:    { type: Number, default: 0 },
+  // ── Косметика ─────────────────────────────────────────────────────────────────
+  activeProfileSkin:  { type: String, default: 'default' },
+  activeProfileFrame: { type: String, default: 'none'    },
+  avatar:             { type: String, default: null       },
+  // ── Сброс пароля ──────────────────────────────────────────────────────────────
+  resetCode:         { type: String, default: null },
+  resetCodeExpires:  { type: Date,   default: null },
+  // ── Социальное ────────────────────────────────────────────────────────────────
+  friends: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  // ── Последний логин (для проверки активности) ─────────────────────────────────
+  lastLoginAt: {
     type: Date,
     default: null
-  },
-  friends: [{ 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User' 
-  }]
-}, { 
-  timestamps: true 
+  }
+}, {
+  timestamps: true
 });
 
 module.exports = mongoose.model('User', UserSchema);

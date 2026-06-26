@@ -4,16 +4,17 @@ const mongoose = require('mongoose');
 const cors     = require('cors');
 const path     = require('path');
 
-const userRoutes = require('./routes/userRoutes');
-const debtRoutes = require('./routes/debtRoutes');
-const caseRoutes = require('./routes/caseRoutes');
+const userRoutes  = require('./routes/userRoutes');
+const debtRoutes  = require('./routes/debtRoutes');
+const caseRoutes  = require('./routes/caseRoutes');
 const friendRoutes = require('./routes/friendRoutes');
-const shopRoutes = require('./routes/shopRoutes');
+const shopRoutes  = require('./routes/shopRoutes');
 const gachaRoutes = require('./routes/gachaRoutes');
-const duelRoutes = require('./routes/duelRoutes');
-const betRoutes = require('./routes/betRoutes');
-const fundRoutes = require('./routes/fundRoutes');
+const duelRoutes  = require('./routes/duelRoutes');
+const betRoutes   = require('./routes/betRoutes');
+const fundRoutes  = require('./routes/fundRoutes');
 const questRoutes = require('./routes/questRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const { startReminderScheduler } = require('./services/reminderService');
 const { startCronScheduler } = require('./services/cronService');
 
@@ -42,6 +43,10 @@ app.use('/api/duel', duelRoutes);
 app.use('/api/bets', betRoutes);
 app.use('/api/fund', fundRoutes);
 app.use('/api/quests', questRoutes);
+app.use('/api/admin', adminRoutes);
+
+// Статика загруженных пруфов оплаты
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Верхнеуровневые роуты (требуемые по заданию)
 const authMiddleware = require('./middlewares/authMiddleware');

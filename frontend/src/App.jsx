@@ -9,7 +9,8 @@ import Shop           from './components/Shop';
 import DuelsAndBets   from './components/DuelsAndBets';
 import SocialBoard    from './components/SocialBoard';
 import BattlePass     from './components/BattlePass';
-import { LogOut, Lock, Mail, User as UserIcon, HelpCircle } from 'lucide-react';
+import AdminPanel     from './components/AdminPanel';
+import { LogOut, Lock, Mail, User as UserIcon, HelpCircle, Shield } from 'lucide-react';
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
@@ -267,6 +268,70 @@ export default function App() {
     } catch (err) {
       alert(err.message || 'Ошибка отклонения');
     }
+  };
+
+  // ── Свидетель ────────────────────────────────────────────────────────────────
+  const handleWitnessDecision = async (transactionId, action) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/debts/${transactionId}/witness`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      alert(data.message);
+      if (currentUser) setDebts(await api.getDebts(currentUser._id));
+    } catch (err) { alert(err.message); }
+  };
+
+  // ── Загрузка пруфа оплаты (FormData) ─────────────────────────────────────────
+  const handlePayProof = async (transactionId, formData) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/debts/${transactionId}/pay-proof`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }, // НЕ ставим Content-Type — multer сам определит
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Ошибка загрузки пруфа');
+    alert(data.message);
+    if (currentUser) {
+      setDebts(await api.getDebts(currentUser._id));
+      setCurrentUser(await api.getMe());
+    }
+    setUsers(await api.getLeaderboard());
+    return data;
+  };
+
+  // ── Прощение долга ────────────────────────────────────────────────────────────
+  const handleForgiveDebt = async (transactionId) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/debts/${transactionId}/forgive`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    alert(data.message);
+    if (currentUser) setDebts(await api.getDebts(currentUser._id));
+    setCurrentUser(await api.getMe());
+    setUsers(await api.getLeaderboard());
+  };
+
+  // ── Передача долга ────────────────────────────────────────────────────────────
+  const handleTransferDebt = async (transactionId, newDebtorId) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/debts/${transactionId}/transfer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ newDebtorId })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    alert(data.message);
+    if (currentUser) setDebts(await api.getDebts(currentUser._id));
   };
 
   const handleUserUpdate = (updatedUser) => {
@@ -597,56 +662,24 @@ export default function App() {
           <div className="lg:col-span-7 space-y-6">
             {/* Панель вкладок */}
             <div className="flex flex-wrap bg-[#151c2c]/85 border border-gray-800 p-1.5 rounded-2xl gap-1">
-              <button
-                onClick={() => setActiveTab('debts')}
-                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
-                  activeTab === 'debts'
-                    ? 'bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/10'
-                    : 'text-gray-400 hover:text-gray-250 border border-transparent'
-                }`}
-              >
-                💸 Долги
-              </button>
-              <button
-                onClick={() => setActiveTab('duels')}
-                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
-                  activeTab === 'duels'
-                    ? 'bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/10'
-                    : 'text-gray-400 hover:text-gray-250 border border-transparent'
-                }`}
-              >
-                ⚔️ Дуэли и Ставки
-              </button>
-              <button
-                onClick={() => setActiveTab('social')}
-                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
-                  activeTab === 'social'
-                    ? 'bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/10'
-                    : 'text-gray-400 hover:text-gray-250 border border-transparent'
-                }`}
-              >
-                🏺 Община
-              </button>
-              <button
-                onClick={() => setActiveTab('battlepass')}
-                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
-                  activeTab === 'battlepass'
-                    ? 'bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/10'
-                    : 'text-gray-400 hover:text-gray-250 border border-transparent'
-                }`}
-              >
-                🎒 Battle Pass
-              </button>
-              <button
-                onClick={() => setActiveTab('shop')}
-                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
-                  activeTab === 'shop'
-                    ? 'bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/10'
-                    : 'text-gray-400 hover:text-gray-250 border border-transparent'
-                }`}
-              >
-                🛒 Магазин
-              </button>
+              {[['debts','💸 Долги'],['duels','⚔️ Дуэли и Ставки'],['social','🏺 Община'],['battlepass','🎒 Battle Pass'],['shop','🛒 Магазин']].map(([tab, label]) => (
+                <button key={tab} onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                    activeTab === tab
+                      ? 'bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/10'
+                      : 'text-gray-400 hover:text-gray-250 border border-transparent'
+                  }`}>{label}</button>
+              ))}
+              {currentUser?.role === 'admin' && (
+                <button onClick={() => setActiveTab('admin')}
+                  className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1 ${
+                    activeTab === 'admin'
+                      ? 'bg-purple-600/20 border border-purple-500/30 text-purple-400 font-extrabold shadow shadow-purple-500/10'
+                      : 'text-gray-500 hover:text-purple-400 border border-transparent'
+                  }`}>
+                  <Shield className="w-3.5 h-3.5" /> Админ
+                </button>
+              )}
             </div>
 
             {/* Контент активной вкладки */}
@@ -657,13 +690,17 @@ export default function App() {
                   currentUser={currentUser}
                   onSubmit={handleCreateDebt}
                 />
-
                 <DebtList
                   debts={debts}
                   currentUser={currentUser}
                   onPay={handlePayDebt}
                   onConfirm={handleConfirmDebt}
                   onDecline={handleDeclineDebt}
+                  onWitness={handleWitnessDecision}
+                  onPayProof={handlePayProof}
+                  onForgive={handleForgiveDebt}
+                  onTransfer={handleTransferDebt}
+                  friends={friends}
                 />
               </div>
             )}
@@ -682,6 +719,10 @@ export default function App() {
 
             {activeTab === 'shop' && (
               <Shop user={currentUser} onUpdateUser={handleUserUpdate} />
+            )}
+
+            {activeTab === 'admin' && currentUser?.role === 'admin' && (
+              <AdminPanel token={localStorage.getItem('token')} />
             )}
           </div>
         </div>

@@ -111,22 +111,71 @@ async function checkSeasonReset() {
   }
 }
 
+// ── Еженедельный базовый доход Кармы ─────────────────────────────────────────
+async function distributeWeeklyKarma() {
+  try {
+    console.log('[CronService] Запуск еженедельного распределения Кармы...');
+    const Transaction = require('../models/Transaction');
+    const WEEKLY_KARMA = 100;
+    const ACTIVITY_DAYS = 30;
+    const cutoff = new Date(Date.now() - ACTIVITY_DAYS * 24 * 60 * 60 * 1000);
+
+    // Активные: зашли за последние 30 дней ИЛИ имеют активный долг
+    const activeDebtorIds = await Transaction.distinct('debtor',   { status: 'active' });
+    const activeCreditorIds = await Transaction.distinct('creditor', { status: 'active' });
+    const activeDebtUsers = [...new Set([...activeDebtorIds.map(String), ...activeCreditorIds.map(String)])];
+
+    const users = await User.find({
+      isBanned: { $ne: true },
+      $or: [
+        { lastLoginAt: { $gte: cutoff } },
+        { _id: { $in: activeDebtUsers } }
+      ]
+    });
+
+    let count = 0;
+    for (const user of users) {
+      user.karma                           += WEEKLY_KARMA;
+      user.stats.totalKarmaEarned          += WEEKLY_KARMA;
+      user.stats.totalKarmaWeeklyReceived  = (user.stats.totalKarmaWeeklyReceived || 0) + WEEKLY_KARMA;
+      await user.save();
+      count++;
+    }
+
+    console.log(`[CronService] Еженедельная Карма: +${WEEKLY_KARMA} начислено ${count} активным пользователям`);
+
+    tg.sendMessage(
+      `📅 <b>Еженедельная Карма распределена!</b>\n\n` +
+      `💰 <b>+${WEEKLY_KARMA} ₸ Кармы</b> получили <b>${count}</b> активных пользователей.\n` +
+      `Продолжайте пользоваться Azadolg — и карма растёт! 🚀`
+    );
+  } catch (error) {
+    console.error('[CronService] Ошибка распределения Кармы:', error);
+  }
+}
+
 function startCronScheduler() {
-  // Запуск розыгрыша джекпота каждое воскресенье в 23:59:00
+  // Еженедельный базовый доход Кармы: каждый понедельник в 09:00
+  cron.schedule('0 9 * * 1', () => {
+    distributeWeeklyKarma();
+  });
+
+  // Розыгрыш джекпота каждое воскресенье в 23:59
   cron.schedule('59 23 * * 0', () => {
     drawJackpot();
   });
 
-  // Проверка смены сезонов каждый день в 00:00:00
+  // Проверка смены сезонов каждый день в 00:00
   cron.schedule('0 0 * * *', () => {
     checkSeasonReset();
   });
 
-  console.log('[CronService] Планировщик cron запущен.');
+  console.log('[CronService] Планировщик cron запущен (Карма: Пн 09:00 | Джекпот: Вс 23:59 | Сезон: ежедневно)');
 }
 
 module.exports = {
   drawJackpot,
   checkSeasonReset,
+  distributeWeeklyKarma,
   startCronScheduler
 };

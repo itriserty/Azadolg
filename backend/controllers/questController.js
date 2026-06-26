@@ -1,247 +1,255 @@
-const User = require('../models/User');
+const User  = require('../models/User');
 const Quest = require('../models/Quest');
-const tg = require('../services/telegramService');
+const tg    = require('../services/telegramService');
 
-// Создать поручение / квест
+// ── Создать квест (bounty уходит в эскроу) ───────────────────────────────────
 async function createQuest(req, res) {
   try {
-    const { title, description, karmaReward } = req.body;
+    const { title, description, bounty, maxParticipants, dueDate } = req.body;
     const creatorId = req.user;
 
-    if (!title || !description || !karmaReward || karmaReward <= 0) {
-      return res.status(400).json({ error: 'Необходимо указать название, описание и награду больше 0' });
-    }
+    if (!title || !description || !bounty || bounty <= 0)
+      return res.status(400).json({ error: 'Укажите название, описание и награду (bounty > 0)' });
 
     const creator = await User.findById(creatorId);
     if (!creator) return res.status(404).json({ error: 'Создатель не найден' });
+    if (creator.isBanned) return res.status(403).json({ error: 'Ваш аккаунт заблокирован' });
 
-    if (creator.karma < karmaReward) {
-      return res.status(400).json({ error: `Недостаточно Кармы для выставления награды. Требуется: ${karmaReward} ₸, у вас: ${creator.karma} ₸.` });
-    }
+    if (creator.karma < bounty)
+      return res.status(400).json({
+        error: `Недостаточно Кармы. Нужно: ${bounty} ₸, у вас: ${creator.karma} ₸`
+      });
 
-    // Списываем награду в "депо" (эскроу)
-    creator.karma -= karmaReward;
+    // Эскроу: списываем bounty сразу
+    creator.karma -= bounty;
     await creator.save();
+
+    const max = Math.max(1, Math.min(20, Number(maxParticipants) || 1));
 
     const quest = new Quest({
       creator: creatorId,
       title,
       description,
-      karmaReward,
-      status: 'available'
+      bounty,
+      karmaReward:     bounty, // обратная совместимость
+      maxParticipants: max,
+      dueDate:         dueDate ? new Date(dueDate) : null,
+      status:          'available'
     });
-
     await quest.save();
 
-    // 📣 Telegram-уведомление о новом квесте
     tg.sendMessage(
-      `🎯 <b>Новое поручение на доске квестов!</b>\n\n` +
+      `🎯 <b>Новое задание на доске квестов!</b>\n\n` +
       `👤 Заказчик: <b>${creator.name}</b>\n` +
-      `📝 Суть: <b>"${title}"</b>\n` +
-      `📜 Описание: <i>${description}</i>\n` +
-      `💰 Награда: <b>+${karmaReward} ₸ Кармы</b>\n` +
-      `⚔️ Возьмите квест в приложении Azadolg!`
+      `📝 <b>"${title}"</b>\n` +
+      `📜 ${description}\n` +
+      `💰 Bounty: <b>${bounty} ₸ Кармы</b> (÷${max} участников)\n` +
+      (dueDate ? `📅 Срок: ${new Date(dueDate).toLocaleDateString('ru-RU')}\n` : '') +
+      `⚔️ Откликнитесь в приложении Azadolg!`
     );
 
-    res.status(201).json({ message: 'Квест успешно создан!', quest, creatorKarma: creator.karma });
+    res.status(201).json({ message: 'Квест создан!', quest, creatorKarma: creator.karma });
   } catch (error) {
-    console.error('Ошибка создания квеста:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('[createQuest]', error);
+    res.status(500).json({ error: 'Ошибка создания квеста' });
   }
 }
 
-// Взять квест в работу
-async function takeQuest(req, res) {
+// ── Откликнуться на квест ─────────────────────────────────────────────────────
+async function joinQuest(req, res) {
   try {
     const { questId } = req.body;
-    const userId = req.user;
+    const userId      = req.user;
 
     const quest = await Quest.findById(questId).populate('creator');
     if (!quest) return res.status(404).json({ error: 'Квест не найден' });
+    if (quest.status !== 'available')
+      return res.status(400).json({ error: 'Этот квест недоступен для новых участников' });
+    if (quest.creator._id.toString() === userId.toString())
+      return res.status(400).json({ error: 'Нельзя выполнять собственные задания' });
+    if (quest.participants.map(p => p.toString()).includes(userId.toString()))
+      return res.status(400).json({ error: 'Вы уже участвуете в этом квесте' });
+    if (quest.participants.length >= quest.maxParticipants)
+      return res.status(400).json({ error: 'Достигнут лимит участников' });
 
-    if (quest.status !== 'available') {
-      return res.status(400).json({ error: 'Этот квест уже взят в работу или выполнен' });
+    quest.participants.push(userId);
+    // Для обратной совместимости: первый участник → assignee
+    if (!quest.assignee) quest.assignee = userId;
+    if (quest.participants.length >= quest.maxParticipants) {
+      quest.status = 'in_progress';
     }
-
-    if (quest.creator._id.toString() === userId.toString()) {
-      return res.status(400).json({ error: 'Вы не можете выполнять собственные поручения' });
-    }
-
-    quest.assignee = userId;
-    quest.status = 'in_progress';
     await quest.save();
 
-    const assignee = await User.findById(userId);
-
-    // 📣 Telegram-уведомление
+    const user = await User.findById(userId);
     tg.sendMessage(
-      `⚔️ <b>Квест взят!</b>\n\n` +
-      `👤 Исполнитель <b>${assignee.name}</b> взялся за поручение <b>"${quest.title}"</b> от <b>${quest.creator.name}</b>.`
+      `⚔️ <b>Участник откликнулся на квест!</b>\n` +
+      `👤 <b>${user?.name}</b> взял задание <b>"${quest.title}"</b>\n` +
+      `👥 Участников: ${quest.participants.length}/${quest.maxParticipants}`,
+      quest.creator.telegramId || null
     );
 
-    res.status(200).json({ message: 'Квест взят в работу!', quest });
+    res.status(200).json({ message: 'Вы записались на квест!', quest });
   } catch (error) {
-    console.error('Ошибка взятия квеста:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('[joinQuest]', error);
+    res.status(500).json({ error: 'Ошибка записи на квест' });
   }
 }
 
-// Отметить как выполненный (отправить на проверку)
+// ── Взять квест (legacy: один участник) ──────────────────────────────────────
+async function takeQuest(req, res) {
+  req.body.questId = req.body.questId;
+  return joinQuest(req, res);
+}
+
+// ── Отметить выполненным ──────────────────────────────────────────────────────
 async function completeQuest(req, res) {
   try {
     const { questId } = req.body;
-    const userId = req.user;
+    const userId      = req.user;
 
-    const quest = await Quest.findById(questId).populate('creator assignee');
+    const quest = await Quest.findById(questId).populate('creator');
     if (!quest) return res.status(404).json({ error: 'Квест не найден' });
-
-    if (quest.status !== 'in_progress') {
+    if (!['in_progress', 'available'].includes(quest.status))
       return res.status(400).json({ error: 'Квест не находится в работе' });
-    }
 
-    if (quest.assignee._id.toString() !== userId.toString()) {
-      return res.status(403).json({ error: 'Вы не являетесь исполнителем этого квеста' });
-    }
+    const isParticipant = quest.participants.map(p => p.toString()).includes(userId.toString());
+    if (!isParticipant)
+      return res.status(403).json({ error: 'Вы не являетесь участником этого квеста' });
 
     quest.status = 'completed';
     await quest.save();
 
-    // 📣 Telegram-уведомление заказчику
-    const text = `🔔 <b>Квест выполнен и ожидает проверки!</b>\n\n` +
-      `👤 Исполнитель <b>${quest.assignee.name}</b> завершил поручение <b>"${quest.title}"</b>.\n` +
-      `🎯 Подтвердите выполнение в приложении!`;
-    
-    if (quest.creator.telegramId) {
-      tg.sendMessage(text, quest.creator.telegramId);
-    } else {
-      tg.sendMessage(text);
-    }
+    const text = `🔔 <b>Квест выполнен — ожидает проверки!</b>\n\n` +
+      `📝 <b>"${quest.title}"</b>\n` +
+      `Участники отправили задание на проверку. Подтвердите в приложении!`;
+
+    if (quest.creator.telegramId) tg.sendMessage(text, quest.creator.telegramId);
+    else tg.sendMessage(text);
 
     res.status(200).json({ message: 'Квест отправлен на проверку!', quest });
   } catch (error) {
-    console.error('Ошибка завершения квеста:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('[completeQuest]', error);
+    res.status(500).json({ error: 'Ошибка завершения квеста' });
   }
 }
 
-// Проверить и подтвердить квест (заказчиком)
+// ── Проверить и подтвердить / отклонить (заказчиком) ─────────────────────────
 async function verifyQuest(req, res) {
   try {
-    const { questId, action } = req.body; // action: 'approve' | 'reject'
-    const userId = req.user;
+    const { questId, action } = req.body;
+    const userId              = req.user;
 
-    const quest = await Quest.findById(questId).populate('creator assignee');
+    const quest = await Quest.findById(questId).populate('creator participants');
     if (!quest) return res.status(404).json({ error: 'Квест не найден' });
-
-    if (quest.status !== 'completed') {
+    if (quest.status !== 'completed')
       return res.status(400).json({ error: 'Квест не ожидает проверки' });
-    }
-
-    if (quest.creator._id.toString() !== userId.toString()) {
-      return res.status(403).json({ error: 'Вы не являетесь создателем этого квеста' });
-    }
+    if (quest.creator._id.toString() !== userId.toString())
+      return res.status(403).json({ error: 'Только создатель квеста может его подтвердить' });
 
     if (action === 'approve') {
       quest.status = 'verified';
       await quest.save();
 
-      // Начисляем награду исполнителю
-      const assignee = await User.findById(quest.assignee._id);
-      assignee.karma += quest.karmaReward;
-      assignee.stats.totalKarmaEarned += quest.karmaReward;
-      
-      // Добавляем BattlePass XP за закрытие квеста (+20 XP)
+      // Делим bounty поровну между участниками
+      const participantIds = quest.participants.map(p => p._id || p);
+      const perPerson      = participantIds.length > 0
+        ? Math.floor(quest.bounty / participantIds.length)
+        : quest.bounty;
+
       const { addXP } = require('../utils/battlePassHelper');
-      await addXP(assignee, 20);
 
-      // 📣 Telegram-уведомление
-      const text = `🎉 <b>Поручение подтверждено!</b>\n\n` +
-        `👤 Заказчик <b>${quest.creator.name}</b> подтвердил выполнение квеста <b>"${quest.title}"</b>.\n` +
-        `💰 Исполнитель <b>${assignee.name}</b> получает <b>+${quest.karmaReward} ₸ Кармы</b> и <b>+20 XP</b> Боевого Пропуска!`;
-      
-      if (assignee.telegramId) {
-        tg.sendMessage(text, assignee.telegramId);
-      } else {
-        tg.sendMessage(text);
-      }
+      await Promise.all(participantIds.map(async (pid) => {
+        const participant = await User.findById(pid);
+        if (!participant) return;
+        participant.karma                    += perPerson;
+        participant.stats.totalKarmaEarned   += perPerson;
+        await addXP(participant, 20);
+        // await participant.save() уже внутри addXP
 
-      res.status(200).json({ message: 'Поручение успешно подтверждено и оплачено!', quest });
+        if (participant.telegramId) {
+          tg.sendMessage(
+            `🎉 <b>Квест подтверждён!</b>\n` +
+            `📝 "${quest.title}"\n` +
+            `💰 Ваша доля: <b>+${perPerson} ₸ Кармы</b> + <b>+20 XP</b>`,
+            participant.telegramId
+          );
+        }
+      }));
+
+      res.status(200).json({
+        message:   `Квест подтверждён! Bounty ${quest.bounty} ₸ распределено по ${participantIds.length} участникам (по ${perPerson} ₸ каждому)`,
+        quest
+      });
     } else if (action === 'reject') {
-      // Возвращаем в работу
       quest.status = 'in_progress';
       await quest.save();
 
-      const text = `⚠️ <b>Поручение отклонено заказчиком!</b>\n\n` +
-        `👤 Заказчик <b>${quest.creator.name}</b> отклонил выполнение квеста <b>"${quest.title}"</b>.\n` +
-        `🔧 Исполнитель <b>${quest.assignee.name}</b>, внесите исправления и попробуйте снова.`;
-
-      if (quest.assignee.telegramId) {
-        tg.sendMessage(text, quest.assignee.telegramId);
-      } else {
-        tg.sendMessage(text);
+      // Уведомляем всех участников
+      for (const pid of quest.participants) {
+        const p = await User.findById(pid._id || pid);
+        if (p?.telegramId) {
+          tg.sendMessage(
+            `⚠️ <b>Квест отклонён заказчиком!</b>\n` +
+            `📝 "${quest.title}"\nВнесите исправления и попробуйте снова.`,
+            p.telegramId
+          );
+        }
       }
 
-      res.status(200).json({ message: 'Поручение возвращено исполнителю на доработку.', quest });
+      res.status(200).json({ message: 'Квест возвращён на доработку', quest });
     } else {
-      res.status(400).json({ error: 'Неверное действие' });
+      res.status(400).json({ error: 'Неверное действие. Ожидается: approve | reject' });
     }
   } catch (error) {
-    console.error('Ошибка проверки квеста:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('[verifyQuest]', error);
+    res.status(500).json({ error: 'Ошибка подтверждения квеста' });
   }
 }
 
-// Отмена квеста создателем (если он ещё не выполнен)
+// ── Отмена квеста (с возвратом bounty) ───────────────────────────────────────
 async function cancelQuest(req, res) {
   try {
     const { questId } = req.body;
-    const userId = req.user;
+    const userId      = req.user;
 
     const quest = await Quest.findById(questId);
     if (!quest) return res.status(404).json({ error: 'Квест не найден' });
+    if (quest.creator.toString() !== userId.toString())
+      return res.status(403).json({ error: 'Только создатель может отменить квест' });
+    if (quest.status === 'verified')
+      return res.status(400).json({ error: 'Нельзя отменить завершённый квест' });
 
-    if (quest.creator.toString() !== userId.toString()) {
-      return res.status(403).json({ error: 'Вы не являетесь создателем этого квеста' });
-    }
-
-    if (quest.status === 'verified') {
-      return res.status(400).json({ error: 'Нельзя отменить уже завершенный и оплаченный квест' });
-    }
-
-    // Возвращаем Карму создателю
+    // Возврат bounty создателю
     const creator = await User.findById(userId);
-    creator.karma += quest.karmaReward;
-    await creator.save();
+    if (creator) {
+      creator.karma += quest.bounty;
+      await creator.save();
+    }
 
-    // Удаляем или помечаем отмененным
-    await Quest.findByIdAndDelete(questId);
+    quest.status = 'cancelled';
+    await quest.save();
 
-    res.status(200).json({ message: 'Квест успешно отменен, Карма возвращена.', creatorKarma: creator.karma });
+    res.status(200).json({
+      message:      'Квест отменён, Карма возвращена',
+      creatorKarma: creator?.karma
+    });
   } catch (error) {
-    console.error('Ошибка отмены квеста:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('[cancelQuest]', error);
+    res.status(500).json({ error: 'Ошибка отмены квеста' });
   }
 }
 
-// Получить список всех квестов
+// ── Список квестов ────────────────────────────────────────────────────────────
 async function getQuests(req, res) {
   try {
-    const quests = await Quest.find()
-      .populate('creator assignee', 'name username eloRating avatar')
+    const quests = await Quest.find({ status: { $ne: 'cancelled' } })
+      .populate('creator participants', 'name username eloRating avatar')
       .sort({ createdAt: -1 });
-
     res.status(200).json(quests);
   } catch (error) {
-    console.error('Ошибка получения квестов:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('[getQuests]', error);
+    res.status(500).json({ error: 'Ошибка получения квестов' });
   }
 }
 
-module.exports = {
-  createQuest,
-  takeQuest,
-  completeQuest,
-  verifyQuest,
-  cancelQuest,
-  getQuests
-};
+module.exports = { createQuest, joinQuest, takeQuest, completeQuest, verifyQuest, cancelQuest, getQuests };

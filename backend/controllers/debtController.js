@@ -1,73 +1,168 @@
 const Transaction = require('../models/Transaction');
-const User = require('../models/User');
+const User        = require('../models/User');
 const { getCalculatedAmount } = require('../utils/debtHelper');
 const tg = require('../services/telegramService');
+const path = require('path');
 
-/**
- * Пересчёт ELO при закрытии долга.
- *  ≤7 дней → должник +30, кредитор +10, 50 coins
- *  >7 дней → должник -20, кредитор +5, 10 coins
- */
-function calculateEloChange(transaction, now = new Date()) {
-  const diffDays = Math.floor((now - new Date(transaction.createdAt)) / (1000 * 60 * 60 * 24));
-  return diffDays <= 7
-    ? { debtorElo: +30, creditorElo: +10, coinsReward: 50,  isOverdue: false }
-    : { debtorElo: -20, creditorElo:  +5, coinsReward: 10,  isOverdue: true  };
+// ── Анти-фарм: логарифмический ELO-бонус с жёстким капом ─────────────────────
+// При amount=500 → ~27 ELO; amount=5000 → ~38 ELO; amount=50000 → ~48 ELO; кап 50
+function calcEloBonus(amount) {
+  return Math.min(50, Math.round(10 * Math.log10((amount || 0) + 1)));
 }
 
-// ── Создание долга ────────────────────────────────────────────────────────────
+// ELO изменения при закрытии (учитывает просрочку)
+function calculateEloChange(transaction, now = new Date()) {
+  const startDate  = transaction.incurredAt || transaction.createdAt;
+  const diffDays   = Math.floor((now - new Date(startDate)) / (1000 * 60 * 60 * 24));
+  const eloBonus   = calcEloBonus(transaction.originalAmount);
+  return diffDays <= 7
+    ? { debtorElo: eloBonus,     creditorElo: Math.round(eloBonus / 3), coinsReward: 50,  isOverdue: false }
+    : { debtorElo: -Math.min(20, eloBonus), creditorElo: Math.round(eloBonus / 5), coinsReward: 10, isOverdue: true };
+}
+
+// Логарифмический ELO-бонус за прощение долга (до 150)
+function calcForgiveEloBonus(amount) {
+  return Math.min(150, Math.round(20 * Math.log10((amount || 0) + 1)));
+}
+
+// ── Создание долга (с обязательным свидетелем) ────────────────────────────────
 async function createDebt(req, res) {
   try {
-    const { creditor, debtor, amount, description, dueDate, penaltyRate } = req.body;
+    const { creditor, debtor, witnessId, amount, description, dueDate, penaltyRate, incurredAt } = req.body;
     const createdBy = req.user;
 
-    if (!creditor || !debtor || !amount || !description || !dueDate)
-      return res.status(400).json({ error: 'Заполните обязательные поля: creditor, debtor, amount, description, dueDate' });
-    if (amount <= 0)    return res.status(400).json({ error: 'Сумма долга должна быть больше нуля' });
-    if (creditor === debtor) return res.status(400).json({ error: 'Нельзя создать долг самому себе' });
+    if (!creditor || !debtor || !witnessId || !amount || !description || !dueDate)
+      return res.status(400).json({ error: 'Обязательные поля: creditor, debtor, witnessId, amount, description, dueDate' });
+    if (Number(amount) <= 0)
+      return res.status(400).json({ error: 'Сумма долга должна быть больше нуля' });
+    if (creditor === debtor)
+      return res.status(400).json({ error: 'Нельзя создать долг самому себе' });
+    if (witnessId === creditor || witnessId === debtor)
+      return res.status(400).json({ error: 'Свидетель не может быть кредитором или должником' });
 
-    const [creditorUser, debtorUser] = await Promise.all([User.findById(creditor), User.findById(debtor)]);
+    const [creditorUser, debtorUser, witnessUser] = await Promise.all([
+      User.findById(creditor),
+      User.findById(debtor),
+      User.findById(witnessId)
+    ]);
     if (!creditorUser || !debtorUser)
       return res.status(404).json({ error: 'Кредитор или должник не найден' });
+    if (!witnessUser)
+      return res.status(404).json({ error: 'Свидетель не найден' });
 
-    // Проверка, что пользователи являются друзьями
-    if (!creditorUser.friends.includes(debtor) || !debtorUser.friends.includes(creditor)) {
+    // Дружба между участниками
+    if (!creditorUser.friends.map(f => f.toString()).includes(debtor) ||
+        !debtorUser.friends.map(f => f.toString()).includes(creditor))
       return res.status(400).json({ error: 'Создавать долги можно только между друзьями' });
+
+    // Свидетель должен быть другом хотя бы одной из сторон
+    const witnessFriendOfCreditor = creditorUser.friends.map(f => f.toString()).includes(witnessId);
+    const witnessFriendOfDebtor   = debtorUser.friends.map(f => f.toString()).includes(witnessId);
+    if (!witnessFriendOfCreditor && !witnessFriendOfDebtor)
+      return res.status(400).json({ error: 'Свидетель должен быть другом кредитора или должника' });
+
+    // Ретроактивность: если incurredAt в прошлом — применяем пеню сразу при создании
+    const actualStartDate = incurredAt ? new Date(incurredAt) : new Date();
+    const now             = new Date();
+    const diffDaysRetro   = Math.floor((now - actualStartDate) / (1000 * 60 * 60 * 24));
+    const rate            = penaltyRate !== undefined ? Number(penaltyRate) : 0.01;
+    let startingAmount    = Number(amount);
+
+    if (diffDaysRetro > 7 && incurredAt) {
+      const overdueDays  = diffDaysRetro - 7;
+      const penaltyMult  = 1 + rate * overdueDays;
+      startingAmount     = Math.round(startingAmount * penaltyMult * 100) / 100;
     }
 
     const transaction = new Transaction({
       creditor, debtor,
-      amount, originalAmount: amount,
+      amount:        startingAmount,
+      originalAmount: Number(amount),
+      paidAmount:    0,
       description,
-      dueDate:      new Date(dueDate),
-      penaltyRate:  penaltyRate !== undefined ? penaltyRate : 0.01,
-      status:       'pending_approval',
+      dueDate:       new Date(dueDate),
+      incurredAt:    actualStartDate,
+      penaltyRate:   rate,
+      witness:       witnessId,
+      witnessStatus: 'pending',
+      status:        'pending_witness',
       createdBy
     });
     await transaction.save();
 
-    // 📣 Telegram: уведомление о новом долге (требующем одобрения)
-    const creatorUser = createdBy.toString() === creditor ? creditorUser : debtorUser;
-    const targetUser = createdBy.toString() === creditor ? debtorUser : creditorUser;
-    
-    const text = `💸 <b>Создан новый долг (ожидает подтверждения)!</b>\n\n` +
-      `👤 Заказчик: <b>${creatorUser.name}</b>\n` +
-      `👤 Получатель: <b>${targetUser.name}</b>\n` +
-      `💰 Сумма: <b>${amount} ₸</b>\n` +
-      `📝 Описание: ${description}\n` +
+    // 📣 Telegram: уведомить свидетеля
+    const text = `🔍 <b>Запрос подтверждения долга!</b>\n\n` +
+      `👤 Кредитор: <b>${creditorUser.name}</b>\n` +
+      `👤 Должник: <b>${debtorUser.name}</b>\n` +
+      `💰 Сумма: <b>${Number(amount)} ₸</b>${diffDaysRetro > 7 ? ` (с пеней: ${startingAmount} ₸)` : ''}\n` +
+      `📝 ${description}\n` +
       `📅 Срок: ${new Date(dueDate).toLocaleDateString('ru-RU')}\n\n` +
-      `⚠️ Пожалуйста, подтвердите или отклоните этот долг в приложении Azadolg!`;
+      `⚖️ Вы назначены свидетелем. Подтвердите или отклоните этот долг в приложении Azadolg!`;
 
-    if (targetUser.telegramId) {
-      tg.sendMessage(text, targetUser.telegramId);
-    } else {
-      tg.sendMessage(text);
-    }
+    if (witnessUser.telegramId) tg.sendMessage(text, witnessUser.telegramId);
+    else tg.sendMessage(text);
 
     res.status(201).json(transaction);
   } catch (error) {
-    console.error(error);
+    console.error('[createDebt]', error);
     res.status(500).json({ error: 'Ошибка создания долга' });
+  }
+}
+
+// ── Подтверждение/отклонение свидетелем ──────────────────────────────────────
+async function witnessDecision(req, res) {
+  try {
+    const { transactionId } = req.params;
+    const { action }        = req.body; // 'approve' | 'reject'
+    const userId            = req.user;
+
+    const tx = await Transaction.findById(transactionId)
+      .populate('creditor debtor witness');
+    if (!tx) return res.status(404).json({ error: 'Долг не найден' });
+
+    if (tx.witness?._id.toString() !== userId.toString())
+      return res.status(403).json({ error: 'Вы не являетесь свидетелем этого долга' });
+    if (tx.status !== 'pending_witness')
+      return res.status(400).json({ error: 'Долг уже обработан свидетелем' });
+
+    if (action === 'approve') {
+      tx.witnessStatus = 'approved';
+      tx.status        = 'pending_approval'; // теперь должник подтверждает
+      await tx.save();
+
+      // Обновляем статистику свидетеля
+      await User.findByIdAndUpdate(userId, { $inc: { 'stats.totalDebtsWitnessed': 1 } });
+
+      const notifyText = `✅ <b>Свидетель подтвердил долг!</b>\n\n` +
+        `👤 Кредитор: <b>${tx.creditor.name}</b>\n` +
+        `👤 Должник: <b>${tx.debtor.name}</b>\n` +
+        `💰 ${tx.originalAmount} ₸\n\n` +
+        `⚠️ Должник должен подтвердить долг в приложении Azadolg!`;
+
+      if (tx.debtor.telegramId)   tg.sendMessage(notifyText, tx.debtor.telegramId);
+      if (tx.creditor.telegramId) tg.sendMessage(notifyText, tx.creditor.telegramId);
+
+    } else if (action === 'reject') {
+      tx.witnessStatus = 'rejected';
+      tx.status        = 'declined';
+      await tx.save();
+
+      const notifyText = `❌ <b>Свидетель отклонил долг!</b>\n\n` +
+        `👤 Кредитор: <b>${tx.creditor.name}</b>\n` +
+        `👤 Должник: <b>${tx.debtor.name}</b>\n` +
+        `💰 ${tx.originalAmount} ₸\n\n` +
+        `Долг аннулирован.`;
+
+      if (tx.debtor.telegramId)   tg.sendMessage(notifyText, tx.debtor.telegramId);
+      if (tx.creditor.telegramId) tg.sendMessage(notifyText, tx.creditor.telegramId);
+    } else {
+      return res.status(400).json({ error: 'Неверное действие. Ожидается: approve | reject' });
+    }
+
+    res.status(200).json({ message: `Решение свидетеля: ${action}`, transaction: tx });
+  } catch (error) {
+    console.error('[witnessDecision]', error);
+    res.status(500).json({ error: 'Ошибка при обработке решения свидетеля' });
   }
 }
 
@@ -78,241 +173,378 @@ async function getDebts(req, res) {
     if (!userId) return res.status(400).json({ error: 'Не указан ID пользователя' });
 
     const transactions = await Transaction.find({
-      $or: [{ creditor: userId }, { debtor: userId }],
-      status: { $in: ['active', 'pending_approval'] }
-    }).populate('creditor debtor', 'name email username eloRating telegramId');
+      $or: [
+        { creditor: userId },
+        { debtor: userId },
+        { witness: userId }
+      ],
+      status: { $in: ['active', 'pending_approval', 'pending_witness'] }
+    }).populate('creditor debtor witness', 'name email username eloRating telegramId avatar');
 
-    const now = new Date();
+    const now    = new Date();
     const result = await Promise.all(transactions.map(async t => {
-      if (t.status === 'pending_approval') {
-        return {
-          ...t.toObject(),
-          amount: t.originalAmount,
-          penaltyAccrued: 0,
-          isOverdue: false,
-          daysSinceCreation: 0
-        };
+      if (t.status === 'pending_approval' || t.status === 'pending_witness') {
+        return { ...t.toObject(), amount: t.originalAmount, penaltyAccrued: 0, isOverdue: false, daysSinceCreation: 0 };
       }
 
-      const currentAmount = getCalculatedAmount(t, now); // 5% если > 7 дней
+      const currentAmount  = getCalculatedAmount(t, now);
       const penaltyAccrued = Number((currentAmount - t.originalAmount).toFixed(2));
-      const diffDays = Math.floor((now - new Date(t.createdAt)) / (1000 * 60 * 60 * 24));
-      const isOverdue = diffDays > 7;
+      const startDate      = t.incurredAt || t.createdAt;
+      const diffDays       = Math.floor((now - new Date(startDate)) / (1000 * 60 * 60 * 24));
+      const isOverdue      = diffDays > 7;
+      const remaining      = Math.max(0, currentAmount - (t.paidAmount || 0));
 
-      // 📣 Telegram: уведомление о штрафе (только если только что применился, то есть exactly 7 дней)
       if (diffDays === 8 && penaltyAccrued > 0 && t.debtor._id.toString() === userId) {
         tg.notifyPenaltyApplied({
-          debtorName:     t.debtor.name,
-          creditorName:   t.creditor.name,
-          originalAmount: t.originalAmount,
-          newAmount:      currentAmount,
+          debtorName: t.debtor.name, creditorName: t.creditor.name,
+          originalAmount: t.originalAmount, newAmount: currentAmount,
           debtorTelegramId: t.debtor.telegramId
         });
       }
 
-      return {
-        ...t.toObject(),
-        amount: currentAmount,
-        penaltyAccrued,
-        isOverdue,
-        daysSinceCreation: diffDays
-      };
+      return { ...t.toObject(), amount: currentAmount, penaltyAccrued, isOverdue, daysSinceCreation: diffDays, remaining };
     }));
 
     res.status(200).json(result);
   } catch (error) {
-    console.error(error);
+    console.error('[getDebts]', error);
     res.status(500).json({ error: 'Ошибка получения списка долгов' });
   }
 }
 
-// ── Оплата долга ──────────────────────────────────────────────────────────────
-async function payDebt(req, res) {
+// ── Загрузка пруфа оплаты + частичный платёж ─────────────────────────────────
+async function submitPaymentProof(req, res) {
   try {
     const { transactionId } = req.params;
-    const transaction = await Transaction.findById(transactionId);
+    const { partialAmount } = req.body;  // опционально: частичная сумма
+    const userId            = req.user;
 
-    if (!transaction) return res.status(404).json({ error: 'Транзакция не найдена' });
-    if (transaction.status !== 'active')
-      return res.status(400).json({ error: `Долг уже ${transaction.status === 'paid' ? 'оплачен' : 'отклонён'}` });
+    const tx = await Transaction.findById(transactionId).populate('creditor debtor');
+    if (!tx) return res.status(404).json({ error: 'Долг не найден' });
+    if (tx.status !== 'active')
+      return res.status(400).json({ error: `Долг имеет статус "${tx.status}" и не может быть оплачен` });
 
-    const now = new Date();
-    const { debtorElo, creditorElo, coinsReward, isOverdue } = calculateEloChange(transaction, now);
-    const finalAmount = getCalculatedAmount(transaction, now);
+    // Только должник или третье лицо может вносить платёж
+    const isDebtor       = tx.debtor._id.toString() === userId.toString();
+    const isCreditor     = tx.creditor._id.toString() === userId.toString();
+    if (isCreditor && !isDebtor)
+      return res.status(403).json({ error: 'Кредитор не может сам закрыть этот долг. Используйте "Простить долг".' });
 
-    let finalDebtorElo = debtorElo;
-    let finalCreditorElo = creditorElo;
-    let finalCoinsReward = coinsReward;
-    let note = '';
-    let isFarm = false;
+    if (!req.file)
+      return res.status(400).json({ error: 'Необходимо прикрепить пруф оплаты (изображение)' });
 
-    // Ограничение 1: Минимальная сумма долга 500 ₸
-    if (transaction.originalAmount < 500) {
-      finalDebtorElo = 0;
-      finalCreditorElo = 0;
-      finalCoinsReward = 0;
-      note = 'Сумма долга менее 500 ₸ (защита от накрутки рейтинга). ELO и Карма не изменены.';
-      isFarm = true;
-    }
+    const now          = new Date();
+    const currentAmount = getCalculatedAmount(tx, now);
+    const remaining    = Math.max(0, currentAmount - (tx.paidAmount || 0));
 
-    // Ограничение 2: Лимит транзакций между друзьями (не более 1 за 24 часа для получения ELO/Кармы)
-    if (!isFarm) {
-      const startOfToday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const recentClosedCount = await Transaction.countDocuments({
-        status: 'paid',
-        resolvedAt: { $gte: startOfToday },
-        $or: [
-          { debtor: transaction.debtor, creditor: transaction.creditor },
-          { debtor: transaction.creditor, creditor: transaction.debtor }
-        ]
+    // Определяем сумму платежа
+    const payAmt = partialAmount
+      ? Math.min(Number(partialAmount), remaining)
+      : remaining;
+
+    if (payAmt <= 0)
+      return res.status(400).json({ error: 'Долг уже полностью оплачен' });
+
+    const proofPath = `/uploads/proofs/${req.file.filename}`;
+
+    // Добавляем запись платежа
+    tx.payments.push({
+      amount:     payAmt,
+      paidAt:     now,
+      proofImage: proofPath,
+      paidBy:     userId
+    });
+    tx.paidAmount = (tx.paidAmount || 0) + payAmt;
+
+    // Если не должник платит — фиксируем paidByThirdParty
+    if (!isDebtor) tx.paidByThirdParty = userId;
+
+    const isFullyPaid = tx.paidAmount >= currentAmount;
+
+    if (isFullyPaid) {
+      // ── Полное закрытие ────────────────────────────────────────────────────
+      tx.status      = 'paid';
+      tx.proofImage  = proofPath;
+      tx.resolvedAt  = now;
+      await tx.save();
+
+      // Пересчёт ELO с антифарм-капом
+      const { debtorElo, creditorElo, coinsReward, isOverdue } = calculateEloChange(tx, now);
+
+      // Лимит 1 транзакция/24ч между этими двумя пользователями
+      let note = '';
+      let applyRewards = true;
+      if (tx.originalAmount < 500) {
+        applyRewards = false;
+        note = 'Сумма < 500 ₸: ELO и Карма не начислены (защита от накрутки)';
+      } else {
+        const startOfDay = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const recentCount = await Transaction.countDocuments({
+          status: 'paid', resolvedAt: { $gte: startOfDay },
+          $or: [
+            { debtor: tx.debtor._id, creditor: tx.creditor._id },
+            { debtor: tx.creditor._id, creditor: tx.debtor._id }
+          ]
+        });
+        if (recentCount > 1) {
+          applyRewards = false;
+          note = 'Превышен лимит возвратов (1 за 24ч между этими пользователями). ELO/Карма не начислены.';
+        }
+      }
+
+      const debtor   = await User.findById(tx.debtor._id);
+      const creditor = await User.findById(tx.creditor._id);
+
+      if (applyRewards) {
+        if (debtor) {
+          debtor.eloRating = Math.max(100, debtor.eloRating + debtorElo);
+          debtor.coins     += coinsReward;
+          debtor.karma     += coinsReward;
+          if (!isOverdue) { debtor.winStreak++; debtor.stats.debtsPaidOnTime++; }
+          else              debtor.winStreak = 0;
+          debtor.stats.totalDebtsPaid++;
+          debtor.stats.totalKarmaEarned += coinsReward;
+          const { addXP } = require('../utils/battlePassHelper');
+          await addXP(debtor, isOverdue ? 10 : 25);
+          await debtor.save();
+        }
+        if (creditor) {
+          creditor.eloRating = Math.max(100, creditor.eloRating + creditorElo);
+          await creditor.save();
+        }
+      } else {
+        if (debtor) { debtor.stats.totalDebtsPaid++; await debtor.save(); }
+      }
+
+      // Расчёт ставок тотализатора
+      try {
+        const { resolveBetsForDebt } = require('./betController');
+        await resolveBetsForDebt(transactionId, isOverdue);
+      } catch (e) { console.error('Ошибка tотализатора:', e); }
+
+      tg.notifyDebtPaid({
+        debtorName:   debtor?.name   || 'Неизвестно',
+        creditorName: creditor?.name || 'Неизвестно',
+        amount:       currentAmount,
+        eloChangeDebtor: applyRewards ? debtorElo : 0,
+        coinsEarned:     applyRewards ? coinsReward : 0,
+        isOverdue, debtorTelegramId: debtor?.telegramId, note
       });
 
-      if (recentClosedCount > 0) {
-        finalDebtorElo = 0;
-        finalCreditorElo = 0;
-        finalCoinsReward = 0;
-        note = 'Превышен лимит (макс. 1 возврат в 24 часа между этими друзьями для ELO/Кармы).';
-      }
+      return res.status(200).json({
+        message:   'Долг полностью оплачен! 🎉',
+        fullyPaid: true, note, transaction: tx
+      });
+    } else {
+      // ── Частичный платёж ───────────────────────────────────────────────────
+      await tx.save();
+
+      const remainingAfter = Math.max(0, currentAmount - tx.paidAmount);
+      const notifyText = `💳 <b>Частичный платёж по долгу!</b>\n\n` +
+        `👤 Кредитор: <b>${tx.creditor.name}</b>\n` +
+        `👤 Должник: <b>${tx.debtor.name}</b>\n` +
+        `✅ Внесено: <b>${payAmt} ₸</b>\n` +
+        `💰 Остаток: <b>${remainingAfter} ₸</b> из ${currentAmount} ₸\n\n` +
+        `Пруф прикреплён. Кредитор может просмотреть.`;
+
+      if (tx.creditor.telegramId) tg.sendMessage(notifyText, tx.creditor.telegramId);
+
+      return res.status(200).json({
+        message:    `Частичный платёж на ${payAmt} ₸ принят`,
+        fullyPaid:  false,
+        paidAmount: tx.paidAmount,
+        remaining:  remainingAfter,
+        transaction: tx
+      });
     }
+  } catch (error) {
+    console.error('[submitPaymentProof]', error);
+    res.status(500).json({ error: 'Ошибка при обработке оплаты' });
+  }
+}
 
-    transaction.status     = 'paid';
-    transaction.amount     = finalAmount;
-    transaction.resolvedAt = now;
-    await transaction.save();
+// ── Прощение долга кредитором ─────────────────────────────────────────────────
+async function forgiveDebt(req, res) {
+  try {
+    const { transactionId } = req.params;
+    const userId            = req.user;
 
-    // Разрешаем ставки на тотализаторе, если они были
-    try {
-      const { resolveBetsForDebt } = require('./betController');
-      await resolveBetsForDebt(transactionId, isOverdue);
-    } catch (err) {
-      console.error('Ошибка расчета ставок тотализатора:', err);
-    }
+    const tx = await Transaction.findById(transactionId).populate('creditor debtor');
+    if (!tx) return res.status(404).json({ error: 'Долг не найден' });
+    if (tx.creditor._id.toString() !== userId.toString())
+      return res.status(403).json({ error: 'Только кредитор может простить долг' });
+    if (!['active', 'pending_approval'].includes(tx.status))
+      return res.status(400).json({ error: `Нельзя простить долг со статусом "${tx.status}"` });
 
-    const debtor = await User.findById(transaction.debtor);
-    const creditor = await User.findById(transaction.creditor);
+    const now      = new Date();
+    tx.status      = 'forgiven';
+    tx.forgiven    = true;
+    tx.forgivenAt  = now;
+    tx.resolvedAt  = now;
+    await tx.save();
 
-    if (debtor) {
-      debtor.eloRating += finalDebtorElo;
-      if (debtor.eloRating < 100) debtor.eloRating = 100;
-      debtor.coins += finalCoinsReward;
-      debtor.karma += finalCoinsReward;
-      
-      // Начисление XP Боевого Пропуска
-      const { addXP } = require('../utils/battlePassHelper');
-      const xpReward = isOverdue ? 10 : 25;
-      await addXP(debtor, xpReward);
-    }
-
+    // ELO кредитора: логарифмический бонус за благородство
+    const eloBonus = calcForgiveEloBonus(tx.originalAmount);
+    const creditor = await User.findById(tx.creditor._id);
     if (creditor) {
-      creditor.eloRating += finalCreditorElo;
+      creditor.eloRating += eloBonus;
+      creditor.stats.totalDebtsForgivenByMe = (creditor.stats.totalDebtsForgivenByMe || 0) + 1;
       await creditor.save();
     }
 
-    // 📣 Telegram: уведомление о закрытии долга
-    tg.notifyDebtPaid({
-      debtorName:     debtor?.name   || 'Неизвестно',
-      creditorName:   creditor?.name || 'Неизвестно',
-      amount:         finalAmount,
-      eloChangeDebtor: finalDebtorElo,
-      coinsEarned:    finalCoinsReward,
-      isOverdue,
-      debtorTelegramId: debtor?.telegramId,
-      note
-    });
+    const notifyText = `💝 <b>Долг прощён!</b>\n\n` +
+      `👤 Кредитор <b>${tx.creditor.name}</b> простил долг <b>${tx.debtor.name}</b>!\n` +
+      `💰 Сумма прощения: <b>${tx.originalAmount} ₸</b>\n` +
+      `🏆 За благородство: <b>+${eloBonus} ELO</b>`;
+
+    if (tx.debtor.telegramId)   tg.sendMessage(notifyText, tx.debtor.telegramId);
+    if (tx.creditor.telegramId) tg.sendMessage(notifyText, tx.creditor.telegramId);
+    tg.sendMessage(notifyText);
 
     res.status(200).json({
-      message: 'Долг успешно оплачен!',
-      note,
-      transaction,
-      rewards: {
-        debtor:   { name: debtor?.name,   eloChange: finalDebtorElo,  newElo: debtor?.eloRating,   coinsEarned: finalCoinsReward },
-        creditor: { name: creditor?.name, eloChange: finalCreditorElo, newElo: creditor?.eloRating }
-      }
+      message:   `Долг прощён! Вы получили +${eloBonus} ELO за благородство`,
+      eloBonus, transaction: tx
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Ошибка оплаты долга' });
+    console.error('[forgiveDebt]', error);
+    res.status(500).json({ error: 'Ошибка при прощении долга' });
   }
 }
 
-// ── Подтверждение долга ────────────────────────────────────────────────────────
+// ── Передача долга другому должнику ──────────────────────────────────────────
+async function transferDebt(req, res) {
+  try {
+    const { transactionId }  = req.params;
+    const { newDebtorId }    = req.body;
+    const userId             = req.user;
+
+    const tx = await Transaction.findById(transactionId).populate('creditor debtor');
+    if (!tx) return res.status(404).json({ error: 'Долг не найден' });
+    if (tx.debtor._id.toString() !== userId.toString())
+      return res.status(403).json({ error: 'Только должник может передать долг' });
+    if (tx.status !== 'active')
+      return res.status(400).json({ error: 'Передача возможна только для активного долга' });
+
+    const [newDebtor, creditor] = await Promise.all([
+      User.findById(newDebtorId),
+      User.findById(tx.creditor._id)
+    ]);
+    if (!newDebtor)
+      return res.status(404).json({ error: 'Новый должник не найден' });
+
+    // Новый должник должен быть другом кредитора
+    if (!creditor.friends.map(f => f.toString()).includes(newDebtorId))
+      return res.status(400).json({ error: 'Передать долг можно только другу кредитора' });
+
+    tx.transferredTo = tx.debtor._id;
+    tx.debtor        = newDebtorId;
+    tx.status        = 'pending_approval'; // новый должник должен подтвердить
+    await tx.save();
+
+    const notifyText = `🔄 <b>Долг передан!</b>\n\n` +
+      `💰 ${tx.originalAmount} ₸ передан новому должнику: <b>${newDebtor.name}</b>\n` +
+      `Кредитор: <b>${creditor.name}</b>\n\n` +
+      `⚠️ ${newDebtor.name}, подтвердите принятие долга в приложении!`;
+
+    if (newDebtor.telegramId) tg.sendMessage(notifyText, newDebtor.telegramId);
+    if (creditor.telegramId)  tg.sendMessage(notifyText, creditor.telegramId);
+
+    res.status(200).json({ message: `Долг передан пользователю ${newDebtor.name}`, transaction: tx });
+  } catch (error) {
+    console.error('[transferDebt]', error);
+    res.status(500).json({ error: 'Ошибка при передаче долга' });
+  }
+}
+
+// ── Оплата за друга (третье лицо вносит пруф) ────────────────────────────────
+// Используем тот же submitPaymentProof — третье лицо просто делает запрос
+// и paidByThirdParty фиксируется автоматически
+
+// ── Подтверждение долга (должник) ────────────────────────────────────────────
 async function confirmDebt(req, res) {
   try {
     const { transactionId } = req.params;
-    const userId = req.user;
+    const userId            = req.user;
 
-    const transaction = await Transaction.findById(transactionId).populate('creditor debtor');
-    if (!transaction) return res.status(404).json({ error: 'Долг не найден' });
+    const tx = await Transaction.findById(transactionId).populate('creditor debtor');
+    if (!tx) return res.status(404).json({ error: 'Долг не найден' });
+    if (tx.status !== 'pending_approval')
+      return res.status(400).json({ error: 'Долг не ожидает подтверждения должником' });
 
-    if (transaction.status !== 'pending_approval') {
-      return res.status(400).json({ error: 'Этот долг уже подтвержден или отклонен' });
-    }
-
-    const isParticipant = transaction.debtor._id.toString() === userId.toString() || transaction.creditor._id.toString() === userId.toString();
-    if (!isParticipant) {
+    const isParticipant = [tx.debtor._id.toString(), tx.creditor._id.toString()].includes(userId.toString());
+    if (!isParticipant)
       return res.status(403).json({ error: 'Вы не являетесь участником этого долга' });
-    }
 
-    transaction.status = 'active';
-    await transaction.save();
+    tx.status = 'active';
+    await tx.save();
 
-    // 📣 Telegram: уведомление о подтверждении
-    const text = `✅ <b>Долг подтвержден!</b>\n\n` +
-      `👤 Кредитор: <b>${transaction.creditor.name}</b>\n` +
-      `👤 Должник: <b>${transaction.debtor.name}</b>\n` +
-      `💰 Сумма: <b>${transaction.amount} ₸</b>\n` +
-      `📝 Описание: ${transaction.description}\n\n` +
-      `Долг теперь официально АКТИВЕН и участвует в ELO-системе.`;
+    const text = `✅ <b>Долг подтверждён!</b>\n\n` +
+      `👤 Кредитор: <b>${tx.creditor.name}</b>\n` +
+      `👤 Должник: <b>${tx.debtor.name}</b>\n` +
+      `💰 Сумма: <b>${tx.originalAmount} ₸</b>\n\n` +
+      `Долг теперь АКТИВЕН в ELO-системе.`;
 
     tg.sendMessage(text);
-    if (transaction.debtor.telegramId) tg.sendMessage(text, transaction.debtor.telegramId);
-    if (transaction.creditor.telegramId) tg.sendMessage(text, transaction.creditor.telegramId);
+    if (tx.debtor.telegramId)   tg.sendMessage(text, tx.debtor.telegramId);
+    if (tx.creditor.telegramId) tg.sendMessage(text, tx.creditor.telegramId);
 
-    res.status(200).json({ message: 'Долг успешно подтвержден!', transaction });
+    res.status(200).json({ message: 'Долг успешно подтверждён!', transaction: tx });
   } catch (error) {
-    console.error('Ошибка подтверждения долга:', error);
-    res.status(500).json({ error: 'Ошибка сервера при подтверждении долга' });
+    console.error('[confirmDebt]', error);
+    res.status(500).json({ error: 'Ошибка подтверждения долга' });
   }
 }
 
-// ── Отклонение долга ───────────────────────────────────────────────────────────
+// ── Отклонение долга ──────────────────────────────────────────────────────────
 async function declineDebt(req, res) {
   try {
     const { transactionId } = req.params;
-    const userId = req.user;
+    const userId            = req.user;
 
-    const transaction = await Transaction.findById(transactionId).populate('creditor debtor');
-    if (!transaction) return res.status(404).json({ error: 'Долг не найден' });
+    const tx = await Transaction.findById(transactionId).populate('creditor debtor');
+    if (!tx) return res.status(404).json({ error: 'Долг не найден' });
+    if (!['pending_approval', 'pending_witness'].includes(tx.status))
+      return res.status(400).json({ error: 'Долг не может быть отклонён в текущем статусе' });
 
-    if (transaction.status !== 'pending_approval') {
-      return res.status(400).json({ error: 'Этот долг уже подтвержден или отклонен' });
-    }
-
-    const isParticipant = transaction.debtor._id.toString() === userId.toString() || transaction.creditor._id.toString() === userId.toString();
-    if (!isParticipant) {
+    const isParticipant = [tx.debtor._id.toString(), tx.creditor._id.toString()].includes(userId.toString());
+    if (!isParticipant)
       return res.status(403).json({ error: 'Вы не являетесь участником этого долга' });
-    }
 
-    transaction.status = 'declined';
-    await transaction.save();
+    tx.status = 'declined';
+    await tx.save();
 
-    // 📣 Telegram: уведомление об отклонении
-    const text = `❌ <b>Долг отклонен!</b>\n\n` +
-      `👤 Кредитор: <b>${transaction.creditor.name}</b>\n` +
-      `👤 Должник: <b>${transaction.debtor.name}</b>\n` +
-      `💰 Сумма: <b>${transaction.amount} ₸</b>\n` +
-      `📝 Описание: ${transaction.description}\n\n` +
-      `Этот долг был отклонен одной из сторон и аннулирован.`;
+    const text = `❌ <b>Долг отклонён!</b>\n\n` +
+      `👤 Кредитор: <b>${tx.creditor.name}</b>\n` +
+      `👤 Должник: <b>${tx.debtor.name}</b>\n` +
+      `💰 ${tx.originalAmount} ₸\n\nДолг аннулирован.`;
 
     tg.sendMessage(text);
-    if (transaction.debtor.telegramId) tg.sendMessage(text, transaction.debtor.telegramId);
-    if (transaction.creditor.telegramId) tg.sendMessage(text, transaction.creditor.telegramId);
+    if (tx.debtor.telegramId)   tg.sendMessage(text, tx.debtor.telegramId);
+    if (tx.creditor.telegramId) tg.sendMessage(text, tx.creditor.telegramId);
 
-    res.status(200).json({ message: 'Долг успешно отклонен', transaction });
+    res.status(200).json({ message: 'Долг успешно отклонён', transaction: tx });
   } catch (error) {
-    console.error('Ошибка отклонения долга:', error);
-    res.status(500).json({ error: 'Ошибка сервера при отклонении долга' });
+    console.error('[declineDebt]', error);
+    res.status(500).json({ error: 'Ошибка отклонения долга' });
   }
 }
 
-module.exports = { createDebt, getDebts, payDebt, confirmDebt, declineDebt };
+// ── Legacy payDebt (для обратной совместимости — переадресует в submitPaymentProof) ──
+async function payDebt(req, res) {
+  // Эмулируем: нет файла — возвращаем понятную ошибку
+  return res.status(400).json({
+    error: 'Для оплаты долга теперь требуется прикрепить пруф оплаты. Используйте эндпоинт POST /:id/pay-proof'
+  });
+}
+
+module.exports = {
+  createDebt,
+  witnessDecision,
+  getDebts,
+  submitPaymentProof,
+  forgiveDebt,
+  transferDebt,
+  confirmDebt,
+  declineDebt,
+  payDebt
+};
