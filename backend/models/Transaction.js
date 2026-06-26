@@ -39,6 +39,10 @@ const TransactionSchema = new mongoose.Schema({
     enum: ['active', 'paid', 'declined'], 
     default: 'active' 
   },
+  overdueReminderSent: {
+    type: Boolean,
+    default: false
+  },
   resolvedAt: {
     type: Date
   }

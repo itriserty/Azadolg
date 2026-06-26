@@ -23,3 +23,5 @@ services:
         sync: false            # ← токен бота из @BotFather
       - key: TELEGRAM_CHAT_ID
         sync: false            # ← ID вашего чата/группы
+      - key: JWT_SECRET
+        sync: false            # ← Секретный ключ для подписи JWT-токенов

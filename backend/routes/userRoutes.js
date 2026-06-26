@@ -1,10 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { getUsers, getLeaderboard, createUser, addFriend } = require('../controllers/userController');
+const { getUsers, getLeaderboard, addFriend, updateTelegramId } = require('../controllers/userController');
+const { register, login, getMe } = require('../controllers/authController');
+const authMiddleware = require('../middlewares/authMiddleware');
 
-router.get('/', getUsers);
-router.get('/leaderboard', getLeaderboard);  // GET /api/users/leaderboard
-router.post('/register', createUser);
-router.post('/add-friend', addFriend);
+router.post('/register', register);
+router.post('/login', login);
+router.get('/me', authMiddleware, getMe);
+router.put('/telegram', authMiddleware, updateTelegramId);
+
+router.get('/', authMiddleware, getUsers);
+router.get('/leaderboard', authMiddleware, getLeaderboard);
+router.post('/add-friend', authMiddleware, addFriend);
 
 module.exports = router;

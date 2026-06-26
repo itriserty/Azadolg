@@ -74,9 +74,33 @@ async function addFriend(req, res) {
   }
 }
 
+// Обновить Telegram ID пользователя
+async function updateTelegramId(req, res) {
+  try {
+    const { telegramId } = req.body;
+    const userId = req.user;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { telegramId: telegramId ? telegramId.trim() : null },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+
+    res.status(200).json({ message: 'Telegram ID успешно обновлен!', user });
+  } catch (error) {
+    console.error('Ошибка обновления telegramId:', error);
+    res.status(500).json({ error: 'Ошибка обновления Telegram ID' });
+  }
+}
+
 module.exports = {
   getUsers,
   getLeaderboard,
   createUser,
-  addFriend
+  addFriend,
+  updateTelegramId
 };

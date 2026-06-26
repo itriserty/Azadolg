@@ -6,12 +6,27 @@ const UserSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  username: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    lowercase: true
+  },
+  password: {
+    type: String,
+    required: true
+  },
   email: { 
     type: String, 
     required: true, 
     unique: true,
     trim: true,
     lowercase: true
+  },
+  telegramId: {
+    type: String,
+    default: null
   },
   eloRating: { 
     type: Number, 

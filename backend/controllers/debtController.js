@@ -29,6 +29,11 @@ async function createDebt(req, res) {
     if (!creditorUser || !debtorUser)
       return res.status(404).json({ error: 'Кредитор или должник не найден' });
 
+    // Проверка, что пользователи являются друзьями
+    if (!creditorUser.friends.includes(debtor) || !debtorUser.friends.includes(creditor)) {
+      return res.status(400).json({ error: 'Создавать долги можно только между друзьями' });
+    }
+
     const transaction = new Transaction({
       creditor, debtor,
       amount, originalAmount: amount,
@@ -43,7 +48,8 @@ async function createDebt(req, res) {
     tg.notifyDebtCreated({
       creditorName: creditorUser.name,
       debtorName:   debtorUser.name,
-      amount, description, dueDate
+      amount, description, dueDate,
+      debtorTelegramId: debtorUser.telegramId
     });
 
     res.status(201).json(transaction);
@@ -62,7 +68,7 @@ async function getDebts(req, res) {
     const transactions = await Transaction.find({
       $or: [{ creditor: userId }, { debtor: userId }],
       status: 'active'
-    }).populate('creditor debtor', 'name email eloRating');
+    }).populate('creditor debtor', 'name email eloRating telegramId');
 
     const now = new Date();
     const result = await Promise.all(transactions.map(async t => {
@@ -77,7 +83,8 @@ async function getDebts(req, res) {
           debtorName:     t.debtor.name,
           creditorName:   t.creditor.name,
           originalAmount: t.originalAmount,
-          newAmount:      currentAmount
+          newAmount:      currentAmount,
+          debtorTelegramId: t.debtor.telegramId
         });
       }
 
@@ -132,7 +139,8 @@ async function payDebt(req, res) {
       amount:         finalAmount,
       eloChangeDebtor: debtorElo,
       coinsEarned:    coinsReward,
-      isOverdue
+      isOverdue,
+      debtorTelegramId: debtor?.telegramId
     });
 
     res.status(200).json({

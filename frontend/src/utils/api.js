@@ -1,21 +1,42 @@
 const API_BASE_URL = '/api'; // Всегда относительный путь — работает и локально (через Vite proxy), и на Render
 
 async function request(url, options = {}) {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE_URL}${url}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers,
     ...options
   });
+  
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Что-то пошло не так');
   return data;
 }
 
 export const api = {
+  // Авторизация
+  register:          (name, username, email, password) => request('/users/register', { method: 'POST', body: JSON.stringify({ name, username, email, password }) }),
+  login:             (username, password) => request('/users/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  getMe:             () => request('/users/me'),
+  updateTelegramId:  (telegramId) => request('/users/telegram', { method: 'PUT', body: JSON.stringify({ telegramId }) }),
+
   // Пользователи
   getUsers:       ()              => request('/users'),
   getLeaderboard: ()              => request('/leaderboard'),
-  createUser:     (name, email)   => request('/users/register', { method: 'POST', body: JSON.stringify({ name, email }) }),
-  addFriend:      (userId, friendId) => request('/users/add-friend', { method: 'POST', body: JSON.stringify({ userId, friendId }) }),
+
+  // Друзья
+  getFriends:         () => request('/friends'),
+  addFriend:          (username) => request('/friends/add', { method: 'POST', body: JSON.stringify({ username }) }),
+  acceptFriend:       (requestId) => request('/friends/accept', { method: 'POST', body: JSON.stringify({ requestId }) }),
+  getPendingRequests: () => request('/friends/requests'),
 
   // Долги
   getDebts:   (userId)        => request(`/debts/user/${userId}`),

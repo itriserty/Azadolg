@@ -5,66 +5,185 @@ import Leaderboard    from './components/Leaderboard';
 import DebtForm       from './components/DebtForm';
 import DebtList       from './components/DebtList';
 import CaseRoulette   from './components/CaseRoulette';
-import { LogIn } from 'lucide-react';
+import { LogOut, Lock, Mail, User as UserIcon, HelpCircle } from 'lucide-react';
 
 export default function App() {
-  const [users,       setUsers]       = useState([]);
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
   const [currentUser, setCurrentUser] = useState(null);
-  const [debts,       setDebts]       = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState('');
+  const [users, setUsers] = useState([]); // Таблица лидеров
+  const [friends, setFriends] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [debts, setDebts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Состояния для форм авторизации
+  const [isLogin, setIsLogin] = useState(true);
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
   const [showRoulette, setShowRoulette] = useState(false);
 
-  // ─── Загрузка данных ──────────────────────────────────────────────────────
+  // ─── Загрузка всех данных (Вызывается после успешного входа) ────────────────
 
-  const fetchUsers = useCallback(async () => {
+  const fetchAppData = useCallback(async () => {
+    if (!localStorage.getItem('token')) return;
     try {
-      // Используем /api/leaderboard для получения списка, отсортированного по eloRating
-      const data = await api.getLeaderboard();
-      setUsers(data);
-      // Обновляем данные текущего пользователя из свежего списка
-      setCurrentUser(prev => prev ? (data.find(u => u._id === prev._id) ?? prev) : (data[0] ?? null));
-    } catch (err) {
-      console.error(err);
-      setError('Не удалось подключиться к бэкенду. Убедитесь, что сервер запущен на порту 5000.');
-    }
-  }, []);
-
-  const fetchDebts = useCallback(async (userId) => {
-    if (!userId) return;
-    try {
-      const data = await api.getDebts(userId);
-      setDebts(data);
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
-  // Первичная инициализация
-  useEffect(() => {
-    (async () => {
       setLoading(true);
-      await fetchUsers();
+      
+      // 1. Профиль
+      const me = await api.getMe();
+      setCurrentUser(me);
+
+      // 2. Лидерборд
+      const leaderData = await api.getLeaderboard();
+      setUsers(leaderData);
+
+      // 3. Друзья и Запросы
+      const friendsData = await api.getFriends();
+      setFriends(friendsData);
+
+      const requestsData = await api.getPendingRequests();
+      setPendingRequests(requestsData);
+
+      // 4. Долги
+      const debtsData = await api.getDebts(me._id);
+      setDebts(debtsData);
+
+      setError('');
+    } catch (err) {
+      console.error(err);
+      if (err.message?.includes('токен') || err.message?.includes('Unauthorized')) {
+        handleLogout();
+      } else {
+        setError('Не удалось загрузить данные приложения. Проверьте подключение к серверу.');
+      }
+    } finally {
       setLoading(false);
-    })();
-  }, [fetchUsers]);
+    }
+  }, []);
 
-  // Обновляем долги при смене пользователя
+  // Первичная инициализация при наличии токена
   useEffect(() => {
-    if (currentUser) fetchDebts(currentUser._id);
-  }, [currentUser, fetchDebts]);
+    if (token) {
+      fetchAppData();
+    } else {
+      setLoading(false);
+    }
+  }, [token, fetchAppData]);
 
-  // ─── Обработчики ─────────────────────────────────────────────────────────
+  // ─── Авторизация ───────────────────────────────────────────────────────────
 
-  const handleUserChange = (userId) => {
-    const user = users.find(u => u._id === userId);
-    if (user) setCurrentUser(user);
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthLoading(true);
+
+    try {
+      if (isLogin) {
+        // Вход
+        const data = await api.login(username, password);
+        localStorage.setItem('token', data.token);
+        setToken(data.token);
+      } else {
+        // Регистрация
+        const data = await api.register(name, username, email, password);
+        localStorage.setItem('token', data.token);
+        setToken(data.token);
+      }
+      // Очистка полей формы
+      setName('');
+      setUsername('');
+      setEmail('');
+      setPassword('');
+    } catch (err) {
+      setAuthError(err.message || 'Ошибка авторизации');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setToken('');
+    setCurrentUser(null);
+    setUsers([]);
+    setFriends([]);
+    setPendingRequests([]);
+    setDebts([]);
+    setShowRoulette(false);
+  };
+
+  // ─── Взаимодействие (Друзья, Долги, Кейсы) ─────────────────────────────────
+
+  const handleAddFriend = async (friendUsername) => {
+    const res = await api.addFriend(friendUsername);
+    // Обновляем списки друзей и входящих запросов
+    const friendsData = await api.getFriends();
+    setFriends(friendsData);
+    const requestsData = await api.getPendingRequests();
+    setPendingRequests(requestsData);
+    // Обновляем лидерборд
+    const leaderData = await api.getLeaderboard();
+    setUsers(leaderData);
+    return res;
+  };
+
+  const handleAcceptRequest = async (requestId) => {
+    try {
+      await api.acceptFriend(requestId);
+      // Обновляем данные
+      const friendsData = await api.getFriends();
+      setFriends(friendsData);
+      const requestsData = await api.getPendingRequests();
+      setPendingRequests(requestsData);
+      
+      const me = await api.getMe();
+      setCurrentUser(me);
+      
+      const leaderData = await api.getLeaderboard();
+      setUsers(leaderData);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleRejectRequest = async (requestId) => {
+    try {
+      await api.rejectFriend(requestId);
+      const requestsData = await api.getPendingRequests();
+      setPendingRequests(requestsData);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleUpdateTelegramId = async (telegramId) => {
+    const res = await api.updateTelegramId(telegramId);
+    setCurrentUser(res.user);
+    // Обновляем лидерборд
+    const leaderData = await api.getLeaderboard();
+    setUsers(leaderData);
+    alert(res.message || 'Telegram ID успешно обновлен!');
   };
 
   const handleCreateDebt = async (debtData) => {
-    await api.createDebt(debtData);
-    await fetchUsers();
-    if (currentUser) await fetchDebts(currentUser._id);
+    try {
+      await api.createDebt(debtData);
+      if (currentUser) {
+        const debtsData = await api.getDebts(currentUser._id);
+        setDebts(debtsData);
+      }
+      // Обновляем балансы пользователей в лидерборде
+      const leaderData = await api.getLeaderboard();
+      setUsers(leaderData);
+    } catch (err) {
+      alert(err.message || 'Ошибка создания долга');
+    }
   };
 
   const handlePayDebt = async (transactionId) => {
@@ -76,22 +195,28 @@ export default function App() {
         `${d.name}: ${d.eloChange >= 0 ? '+' : ''}${d.eloChange} ELO, +${d.coinsEarned} Coins\n` +
         `${c.name}: ${c.eloChange >= 0 ? '+' : ''}${c.eloChange} ELO`
       );
-      await fetchUsers();
-      if (currentUser) await fetchDebts(currentUser._id);
+      if (currentUser) {
+        const debtsData = await api.getDebts(currentUser._id);
+        setDebts(debtsData);
+        // Обновляем текущего пользователя (у него прибавились ELO/Coins)
+        const me = await api.getMe();
+        setCurrentUser(me);
+      }
+      const leaderData = await api.getLeaderboard();
+      setUsers(leaderData);
     } catch (err) {
       alert(err.message || 'Ошибка при оплате');
     }
   };
 
-  // Коллбэк для CaseRoulette — мгновенно обновляет UI без лишних запросов
   const handleUserUpdate = (updatedUser) => {
     setCurrentUser(updatedUser);
     setUsers(prev => prev.map(u => u._id === updatedUser._id ? { ...u, ...updatedUser } : u));
-    // Также обновляем долги (мог измениться долг при debt_reduction)
-    if (updatedUser._id) fetchDebts(updatedUser._id);
+    if (updatedUser._id) {
+      api.getDebts(updatedUser._id).then(setDebts);
+    }
   };
 
-  // Открытие кейса — вызывается из Dashboard (кнопка) или раздела рулетки
   const handleOpenCase = async () => {
     if (!currentUser) throw new Error('Пользователь не выбран');
     return await api.openCase(currentUser._id);
@@ -100,14 +225,17 @@ export default function App() {
   // ─── Баланс долгов ────────────────────────────────────────────────────────
 
   const totalOwesMe = debts
-    .filter(d => d.creditor._id === currentUser?._id)
+    .filter(d => d.creditor?._id === currentUser?._id)
     .reduce((sum, d) => sum + d.amount, 0);
 
   const totalIOwe = debts
-    .filter(d => d.debtor._id === currentUser?._id)
+    .filter(d => d.debtor?._id === currentUser?._id)
     .reduce((sum, d) => sum + d.amount, 0);
 
   const netBalance = Number((totalOwesMe - totalIOwe).toFixed(2));
+
+  // Список пользователей для формы создания долга (текущий пользователь + его друзья)
+  const debtFormUsers = currentUser ? [currentUser, ...friends] : [];
 
   // ─── Рендер ───────────────────────────────────────────────────────────────
 
@@ -116,6 +244,127 @@ export default function App() {
       <div className="min-h-screen bg-[#0b0f19] flex flex-col items-center justify-center text-gray-400 gap-4">
         <div className="w-12 h-12 border-4 border-t-purple-500 border-gray-800 rounded-full animate-spin" />
         <p className="text-sm font-semibold tracking-widest uppercase">Загрузка Azadolg...</p>
+      </div>
+    );
+  }
+
+  // Если не авторизован — показываем красивый экран входа / регистрации
+  if (!token || !currentUser) {
+    return (
+      <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center px-4 relative overflow-hidden">
+        {/* Неоновые фоновые сферы */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+
+        <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-8 max-w-md w-full shadow-2xl shadow-black relative z-10">
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-500 to-cyan-400 flex items-center justify-center font-black text-white text-3xl mx-auto shadow-purple-500/35 shadow-lg mb-3">
+              A
+            </div>
+            <h2 className="text-2xl font-black text-white tracking-tight">Добро пожаловать в Azadolg</h2>
+            <p className="text-xs text-gray-400 mt-1">Закрытая финансовая ELO-система для друзей ⚔️</p>
+          </div>
+
+          {/* Переключатель вкладок */}
+          <div className="flex bg-[#0b0f19] p-1.5 rounded-xl border border-gray-850 mb-6">
+            <button
+              onClick={() => { setIsLogin(true); setAuthError(''); }}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
+                isLogin ? 'bg-[#151c2c] text-cyan-400 shadow-md border border-gray-800' : 'text-gray-400 hover:text-gray-255'
+              }`}
+            >
+              Войти
+            </button>
+            <button
+              onClick={() => { setIsLogin(false); setAuthError(''); }}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
+                !isLogin ? 'bg-[#151c2c] text-cyan-400 shadow-md border border-gray-800' : 'text-gray-400 hover:text-gray-255'
+              }`}
+            >
+              Регистрация
+            </button>
+          </div>
+
+          {authError && (
+            <div className="p-3 bg-red-600/10 border border-red-600/30 rounded-xl text-xs text-red-400 mb-4 font-semibold text-center">
+              {authError}
+            </div>
+          )}
+
+          <form onSubmit={handleAuthSubmit} className="space-y-4 text-sm">
+            {!isLogin && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Полное Имя</label>
+                <div className="relative">
+                  <UserIcon className="w-4 h-4 text-gray-500 absolute left-3.5 top-3.5" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="Алексей Смирнов"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Username (Юзернейм)</label>
+              <div className="relative">
+                <UserIcon className="w-4 h-4 text-gray-500 absolute left-3.5 top-3.5" />
+                <input
+                  type="text"
+                  required
+                  placeholder="alex_ninja"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                />
+              </div>
+            </div>
+
+            {!isLogin && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Email</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-gray-500 absolute left-3.5 top-3.5" />
+                  <input
+                    type="email"
+                    required
+                    placeholder="alex@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Пароль</label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-3.5" />
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="w-full bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-purple-500/20 shadow-md hover:opacity-90 transition disabled:opacity-50 mt-4"
+            >
+              {authLoading ? 'Обработка...' : isLogin ? 'Войти в игру' : 'Зарегистрироваться'}
+            </button>
+          </form>
+        </div>
       </div>
     );
   }
@@ -134,26 +383,26 @@ export default function App() {
               <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-1.5">
                 Azadolg
                 <span className="text-[9px] bg-cyan-400/15 text-cyan-400 border border-cyan-400/30 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                  v2
+                  v3
                 </span>
               </h1>
-              <p className="text-[10px] text-gray-500">Геймифицированный трекер долгов</p>
+              <p className="text-[10px] text-gray-500">Закрытая финансовая ELO-система</p>
             </div>
           </div>
 
-          {/* Селектор пользователя */}
-          <div className="flex items-center gap-2">
-            <LogIn className="w-4 h-4 text-gray-500 hidden sm:block" />
-            <span className="text-xs text-gray-400 hidden sm:block">Играете за:</span>
-            <select
-              value={currentUser?._id || ''}
-              onChange={(e) => handleUserChange(e.target.value)}
-              className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-1.5 text-xs text-gray-200 font-bold focus:outline-none focus:border-purple-500/40"
+          {/* Панель текущего пользователя и Выход */}
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden md:block">
+              <div className="text-xs font-bold text-gray-200">{currentUser.name}</div>
+              <div className="text-[10px] text-gray-500">@{currentUser.username}</div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 bg-gray-850 hover:bg-red-950/20 hover:text-red-400 text-gray-400 font-bold py-1.5 px-3 rounded-xl text-xs border border-gray-800 hover:border-red-900/30 transition"
             >
-              {users.map(u => (
-                <option key={u._id} value={u._id}>{u.name} — {u.eloRating} ELO</option>
-              ))}
-            </select>
+              <LogOut className="w-3.5 h-3.5" />
+              Выйти
+            </button>
           </div>
         </div>
       </header>
@@ -169,14 +418,19 @@ export default function App() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* ── Левая колонка (Dashboard + Лидерборд + Рулетка) ─── */}
           <div className="lg:col-span-5 space-y-8">
-
             {/* Dashboard: профиль, ELO-виджет, баланс, кнопка кейса */}
             <Dashboard
               user={currentUser}
               netBalance={netBalance}
               totalOwesMe={totalOwesMe}
               totalIOwe={totalIOwe}
+              friends={friends}
+              pendingRequests={pendingRequests}
               onOpenCaseClick={() => setShowRoulette(prev => !prev)}
+              onAddFriend={handleAddFriend}
+              onAcceptRequest={handleAcceptRequest}
+              onRejectRequest={handleRejectRequest}
+              onUpdateTelegramId={handleUpdateTelegramId}
             />
 
             {/* Рулетка кейсов (показываем/скрываем по кнопке в Dashboard) */}
@@ -188,14 +442,14 @@ export default function App() {
               />
             )}
 
-            {/* ELO-лидерборд (использует /api/leaderboard) */}
+            {/* ELO-лидерборд */}
             <Leaderboard users={users} currentUser={currentUser} />
           </div>
 
           {/* ── Правая колонка (Форма + Списки долгов) ───────────── */}
           <div className="lg:col-span-7 space-y-8">
             <DebtForm
-              users={users}
+              users={debtFormUsers}
               currentUser={currentUser}
               onSubmit={handleCreateDebt}
             />

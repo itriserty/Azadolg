@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { createDebt, getDebts, payDebt } = require('../controllers/debtController');
+const authMiddleware = require('../middlewares/authMiddleware');
+
+router.use(authMiddleware);
 
 // Создание долга
 router.post('/create', createDebt);

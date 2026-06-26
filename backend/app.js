@@ -7,6 +7,8 @@ const path     = require('path');
 const userRoutes = require('./routes/userRoutes');
 const debtRoutes = require('./routes/debtRoutes');
 const caseRoutes = require('./routes/caseRoutes');
+const friendRoutes = require('./routes/friendRoutes');
+const { startReminderScheduler } = require('./services/reminderService');
 
 const { getLeaderboard } = require('./controllers/userController');
 const { openCase }       = require('./controllers/caseController');
@@ -26,10 +28,12 @@ app.use((req, res, next) => {
 app.use('/api/users',  userRoutes);
 app.use('/api/debts',  debtRoutes);
 app.use('/api/cases',  caseRoutes);
+app.use('/api/friends', friendRoutes);
 
 // Верхнеуровневые роуты (требуемые по заданию)
-app.get('/api/leaderboard', getLeaderboard);
-app.post('/api/open-case',  openCase);
+const authMiddleware = require('./middlewares/authMiddleware');
+app.get('/api/leaderboard', authMiddleware, getLeaderboard);
+app.post('/api/open-case',  authMiddleware, openCase);
 
 // ── Раздача собранного React-фронтенда ────────────────────────────────────────
 // На Render фронтенд собирается перед стартом (см. render.yaml buildCommand).
@@ -51,6 +55,7 @@ app.get('*', (req, res) => {
 async function seedDatabase() {
   const User        = require('./models/User');
   const Transaction = require('./models/Transaction');
+  const bcrypt      = require('bcryptjs');
 
   const count = await User.countDocuments();
   if (count > 0) {
@@ -60,9 +65,11 @@ async function seedDatabase() {
 
   console.log('[SEED] База данных пуста. Создаём тестовые данные...');
 
-  const alice   = new User({ name: 'Алиса',  email: 'alice@example.com',   eloRating: 1050, coins: 250 });
-  const bob     = new User({ name: 'Боб',    email: 'bob@example.com',     eloRating: 980,  coins: 80  });
-  const charlie = new User({ name: 'Чарли',  email: 'charlie@example.com', eloRating: 1000, coins: 400 });
+  const hashedPassword = await bcrypt.hash('password123', 10);
+
+  const alice   = new User({ name: 'Алиса',  username: 'alice',   password: hashedPassword, email: 'alice@example.com',   eloRating: 1050, coins: 250 });
+  const bob     = new User({ name: 'Боб',    username: 'bob',     password: hashedPassword, email: 'bob@example.com',     eloRating: 980,  coins: 80  });
+  const charlie = new User({ name: 'Чарли',  username: 'charlie', password: hashedPassword, email: 'charlie@example.com', eloRating: 1000, coins: 400 });
   await Promise.all([alice.save(), bob.save(), charlie.save()]);
 
   alice.friends   = [bob._id, charlie._id];
@@ -106,6 +113,7 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
   .then(async () => {
     console.log('✅ MongoDB Atlas: подключено.');
     await seedDatabase();
+    startReminderScheduler();
     app.listen(PORT, () => console.log(`🚀 Сервер запущен на порту ${PORT}`));
   })
   .catch(err => {

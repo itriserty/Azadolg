@@ -80,7 +80,8 @@ async function openCase(req, res) {
       userName:    user.name,
       dropLabel:   prize.label,
       dropRarity:  prize.rarity,
-      description
+      description,
+      telegramId:  user.telegramId
     });
 
     res.status(200).json({
