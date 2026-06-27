@@ -32,6 +32,26 @@ async function sendMessage(text, chatId = CHAT_ID) {
 // ─── Шаблоны уведомлений ─────────────────────────────────────────────────────
 
 /**
+ * Уведомление для свидетеля о запросе подтверждения долга.
+ */
+function notifyWitnessRequest({ creditorName, debtorName, amount, promisedReturnAmount, description, dueDate, witnessTelegramId, debtorTelegramId, creditorTelegramId }) {
+  const date = new Date(dueDate).toLocaleDateString('ru-RU');
+  const text = `🔍 <b>Запрос подтверждения долга!</b>\n\n` +
+    `👤 Кредитор: <b>${creditorName}</b>\n` +
+    `👤 Должник: <b>${debtorName}</b>\n` +
+    `💰 Сумма займа: <b>${amount} ₸</b>\n` +
+    `${promisedReturnAmount ? `🤝 Обещано вернуть: <b>${promisedReturnAmount} ₸</b>\n` : ''}` +
+    `📝 Описание: ${description}\n` +
+    `📅 Срок: <b>${date}</b>\n\n` +
+    `⚖️ Вы назначены свидетелем. Подтвердите или отклоните этот долг в приложении Azadolg!`;
+
+  if (witnessTelegramId) sendMessage(text, witnessTelegramId);
+  if (debtorTelegramId) sendMessage(text, debtorTelegramId);
+  if (creditorTelegramId) sendMessage(text, creditorTelegramId);
+  if (CHAT_ID) sendMessage(text, CHAT_ID);
+}
+
+/**
  * Уведомление о создании нового долга.
  */
 function notifyDebtCreated({ creditorName, debtorName, amount, description, dueDate, debtorTelegramId }) {
@@ -55,7 +75,7 @@ function notifyDebtCreated({ creditorName, debtorName, amount, description, dueD
 /**
  * Уведомление об оплате (закрытии) долга.
  */
-function notifyDebtPaid({ debtorName, creditorName, amount, eloChangeDebtor, coinsEarned, isOverdue, debtorTelegramId, note }) {
+function notifyDebtPaid({ debtorName, creditorName, amount, eloChangeDebtor, coinsEarned, isOverdue, debtorTelegramId, creditorTelegramId, note }) {
   const icon = isOverdue ? '⚠️' : '✅';
   const eloEmoji = eloChangeDebtor >= 0 ? '📈' : '📉';
   let text = `${icon} <b>Долг закрыт${isOverdue ? ' (с просрочкой)' : ' вовремя'}!</b>\n\n` +
@@ -72,7 +92,10 @@ function notifyDebtPaid({ debtorName, creditorName, amount, eloChangeDebtor, coi
   if (debtorTelegramId) {
     sendMessage(text, debtorTelegramId);
   }
-  if (CHAT_ID && CHAT_ID !== debtorTelegramId) {
+  if (creditorTelegramId) {
+    sendMessage(text, creditorTelegramId);
+  }
+  if (CHAT_ID) {
     sendMessage(text, CHAT_ID);
   }
 }
@@ -115,6 +138,7 @@ function notifyPenaltyApplied({ debtorName, creditorName, originalAmount, newAmo
 
 module.exports = {
   sendMessage,
+  notifyWitnessRequest,
   notifyDebtCreated,
   notifyDebtPaid,
   notifyCase,

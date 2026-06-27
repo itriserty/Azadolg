@@ -639,7 +639,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile }) 
                           <img
                             src={c.authorId?.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${c.authorId?.username}`}
                             alt={c.authorId?.name}
-                            className="w-7.5 h-7.5 rounded-lg border border-gray-800/50"
+                            className="w-8 h-8 rounded-lg border border-gray-800/50 shrink-0"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-center">

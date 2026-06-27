@@ -93,19 +93,18 @@ async function createDebt(req, res) {
     });
     await transaction.save();
 
-    // 📣 Telegram: уведомить свидетеля
-    const text = `🔍 <b>Запрос подтверждения долга!</b>\n\n` +
-      `👤 Кредитор: <b>${creditorUser.name}</b>\n` +
-      `👤 Должник: <b>${debtorUser.name}</b>\n` +
-      `💰 Сумма займа: <b>${Number(amount)} ₸</b>\n` +
-      `${promisedReturnAmount ? `🤝 Обещано вернуть: <b>${Number(promisedReturnAmount)} ₸</b>\n` : ''}` +
-      `${diffDaysRetro > 7 ? `⚠️ (С пеней: ${startingAmount} ₸)\n` : ''}` +
-      `📝 ${description}\n` +
-      `📅 Срок: ${new Date(dueDate).toLocaleDateString('ru-RU')}\n\n` +
-      `⚖️ Вы назначены свидетелем. Подтвердите или отклоните этот долг в приложении Azadolg!`;
-
-    if (witnessUser.telegramId) tg.sendMessage(text, witnessUser.telegramId);
-    else tg.sendMessage(text);
+    // 📣 Telegram: уведомить участников и свидетеля
+    tg.notifyWitnessRequest({
+      creditorName: creditorUser.name,
+      debtorName: debtorUser.name,
+      amount: Number(amount),
+      promisedReturnAmount: promisedReturnAmount ? Number(promisedReturnAmount) : null,
+      description,
+      dueDate,
+      witnessTelegramId: witnessUser.telegramId,
+      debtorTelegramId: debtorUser.telegramId,
+      creditorTelegramId: creditorUser.telegramId
+    });
 
     res.status(201).json(transaction);
   } catch (error) {
@@ -152,6 +151,8 @@ async function witnessDecision(req, res) {
 
       if (tx.debtor.telegramId)   tg.sendMessage(notifyText, tx.debtor.telegramId);
       if (tx.creditor.telegramId) tg.sendMessage(notifyText, tx.creditor.telegramId);
+      if (tx.witness?.telegramId)  tg.sendMessage(notifyText, tx.witness.telegramId);
+      tg.sendMessage(notifyText);
 
     } else if (action === 'reject') {
       tx.witnessStatus = 'rejected';
@@ -166,6 +167,8 @@ async function witnessDecision(req, res) {
 
       if (tx.debtor.telegramId)   tg.sendMessage(notifyText, tx.debtor.telegramId);
       if (tx.creditor.telegramId) tg.sendMessage(notifyText, tx.creditor.telegramId);
+      if (tx.witness?.telegramId)  tg.sendMessage(notifyText, tx.witness.telegramId);
+      tg.sendMessage(notifyText);
     } else {
       return res.status(400).json({ error: 'Неверное действие. Ожидается: approve | reject' });
     }
@@ -358,7 +361,10 @@ async function submitPaymentProof(req, res) {
         amount:       currentAmount,
         eloChangeDebtor: applyRewards ? debtorElo : 0,
         coinsEarned:     applyRewards ? coinsReward : 0,
-        isOverdue, debtorTelegramId: debtor?.telegramId, note
+        isOverdue,
+        debtorTelegramId: debtor?.telegramId,
+        creditorTelegramId: creditor?.telegramId,
+        note
       });
 
       return res.status(200).json({
