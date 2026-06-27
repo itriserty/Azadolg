@@ -192,12 +192,38 @@ function startCronScheduler() {
     checkSeasonReset();
   });
 
-  console.log('[CronService] Планировщик cron запущен (Карма: Пн 09:00 | Джекпот: Вс 23:59 | Сезон: 1-е число месяца)');
+  // Проверка и очистка неактивных сборов краудфандинга каждые 6 часов
+  cron.schedule('0 */6 * * *', () => {
+    cleanExpiredCrowdfunds();
+  });
+
+  console.log('[CronService] Планировщик cron запущен (Карма: Пн 09:00 | Джекпот: Вс 23:59 | Сезон: 1-е число месяца | Сборы: каждые 6ч)');
+}
+
+async function cleanExpiredCrowdfunds() {
+  try {
+    const Fund = require('../models/Fund');
+    const cutoff = new Date();
+    cutoff.setHours(cutoff.getHours() - 72);
+
+    const result = await Fund.deleteMany({
+      status: 'active',
+      currentAmount: 0,
+      createdAt: { $lt: cutoff }
+    });
+
+    if (result.deletedCount > 0) {
+      console.log(`[CronService] Очищено ${result.deletedCount} сборов краудфандинга без взносов (старше 72 часов).`);
+    }
+  } catch (error) {
+    console.error('[CronService] Ошибка очистки просроченных сборов:', error);
+  }
 }
 
 module.exports = {
   drawJackpot,
   checkSeasonReset,
   distributeWeeklyKarma,
-  startCronScheduler
+  startCronScheduler,
+  cleanExpiredCrowdfunds
 };

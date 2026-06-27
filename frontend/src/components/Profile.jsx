@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { Shield, Eye, EyeOff, Trophy, Award, MessageSquare, Send, Trash2, Coins, Flame, Heart, DollarSign } from 'lucide-react';
 import DebtList from './DebtList';
@@ -20,6 +21,10 @@ const FRAME_STYLES = {
 };
 
 export default function Profile({ userId, currentUser, onBack }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const targetUserId = id || userId;
+
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -41,7 +46,7 @@ export default function Profile({ userId, currentUser, onBack }) {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const data = await api.request(`/users/${userId}/profile`);
+      const data = await api.request(`/users/${targetUserId}/profile`);
       setProfileData(data);
       setSelectedShowcase((data.user?.achievementShowcase || []).map(a => a._id || a));
       setError('');
@@ -54,12 +59,12 @@ export default function Profile({ userId, currentUser, onBack }) {
   };
 
   useEffect(() => {
-    if (userId) {
+    if (targetUserId) {
       fetchProfile();
     }
-  }, [userId]);
+  }, [targetUserId]);
 
-  const isSelf = currentUser && currentUser._id === userId;
+  const isSelf = currentUser && currentUser._id === targetUserId;
 
   const handleTogglePrivacy = async () => {
     try {
@@ -78,7 +83,7 @@ export default function Profile({ userId, currentUser, onBack }) {
     if (!commentText.trim()) return;
     setSubmittingComment(true);
     try {
-      const newComment = await api.request(`/users/${userId}/comments`, {
+      const newComment = await api.request(`/users/${targetUserId}/comments`, {
         method: 'POST',
         body: JSON.stringify({ text: commentText })
       });
@@ -97,7 +102,7 @@ export default function Profile({ userId, currentUser, onBack }) {
   const handleDeleteComment = async (commentId) => {
     if (!window.confirm('Удалить этот комментарий со стены?')) return;
     try {
-      await api.request(`/users/${userId}/comments/${commentId}`, { method: 'DELETE' });
+      await api.request(`/users/${targetUserId}/comments/${commentId}`, { method: 'DELETE' });
       setProfileData(prev => ({
         ...prev,
         comments: prev.comments.filter(c => c._id !== commentId)

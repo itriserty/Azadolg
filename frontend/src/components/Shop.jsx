@@ -1,62 +1,63 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
+import { Coins, Tag, Award, Sparkles, User, ShoppingBag, ShieldCheck, Heart } from 'lucide-react';
+import Marketplace from './Marketplace';
 
 const RARITY_COLORS = {
-  'Тайное': 'bg-gradient-to-r from-amber-500 to-yellow-600 text-white shadow-lg shadow-yellow-500/20 border-yellow-400',
-  'Запрещенное': 'bg-gradient-to-r from-purple-500 to-fuchsia-600 text-white shadow-lg shadow-purple-500/20 border-purple-400',
-  'Армейское': 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20 border-blue-400',
-  'Ширпотреб': 'bg-gradient-to-r from-slate-500 to-gray-600 text-white border-slate-400'
+  immortal: 'bg-gradient-to-r from-indigo-500 to-indigo-650 text-white shadow shadow-indigo-500/20 border-indigo-400',
+  legendary: 'bg-gradient-to-r from-amber-500 to-yellow-600 text-white shadow shadow-yellow-500/20 border-yellow-400',
+  rare: 'bg-gradient-to-r from-purple-500 to-fuchsia-600 text-white shadow shadow-purple-500/20 border-purple-400',
+  common: 'bg-gradient-to-r from-slate-500 to-gray-600 text-white border-slate-400'
 };
 
-export default function Shop({ user, onUpdateUser }) {
+export default function Shop({ user, onUpdateUser, onViewProfile }) {
   const [items, setItems] = useState([]);
   const [inventory, setInventory] = useState([]);
+  const [activeTab, setActiveTab] = useState('official'); // 'official' | 'p2p'
   const [loading, setLoading] = useState(false);
-  const [gachaRolling, setGachaRolling] = useState(false);
-  const [gachaDrop, setGachaDrop] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-
-  useEffect(() => {
-    fetchShopData();
-  }, []);
 
   const fetchShopData = async () => {
     try {
       setLoading(true);
       const [shopItems, userInventory] = await Promise.all([
-        api.getShopItems(),
-        api.getUserInventory()
+        api.request('/shop/items'),
+        api.request('/shop/inventory')
       ]);
       setItems(shopItems);
       setInventory(userInventory);
+      setError('');
     } catch (err) {
-      setError(err.message || 'Ошибка загрузки данных магазина');
+      console.error(err);
+      setError('Ошибка загрузки витрины магазина');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchShopData();
+  }, []);
 
   const handleBuy = async (itemId) => {
     try {
       setError('');
       setSuccess('');
       setLoading(true);
-      const res = await api.buyShopItem(itemId);
+      const res = await api.request('/shop/buy', {
+        method: 'POST',
+        body: JSON.stringify({ itemId })
+      });
       setSuccess(res.message);
       
-      // Обновляем баланс пользователя на фронтенде
-      if (res.user) {
-        onUpdateUser({
-          ...user,
-          karma: res.user.karma,
-          eloRating: res.user.eloRating
-        });
+      if (res.user && onUpdateUser) {
+        onUpdateUser(res.user);
       }
       
       await fetchShopData();
     } catch (err) {
-      setError(err.message || 'Ошибка при покупке товара');
+      setError(err.message || 'Ошибка покупки');
     } finally {
       setLoading(false);
     }
@@ -67,51 +68,26 @@ export default function Shop({ user, onUpdateUser }) {
       setError('');
       setSuccess('');
       setLoading(true);
-      const res = await api.activateCosmetic(itemId, itemType);
+      const res = await api.request('/shop/activate', {
+        method: 'POST',
+        body: JSON.stringify({ itemId, itemType })
+      });
       setSuccess(res.message);
-      if (res.user) {
+      
+      if (res.user && onUpdateUser) {
         onUpdateUser(res.user);
       }
+      
       await fetchShopData();
     } catch (err) {
-      setError(err.message || 'Ошибка активации');
+      setError(err.message || 'Ошибка активации предмета');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRollGacha = async () => {
-    try {
-      setError('');
-      setSuccess('');
-      setGachaDrop(null);
-      setGachaRolling(true);
-
-      // Имитируем вращение рулетки для вау-эффекта
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const res = await api.pullGacha();
-      setGachaDrop(res.drop);
-      
-      if (res.user) {
-        onUpdateUser({
-          ...user,
-          karma: res.user.karma,
-          eloRating: res.user.eloRating,
-          coins: res.user.coins
-        });
-      }
-      
-      await fetchShopData();
-    } catch (err) {
-      setError(err.message || 'Ошибка при запуске Гачи');
-    } finally {
-      setGachaRolling(false);
-    }
-  };
-
   const isOwned = (itemId) => {
-    return inventory.some(inv => inv.itemId === itemId);
+    return inventory.some(inv => inv.itemId === itemId && inv.quantity > 0);
   };
 
   const getActiveItem = (itemType) => {
@@ -121,209 +97,185 @@ export default function Shop({ user, onUpdateUser }) {
   };
 
   return (
-    <div className="space-y-8 pb-12 animate-fadeIn">
-      {/* Шапка с балансом */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-slate-900/60 border border-slate-800/80 backdrop-blur-md rounded-2xl p-6 shadow-xl">
+    <div className="space-y-6 text-xs text-gray-300">
+      
+      {/* Шапка магазина */}
+      <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-extrabold text-white tracking-wide">Магазин и Гача-рулетка</h2>
-          <p className="text-slate-400 mt-1">Тратьте заработанную Карму на оформление профиля и бустеры рейтинга ELO.</p>
+          <h2 className="text-base font-black tracking-tight text-white flex items-center gap-1.5 uppercase">
+            🛍️ Рынок и Кастомизация
+          </h2>
+          <p className="text-[10px] text-gray-500">Улучшайте свой профиль, покупайте бустеры и торгуйте скинами.</p>
         </div>
-        <div className="mt-4 md:mt-0 flex items-center space-x-6 bg-slate-800/50 px-6 py-3 rounded-xl border border-slate-700/50">
+
+        <div className="flex items-center gap-4 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl self-start md:self-auto shrink-0">
           <div>
-            <div className="text-xs text-slate-400 uppercase tracking-wider">Ваша Карма</div>
-            <div className="text-2xl font-black text-emerald-400 flex items-center">
-              <span>{user.karma} ₸</span>
-            </div>
-          </div>
-          <div className="h-8 w-px bg-slate-700/80" />
-          <div>
-            <div className="text-xs text-slate-400 uppercase tracking-wider">Ваш Рейтинг</div>
-            <div className="text-2xl font-black text-blue-400 flex items-center">
-              <span>{user.eloRating} ELO</span>
-            </div>
+            <div className="text-[9px] text-gray-500 font-bold uppercase leading-none mb-0.5">Баланс Кармы</div>
+            <div className="text-sm font-black text-emerald-400 leading-none">💠 {user.karma} ✧</div>
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm flex items-center space-x-3">
-          <span>⚠️</span>
-          <span>{error}</span>
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 font-bold flex items-center gap-2">
+          <span>⚠️</span> {error}
         </div>
       )}
 
       {success && (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-xl text-sm flex items-center space-x-3">
-          <span>✅</span>
-          <span>{success}</span>
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 font-bold flex items-center gap-2">
+          <span>✅</span> {success}
         </div>
       )}
 
-      {/* Сетка: Гача и Товары */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Блок ГАЧА-Рулетки */}
-        <div className="lg:col-span-1 bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-purple-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-          
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="bg-purple-500/20 text-purple-400 text-xs font-bold px-3 py-1 rounded-full border border-purple-500/30">Кейс Косметики</span>
-              <span className="text-slate-400 text-sm font-semibold">100 ₸ / Крутка</span>
-            </div>
-            
-            <h3 className="text-2xl font-bold text-white mb-2">Gacha Roulette</h3>
-            <p className="text-slate-400 text-sm leading-relaxed mb-6">
-              Испытайте удачу! Из кейса с разной вероятностью выпадают неоновые скины, анимированные рамки профиля и ELO-бустеры.
-            </p>
+      {/* Переключатель вкладок магазина */}
+      <div className="flex bg-[#151c2c]/80 border border-gray-800 p-1.5 rounded-2xl gap-1.5 max-w-xs mx-auto">
+        <button
+          onClick={() => setActiveTab('official')}
+          className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'official'
+              ? 'bg-gradient-to-r from-purple-650/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow'
+              : 'text-gray-400 hover:text-gray-250 border border-transparent'
+          }`}
+        >
+          🏪 Магазин
+        </button>
+        <button
+          onClick={() => setActiveTab('p2p')}
+          className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'p2p'
+              ? 'bg-gradient-to-r from-purple-650/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow'
+              : 'text-gray-400 hover:text-gray-250 border border-transparent'
+          }`}
+        >
+          🛍️ P2P Маркет
+        </button>
+      </div>
 
-            {/* Визуализатор рулетки */}
-            <div className="h-48 flex items-center justify-center bg-slate-950/60 rounded-2xl border border-slate-800 relative overflow-hidden mb-6">
-              {gachaRolling ? (
-                <div className="flex flex-col items-center space-y-4">
-                  <div className="w-16 h-16 border-4 border-t-purple-500 border-r-emerald-400 border-b-blue-500 border-l-slate-700 rounded-full animate-spin" />
-                  <div className="text-purple-400 text-sm font-black tracking-widest uppercase animate-pulse">Крутим кейс...</div>
-                </div>
-              ) : gachaDrop ? (
-                <div className="text-center p-4 animate-scaleUp">
-                  <div className="text-xs uppercase tracking-wider text-slate-400 mb-1">Вы выбили:</div>
-                  <div className={`inline-block px-3 py-1 rounded-full text-xs font-bold border ${RARITY_COLORS[gachaDrop.rarity] || ''} mb-2`}>
-                    {gachaDrop.rarity}
-                  </div>
-                  <h4 className="text-xl font-black text-white">{gachaDrop.name}</h4>
-                  <p className="text-xs text-slate-400 mt-1 max-w-[200px] mx-auto">{gachaDrop.description}</p>
-                </div>
-              ) : (
-                <div className="text-center">
-                  <div className="text-6xl mb-2">🎁</div>
-                  <div className="text-slate-500 text-xs">Нажмите ниже для прокрутки</div>
-                </div>
-              )}
-            </div>
-          </div>
+      {activeTab === 'p2p' ? (
+        <Marketplace user={user} onUpdateUser={onUpdateUser} onViewProfile={onViewProfile} />
+      ) : (
+        <div className="space-y-6">
+          {/* Официальная витрина */}
+          <div className="bg-[#151c2c] border border-gray-800 rounded-3xl p-5 shadow-xl shadow-black/40 space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-wider text-purple-400">
+              Официальная Витрина Azadolg
+            </h3>
 
-          <button
-            onClick={handleRollGacha}
-            disabled={gachaRolling || user.karma < 100 || loading}
-            className={`w-full py-4 rounded-xl font-bold text-white transition-all transform duration-300 shadow-lg ${
-              user.karma >= 100 && !gachaRolling
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 hover:-translate-y-0.5 active:translate-y-0 hover:shadow-purple-500/20'
-                : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
-            }`}
-          >
-            {user.karma < 100 ? 'Недостаточно Кармы' : gachaRolling ? 'Вращение...' : 'Прокрутить за 100 ₸'}
-          </button>
-        </div>
+            {loading && items.length === 0 ? (
+              <div className="text-center py-10 flex flex-col items-center justify-center space-y-2">
+                <div className="w-8 h-8 border-2 border-t-purple-500 border-gray-800 rounded-full animate-spin" />
+                <span>Загрузка витрины...</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {items.map((item) => {
+                  const owned = isOwned(item.itemId);
+                  const active = getActiveItem(item.type) === item.itemId;
 
-        {/* Список товаров в Магазине */}
-        <div className="lg:col-span-2 space-y-6">
-          <h3 className="text-2xl font-bold text-white">Товары на витрине</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {items.map(item => {
-              const owned = isOwned(item.id);
-              const active = getActiveItem(item.type) === item.id;
-              
-              return (
-                <div key={item.id} className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 hover:border-slate-700 transition-all flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-start mb-3">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${RARITY_COLORS[item.rarity] || ''}`}>
-                        {item.rarity}
-                      </span>
-                      <span className="text-slate-500 text-xs capitalize">{item.type === 'boost' ? 'Буст' : item.type === 'skin' ? 'Скин' : 'Рамка'}</span>
+                  return (
+                    <div key={item.itemId} className="bg-black/25 border border-gray-850 hover:border-gray-800 rounded-xl p-4 flex flex-col justify-between space-y-3">
+                      <div>
+                        <div className="flex justify-between items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${RARITY_COLORS[item.rarity] || RARITY_COLORS.common}`}>
+                            {item.rarity}
+                          </span>
+                          <span className="text-gray-550 text-[9px] uppercase tracking-wider">{item.type}</span>
+                        </div>
+
+                        <h4 className="font-bold text-gray-200 mt-2 text-sm">{item.name}</h4>
+                        <p className="text-[10px] text-gray-400 mt-1">{item.description}</p>
+                      </div>
+
+                      <div className="border-t border-gray-800/40 pt-3 flex items-center justify-between">
+                        <span className="text-emerald-400 font-extrabold text-sm flex items-center gap-0.5">
+                          {item.price} ✧
+                        </span>
+
+                        {item.type === 'boost' ? (
+                          <button
+                            onClick={() => handleBuy(item.itemId)}
+                            disabled={loading || user.karma < item.price}
+                            className={`px-3 py-1.5 rounded-lg font-bold text-[10px] uppercase transition ${
+                              user.karma >= item.price
+                                ? 'bg-emerald-650 hover:bg-emerald-550 text-white'
+                                : 'bg-gray-800 text-gray-550 cursor-not-allowed'
+                            }`}
+                          >
+                            Применить (+{item.value} {item.itemId.includes('elo') ? 'ELO' : 'Карма'})
+                          </button>
+                        ) : owned ? (
+                          active ? (
+                            <button
+                              onClick={() => handleActivate(item.type === 'skin' ? 'default' : 'none', item.type)}
+                              disabled={loading}
+                              className="px-3 py-1.5 bg-gray-850 hover:bg-gray-800 border border-gray-700 text-gray-300 font-bold rounded-lg text-[10px] uppercase transition"
+                            >
+                              Снять
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleActivate(item.itemId, item.type)}
+                              disabled={loading}
+                              className="px-3 py-1.5 bg-indigo-650 hover:bg-indigo-550 text-white font-bold rounded-lg text-[10px] uppercase transition"
+                            >
+                              Использовать
+                            </button>
+                          )
+                        ) : (
+                          <button
+                            onClick={() => handleBuy(item.itemId)}
+                            disabled={loading || user.karma < item.price}
+                            className={`px-3 py-1.5 font-bold rounded-lg text-[10px] uppercase transition ${
+                              user.karma >= item.price
+                                ? 'bg-purple-650 hover:bg-purple-550 text-white'
+                                : 'bg-gray-800 text-gray-550 cursor-not-allowed'
+                            }`}
+                          >
+                            Купить
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <h4 className="text-lg font-bold text-white mb-1">{item.name}</h4>
-                    <p className="text-xs text-slate-400 mb-4">{item.description}</p>
-                  </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-800/50">
-                    <span className="text-emerald-400 font-extrabold text-lg">{item.price} ₸</span>
-                    
-                    {item.type === 'boost' ? (
-                      <button
-                        onClick={() => handleBuy(item.id)}
-                        disabled={loading || user.karma < item.price}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                          user.karma >= item.price
-                            ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-                            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                        }`}
-                      >
-                        Применить (+{item.value} ELO)
-                      </button>
-                    ) : owned ? (
-                      active ? (
-                        <button
-                          onClick={() => handleActivate(item.type === 'skin' ? 'default' : 'none', item.type)}
-                          disabled={loading}
-                          className="px-4 py-2 rounded-lg text-xs font-bold bg-slate-700 text-slate-200 hover:bg-slate-600 transition-all"
-                        >
-                          Снять
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleActivate(item.id, item.type)}
-                          disabled={loading}
-                          className="px-4 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-500 transition-all"
-                        >
-                          Надеть
-                        </button>
-                      )
-                    ) : (
-                      <button
-                        onClick={() => handleBuy(item.id)}
-                        disabled={loading || user.karma < item.price}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                          user.karma >= item.price
-                            ? 'bg-purple-600 hover:bg-purple-500 text-white'
-                            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                        }`}
-                      >
-                        Купить
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          {/* Инвентарь коллекционера */}
+          <div className="bg-[#151c2c] border border-gray-800 rounded-3xl p-5 shadow-xl shadow-black/40 space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-wider text-cyan-400">
+              Ваш косметический шкаф (Инвентарь)
+            </h3>
+
+            {inventory.filter(i => i.itemType !== 'boost').length === 0 ? (
+              <p className="text-[10px] text-gray-550 text-center py-6">В шкафу пока пусто. Купите вещи или откройте кейсы!</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {inventory.filter(i => i.itemType !== 'boost').map((inv) => {
+                  const active = getActiveItem(inv.itemType) === inv.itemId;
+                  return (
+                    <div
+                      key={inv._id}
+                      onClick={() => handleActivate(active ? (inv.itemType === 'skin' ? 'default' : 'none') : inv.itemId, inv.itemType)}
+                      className={`bg-black/30 border p-3 rounded-xl text-center cursor-pointer transition-all hover:scale-[1.03] ${
+                        active ? 'border-cyan-500 bg-cyan-950/10 shadow shadow-cyan-500/10' : 'border-gray-850 hover:border-gray-800'
+                      }`}
+                    >
+                      <div className="text-2xl mb-1">{inv.itemType === 'skin' ? '🎨' : '🖼️'}</div>
+                      <div className="font-bold text-gray-200 truncate leading-none">{inv.details?.name || inv.itemId}</div>
+                      <div className="text-[8px] text-gray-500 mt-1 uppercase tracking-widest">
+                        {active ? 'Надето' : 'В запасе'} {inv.quantity > 1 && `(x${inv.quantity})`}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
-
-      </div>
-
-      {/* Инвентарь Косметики */}
-      <div className="bg-slate-900/40 border border-slate-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl">
-        <h3 className="text-xl font-bold text-white mb-4">Ваша коллекция косметики</h3>
-        
-        {inventory.filter(i => i.itemType !== 'boost').length === 0 ? (
-          <div className="text-center py-8 text-slate-500 text-sm">
-            Ваш инвентарь пуст. Покупайте товары в магазине или крутите гачу! 🛒
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {inventory.filter(i => i.itemType !== 'boost').map(inv => {
-              const active = getActiveItem(inv.itemType) === inv.itemId;
-              return (
-                <div
-                  key={inv._id}
-                  onClick={() => handleActivate(active ? (inv.itemType === 'skin' ? 'default' : 'none') : inv.itemId, inv.itemType)}
-                  className={`bg-slate-950/60 border rounded-xl p-3 text-center cursor-pointer transition-all hover:scale-105 ${
-                    active ? 'border-indigo-500 bg-indigo-950/20 shadow-md shadow-indigo-500/10' : 'border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="text-2xl mb-1">{inv.itemType === 'skin' ? '🖼️' : '🔘'}</div>
-                  <div className="text-xs font-bold text-white truncate">{inv.details?.name || inv.itemId}</div>
-                  <div className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">
-                    {active ? 'Активен' : 'В запасе'} {inv.quantity > 1 && `(x${inv.quantity})`}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      )}
 
     </div>
   );

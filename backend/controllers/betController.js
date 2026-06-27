@@ -17,19 +17,22 @@ async function getOrCreateSystemState() {
 // Сделать ставку на долг (тотализатор)
 async function placeBet(req, res) {
   try {
-    const { debtId, prediction, wager } = req.body;
+    const { debtId, prediction } = req.body;
     const userId = req.user;
-
-    if (wager <= 0) {
-      return res.status(400).json({ error: 'Ставка должна быть больше нуля' });
+    
+    const parsedWager = Math.round(Number(req.body.wager));
+    if (isNaN(parsedWager) || parsedWager <= 0) {
+      return res.status(400).json({ error: 'Ставка должна быть целым положительным числом' });
     }
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
 
-    if (user.karma < wager) {
-      return res.status(400).json({ error: `Недостаточно Кармы для ставки. Требуется: ${wager} ₸, у вас: ${user.karma} ₸.` });
+    if (user.karma < parsedWager) {
+      return res.status(400).json({ error: `Недостаточно Кармы для ставки. Требуется: ${parsedWager} ✧, у вас: ${user.karma} ✧.` });
     }
+
+    const wager = parsedWager;
 
     const debt = await Transaction.findById(debtId);
     if (!debt) return res.status(404).json({ error: 'Долг не найден' });

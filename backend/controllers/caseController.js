@@ -58,6 +58,15 @@ async function openCase(req, res) {
     // Списываем Карму
     user.karma -= cost;
 
+    // НАПОЛНЕНИЕ ДЖЕКПОТА: 100% от траты Кармы на кейсы переходит в Джекпот
+    const SystemState = require('../models/SystemState');
+    let systemState = await SystemState.findOne();
+    if (!systemState) {
+      systemState = new SystemState();
+    }
+    systemState.jackpotPool += cost;
+    await systemState.save();
+
     let dropLabel = '';
     let dropRarity = '';
     let dropEmoji = '🎁';

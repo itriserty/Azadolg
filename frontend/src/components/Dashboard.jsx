@@ -265,7 +265,7 @@ export default function Dashboard({
             <Coins className="w-4 h-4 text-emerald-400" />
             <div>
               <div className="text-[10px] text-gray-500 leading-none">Ваша Карма</div>
-              <div className="font-black text-emerald-400 text-sm leading-tight">{user.karma} Карма</div>
+              <div className="font-black text-emerald-400 text-sm leading-tight">💠 {user.karma} ✧</div>
             </div>
           </div>
 
@@ -279,7 +279,7 @@ export default function Dashboard({
           >
             <Package className="w-4 h-4" />
             Открыть кейс
-            {user.karma >= 100 && <span className="text-[10px] opacity-75">(-100 Кармы)</span>}
+            {user.karma >= 100 && <span className="text-[10px] opacity-75">(-100 ✧)</span>}
           </motion.button>
         </div>
       </div>

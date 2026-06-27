@@ -158,11 +158,14 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
     const pred = bettingPredictions[debtId];
     if (pred === undefined) return setError('Выберите ваш прогноз на долг');
     
+    const wager = Number(bettingWager);
+    if (wager <= 0) return setError('Ставка должна быть больше нуля');
+
+    const confirmed = window.confirm(`Разместить ставку ${wager} ✧ на прогноз "${pred ? 'Вернет вовремя' : 'Просрочит'}"? Это действие сработает мгновенно.`);
+    if (!confirmed) return;
+
     try {
       setLoading(true);
-      const wager = Number(bettingWager);
-      if (wager <= 0) return setError('Ставка должна быть больше нуля');
-
       const res = await api.placeBet(debtId, pred, wager);
       setSuccess(res.message);
       

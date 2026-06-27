@@ -16,6 +16,7 @@ const fundRoutes  = require('./routes/fundRoutes');
 const questRoutes = require('./routes/questRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const marketRoutes = require('./routes/marketRoutes');
+const postRoutes = require('./routes/postRoutes');
 const { startReminderScheduler } = require('./services/reminderService');
 const { startCronScheduler } = require('./services/cronService');
 
@@ -46,6 +47,7 @@ app.use('/api/fund', fundRoutes);
 app.use('/api/quests', questRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/market', marketRoutes);
+app.use('/api/posts', postRoutes);
 
 // Статика загруженных пруфов оплаты
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -54,6 +56,19 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const authMiddleware = require('./middlewares/authMiddleware');
 app.get('/api/leaderboard', authMiddleware, getLeaderboard);
 app.post('/api/open-case',  authMiddleware, openCase);
+app.get('/api/system/jackpot', authMiddleware, async (req, res) => {
+  try {
+    const SystemState = require('./models/SystemState');
+    let state = await SystemState.findOne();
+    if (!state) {
+      state = new SystemState();
+      await state.save();
+    }
+    res.status(200).json({ jackpotPool: state.jackpotPool });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка получения джекпота' });
+  }
+});
 
 // ── Раздача собранного React-фронтенда ────────────────────────────────────────
 // На Render фронтенд собирается перед стартом (см. render.yaml buildCommand).
@@ -144,6 +159,14 @@ async function seedDatabase() {
         isActive: true
       }
     ]);
+  }
+
+  // Семена магазина
+  try {
+    const { seedShop } = require('./scripts/seedShop');
+    await seedShop();
+  } catch (err) {
+    console.error('[app.js] Ошибка импорта/запуска сидирования магазина:', err);
   }
 
   // Очистка БД от устаревших учетных записей (без логина/пароля), чтобы не засорять ленту
