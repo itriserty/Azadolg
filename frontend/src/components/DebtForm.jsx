@@ -6,6 +6,7 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
   const [debtor,      setDebtor]      = useState('');
   const [witnessId,   setWitnessId]   = useState('');
   const [amount,      setAmount]      = useState('');
+  const [promisedReturnAmount, setPromisedReturnAmount] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate,     setDueDate]     = useState('');
   const [incurredAt,  setIncurredAt]  = useState('');
@@ -38,6 +39,9 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
     if (creditor === debtor) return setError('Нельзя создать долг самому себе');
     if (witnessId === creditor || witnessId === debtor)
       return setError('Свидетель не может быть кредитором или должником');
+    if (promisedReturnAmount && parseFloat(promisedReturnAmount) < parseFloat(amount)) {
+      return setError('Обещанная сумма возврата не может быть меньше суммы займа');
+    }
 
     setLoading(true);
     try {
@@ -46,12 +50,13 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
         debtor,
         witnessId,
         amount:      parseFloat(amount),
+        promisedReturnAmount: promisedReturnAmount ? parseFloat(promisedReturnAmount) : null,
         description,
         dueDate,
         penaltyRate: parseFloat(penaltyRate),
         ...(incurredAt ? { incurredAt } : {})
       });
-      setAmount(''); setDescription(''); setDueDate('');
+      setAmount(''); setPromisedReturnAmount(''); setDescription(''); setDueDate('');
       setWitnessId(''); setIncurredAt('');
       setPenaltyRate(0.01); setShowRetro(false);
     } catch (err) {
@@ -117,16 +122,28 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
           </p>
         </div>
 
-        {/* Сумма и Описание */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Сумма, Обещано вернуть и Описание */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className={labelCls}>Сумма (₸)</label>
+            <label className={labelCls}>Сумма займа (₸)</label>
             <input
               type="number" value={amount} onChange={e => setAmount(e.target.value)}
               placeholder="Минимум 500 ₸" min="1" required className={inputCls}
             />
             {amount && Number(amount) < 500 && (
               <p className="text-[10px] text-yellow-500 mt-1">⚠️ Суммы менее 500 ₸ не дают ELO/Карму (защита от фарма)</p>
+            )}
+          </div>
+          <div>
+            <label className={`${labelCls} text-purple-400 flex items-center gap-1`}>
+              Обещано вернуть (₸) <span className="text-[8px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1 rounded-full font-bold">Оффер</span>
+            </label>
+            <input
+              type="number" value={promisedReturnAmount} onChange={e => setPromisedReturnAmount(e.target.value)}
+              placeholder="Опционально (больше займа)" min="1" className={inputCls}
+            />
+            {promisedReturnAmount && amount && Number(promisedReturnAmount) <= Number(amount) && (
+              <p className="text-[10px] text-red-500 mt-1">Должно быть больше займа</p>
             )}
           </div>
           <div>

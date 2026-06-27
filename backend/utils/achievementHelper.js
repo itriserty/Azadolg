@@ -1,0 +1,86 @@
+const User = require('../models/User');
+const Achievement = require('../models/Achievement');
+const Transaction = require('../models/Transaction');
+const tg = require('../services/telegramService');
+
+/**
+ * Проверяет и выдает ачивки пользователю по триггеру.
+ * @param {string} userId - ID пользователя
+ * @param {string} triggerType - Тип триггера ('declined_loan_streak', 'active_debts_count', 'overdue_365', etc.)
+ * @param {number} [currentValue] - Текущее значение показателя (опционально, если можно рассчитать)
+ */
+async function checkAndAward(userId, triggerType, currentValue = null) {
+  try {
+    const user = await User.findById(userId);
+    if (!user) return;
+
+    // Ищем активные достижения с этим триггером
+    const achievements = await Achievement.find({ trigger: triggerType, isActive: true });
+    if (achievements.length === 0) return;
+
+    // Вычисляем значение, если оно не передано
+    let val = currentValue;
+    if (val === null) {
+      if (triggerType === 'declined_loan_streak') {
+        val = user.consecutiveDeclines || 0;
+      } else if (triggerType === 'active_debts_count') {
+        val = await Transaction.countDocuments({ debtor: userId, status: 'active' });
+      } else if (triggerType === 'overdue_365') {
+        const oneYearAgo = new Date();
+        oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+        val = await Transaction.countDocuments({
+          debtor: userId,
+          status: 'active',
+          dueDate: { $lt: oneYearAgo }
+        });
+      } else if (triggerType === 'debts_paid_count') {
+        val = user.stats.totalDebtsPaid || 0;
+      } else if (triggerType === 'forgiven_count') {
+        val = user.stats.totalDebtsForgivenByMe || 0;
+      } else if (triggerType === 'witnesses_count') {
+        val = user.stats.totalDebtsWitnessed || 0;
+      }
+    }
+
+    let changed = false;
+    for (const ach of achievements) {
+      // Проверяем, получена ли уже ачивка
+      const alreadyEarned = user.achievements.some(a => a.achievement.toString() === ach._id.toString());
+      if (alreadyEarned && !ach.isRepeatable) {
+        continue;
+      }
+
+      // Проверяем порог
+      if (val >= ach.threshold) {
+        // Выдаем ачивку
+        user.achievements.push({ achievement: ach._id, earnedAt: new Date() });
+        changed = true;
+        
+        // Telegram-уведомление
+        const announceText = `🏆 <b>ДОСТИЖЕНИЕ РАЗБЛОКИРОВАНО!</b> 🏆\n\n` +
+          `👤 Игрок: <b>${user.name}</b> (@${user.username})\n` +
+          `🎖️ Награда: <b>${ach.emoji} ${ach.title}</b> (${ach.rarity})\n` +
+          `📝 <i>${ach.description}</i>`;
+        
+        tg.sendMessage(announceText);
+        if (user.telegramId) {
+          try {
+            await tg.sendMessage(`🎉 Поздравляем! Вы получили достижение: <b>${ach.emoji} ${ach.title}</b>!`, user.telegramId);
+          } catch (e) {
+            console.error('Ошибка отправки уведомления в Telegram:', e.message);
+          }
+        }
+      }
+    }
+
+    if (changed) {
+      await user.save();
+    }
+  } catch (err) {
+    console.error(`[checkAndAward] Ошибка проверки ачивок для ${userId}:`, err);
+  }
+}
+
+module.exports = {
+  checkAndAward
+};

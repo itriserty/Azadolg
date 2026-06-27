@@ -6,11 +6,13 @@ const SHOP_ITEMS = {
   'neon_red_frame': { id: 'neon_red_frame', name: 'Неоново-Красная Рамка', price: 150, type: 'frame', rarity: 'Запрещенное', description: 'Стильная красная неоновая рамка для аватара.' },
   'neon_cyan_frame': { id: 'neon_cyan_frame', name: 'Неоново-Голубая Рамка', price: 150, type: 'frame', rarity: 'Запрещенное', description: 'Свежая голубая неоновая рамка для аватара.' },
   'gold_frame': { id: 'gold_frame', name: 'Золотая Рамка', price: 300, type: 'frame', rarity: 'Тайное', description: 'Премиальная золотая рамка для чемпионов.' },
+  'diamond_frame': { id: 'diamond_frame', name: 'Алмазная Рамка', price: 800, type: 'frame', rarity: 'Immortal', description: 'Переливающаяся алмазная рамка для истинной элиты.' },
   
   // Скины / Обложки профиля
   'vaporwave_skin': { id: 'vaporwave_skin', name: 'Скин Vaporwave', price: 250, type: 'skin', rarity: 'Запрещенное', description: 'Фиолетово-розовая ретро-эстетика для профиля.' },
   'cyberpunk_skin': { id: 'cyberpunk_skin', name: 'Скин Киберпанк', price: 250, type: 'skin', rarity: 'Запрещенное', description: 'Темный хакерский скин с неоновыми деталями.' },
   'matrix_skin': { id: 'matrix_skin', name: 'Скин Матрица', price: 350, type: 'skin', rarity: 'Тайное', description: 'Зеленый цифровой дождь для истинных гиков.' },
+  'galaxy_skin': { id: 'galaxy_skin', name: 'Скин Галактика', price: 1000, type: 'skin', rarity: 'Immortal', description: 'Премиальный анимированный космический фон профиля.' },
 
   // Бустеры ELO (одноразовые)
   'elo_booster_10': { id: 'elo_booster_10', name: 'Буст +10 ELO', price: 100, type: 'boost', rarity: 'Ширпотреб', description: 'Одноразовое мгновенное начисление +10 ELO.', value: 10 },

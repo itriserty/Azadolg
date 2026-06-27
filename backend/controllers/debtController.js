@@ -28,13 +28,15 @@ function calcForgiveEloBonus(amount) {
 // ── Создание долга (с обязательным свидетелем) ────────────────────────────────
 async function createDebt(req, res) {
   try {
-    const { creditor, debtor, witnessId, amount, description, dueDate, penaltyRate, incurredAt } = req.body;
+    const { creditor, debtor, witnessId, amount, description, dueDate, penaltyRate, incurredAt, promisedReturnAmount } = req.body;
     const createdBy = req.user;
 
     if (!creditor || !debtor || !witnessId || !amount || !description || !dueDate)
       return res.status(400).json({ error: 'Обязательные поля: creditor, debtor, witnessId, amount, description, dueDate' });
     if (Number(amount) <= 0)
       return res.status(400).json({ error: 'Сумма долга должна быть больше нуля' });
+    if (promisedReturnAmount && Number(promisedReturnAmount) < Number(amount))
+      return res.status(400).json({ error: 'Обещанная сумма возврата не может быть меньше суммы займа' });
     if (creditor === debtor)
       return res.status(400).json({ error: 'Нельзя создать долг самому себе' });
     if (witnessId === creditor || witnessId === debtor)
@@ -66,7 +68,7 @@ async function createDebt(req, res) {
     const now             = new Date();
     const diffDaysRetro   = Math.floor((now - actualStartDate) / (1000 * 60 * 60 * 24));
     const rate            = penaltyRate !== undefined ? Number(penaltyRate) : 0.01;
-    let startingAmount    = Number(amount);
+    let startingAmount    = promisedReturnAmount ? Number(promisedReturnAmount) : Number(amount);
 
     if (diffDaysRetro > 7 && incurredAt) {
       const overdueDays  = diffDaysRetro - 7;
@@ -78,6 +80,7 @@ async function createDebt(req, res) {
       creditor, debtor,
       amount:        startingAmount,
       originalAmount: Number(amount),
+      promisedReturnAmount: promisedReturnAmount ? Number(promisedReturnAmount) : null,
       paidAmount:    0,
       description,
       dueDate:       new Date(dueDate),
@@ -94,7 +97,9 @@ async function createDebt(req, res) {
     const text = `🔍 <b>Запрос подтверждения долга!</b>\n\n` +
       `👤 Кредитор: <b>${creditorUser.name}</b>\n` +
       `👤 Должник: <b>${debtorUser.name}</b>\n` +
-      `💰 Сумма: <b>${Number(amount)} ₸</b>${diffDaysRetro > 7 ? ` (с пеней: ${startingAmount} ₸)` : ''}\n` +
+      `💰 Сумма займа: <b>${Number(amount)} ₸</b>\n` +
+      `${promisedReturnAmount ? `🤝 Обещано вернуть: <b>${Number(promisedReturnAmount)} ₸</b>\n` : ''}` +
+      `${diffDaysRetro > 7 ? `⚠️ (С пеней: ${startingAmount} ₸)\n` : ''}` +
       `📝 ${description}\n` +
       `📅 Срок: ${new Date(dueDate).toLocaleDateString('ru-RU')}\n\n` +
       `⚖️ Вы назначены свидетелем. Подтвердите или отклоните этот долг в приложении Azadolg!`;
@@ -130,8 +135,14 @@ async function witnessDecision(req, res) {
       tx.status        = 'pending_approval'; // теперь должник подтверждает
       await tx.save();
 
-      // Обновляем статистику свидетеля
-      await User.findByIdAndUpdate(userId, { $inc: { 'stats.totalDebtsWitnessed': 1 } });
+      // Обновляем статистику свидетеля и проверяем достижения
+      const witnessUser = await User.findById(userId);
+      if (witnessUser) {
+        witnessUser.stats.totalDebtsWitnessed = (witnessUser.stats.totalDebtsWitnessed || 0) + 1;
+        await witnessUser.save();
+        const { checkAndAward } = require('../utils/achievementHelper');
+        await checkAndAward(userId, 'witnesses_count');
+      }
 
       const notifyText = `✅ <b>Свидетель подтвердил долг!</b>\n\n` +
         `👤 Кредитор: <b>${tx.creditor.name}</b>\n` +
@@ -307,13 +318,32 @@ async function submitPaymentProof(req, res) {
           const { addXP } = require('../utils/battlePassHelper');
           await addXP(debtor, isOverdue ? 10 : 25);
           await debtor.save();
+          const { checkAndAward } = require('../utils/achievementHelper');
+          await checkAndAward(debtor._id, 'debts_paid_count');
         }
         if (creditor) {
-          creditor.eloRating = Math.max(100, creditor.eloRating + creditorElo);
+          let finalCreditorElo = creditorElo;
+          let creditorKarma = 0;
+          if (tx.promisedReturnAmount && tx.promisedReturnAmount > tx.originalAmount) {
+            const bonusElo = Math.max(10, Math.round(creditorElo * 0.5));
+            finalCreditorElo += bonusElo;
+            creditorKarma = Math.round((tx.promisedReturnAmount - tx.originalAmount) * 0.1);
+            note += (note ? '. ' : '') + `Кредитору начислен бонус за риск: +${bonusElo} ELO и +${creditorKarma} ₸ Кармы`;
+          }
+          creditor.eloRating = Math.max(100, creditor.eloRating + finalCreditorElo);
+          if (creditorKarma > 0) {
+            creditor.karma += creditorKarma;
+            creditor.stats.totalKarmaEarned += creditorKarma;
+          }
           await creditor.save();
         }
       } else {
-        if (debtor) { debtor.stats.totalDebtsPaid++; await debtor.save(); }
+        if (debtor) {
+          debtor.stats.totalDebtsPaid++;
+          await debtor.save();
+          const { checkAndAward } = require('../utils/achievementHelper');
+          await checkAndAward(debtor._id, 'debts_paid_count');
+        }
       }
 
       // Расчёт ставок тотализатора
@@ -390,6 +420,8 @@ async function forgiveDebt(req, res) {
       creditor.eloRating += eloBonus;
       creditor.stats.totalDebtsForgivenByMe = (creditor.stats.totalDebtsForgivenByMe || 0) + 1;
       await creditor.save();
+      const { checkAndAward } = require('../utils/achievementHelper');
+      await checkAndAward(creditor._id, 'forgiven_count');
     }
 
     const notifyText = `💝 <b>Долг прощён!</b>\n\n` +
@@ -478,6 +510,19 @@ async function confirmDebt(req, res) {
     tx.status = 'active';
     await tx.save();
 
+    // Сбрасываем подряд идущие отклонения, если подтвердили запрос
+    if (tx.createdBy.toString() !== userId.toString()) {
+      const user = await User.findById(userId);
+      if (user) {
+        user.consecutiveDeclines = 0;
+        await user.save();
+      }
+    }
+
+    // Проверяем достижение "Мамкин инвестор" для должника
+    const { checkAndAward } = require('../utils/achievementHelper');
+    await checkAndAward(tx.debtor._id, 'active_debts_count');
+
     const text = `✅ <b>Долг подтверждён!</b>\n\n` +
       `👤 Кредитор: <b>${tx.creditor.name}</b>\n` +
       `👤 Должник: <b>${tx.debtor.name}</b>\n` +
@@ -512,6 +557,17 @@ async function declineDebt(req, res) {
 
     tx.status = 'declined';
     await tx.save();
+
+    // Проверяем, было ли это отклонение входящего запроса
+    if (tx.createdBy.toString() !== userId.toString()) {
+      const user = await User.findById(userId);
+      if (user) {
+        user.consecutiveDeclines = (user.consecutiveDeclines || 0) + 1;
+        await user.save();
+        const { checkAndAward } = require('../utils/achievementHelper');
+        await checkAndAward(userId, 'declined_loan_streak');
+      }
+    }
 
     const text = `❌ <b>Долг отклонён!</b>\n\n` +
       `👤 Кредитор: <b>${tx.creditor.name}</b>\n` +

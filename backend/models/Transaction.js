@@ -29,6 +29,10 @@ const TransactionSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  promisedReturnAmount: {
+    type: Number,
+    default: null
+  },
   // Реально выплаченная сумма (частичные платежи)
   paidAmount: {
     type: Number,

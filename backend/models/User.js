@@ -82,6 +82,15 @@ const UserSchema = new mongoose.Schema({
   activeProfileSkin:  { type: String, default: 'default' },
   activeProfileFrame: { type: String, default: 'none'    },
   avatar:             { type: String, default: null       },
+  // ── Приватность и Витрина ─────────────────────────────────────────────────────
+  isPrivateProfile:   { type: Boolean, default: false },
+  badges:             [{ type: String }],
+  achievements: [{
+    achievement: { type: mongoose.Schema.Types.ObjectId, ref: 'Achievement' },
+    earnedAt:    { type: Date, default: Date.now }
+  }],
+  achievementShowcase: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Achievement' }],
+  consecutiveDeclines: { type: Number, default: 0 },
   // ── Сброс пароля ──────────────────────────────────────────────────────────────
   resetCode:         { type: String, default: null },
   resetCodeExpires:  { type: Date,   default: null },

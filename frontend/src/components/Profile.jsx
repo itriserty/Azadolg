@@ -1,0 +1,564 @@
+import React, { useState, useEffect } from 'react';
+import { api } from '../utils/api';
+import { Shield, Eye, EyeOff, Trophy, Award, MessageSquare, Send, Trash2, Coins, Flame, Heart, DollarSign } from 'lucide-react';
+import DebtList from './DebtList';
+
+const SKIN_STYLES = {
+  default: 'bg-[#151c2c]/80 text-white',
+  vaporwave_skin: 'bg-gradient-to-br from-indigo-950 via-purple-900 to-pink-900 text-pink-100 border border-pink-500/20 shadow-pink-500/5 shadow-xl',
+  cyberpunk_skin: 'bg-gradient-to-br from-gray-950 via-slate-900 to-black text-cyan-200 border border-yellow-500/20 shadow-yellow-500/5 shadow-xl',
+  matrix_skin: 'bg-[#050c05] text-green-300 border border-green-500/20 shadow-green-500/5 shadow-xl font-mono',
+  galaxy_skin: 'bg-gradient-to-br from-black via-slate-950 to-indigo-950 text-indigo-200 border border-indigo-500/20 shadow-indigo-500/5 shadow-xl animate-pulse-slow'
+};
+
+const FRAME_STYLES = {
+  none: 'border-2 border-gray-700',
+  neon_red_frame: 'border-4 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)] ring-2 ring-red-300',
+  neon_cyan_frame: 'border-4 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.8)] ring-2 ring-cyan-300',
+  gold_frame: 'border-4 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.9)] ring-2 ring-yellow-300 ring-offset-1 ring-offset-black',
+  diamond_frame: 'border-4 border-indigo-400 shadow-[0_0_25px_rgba(129,140,248,0.95)] ring-2 ring-sky-300 ring-offset-1 ring-offset-black border-double'
+};
+
+export default function Profile({ userId, currentUser, onBack }) {
+  const [profileData, setProfileData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  
+  // Комментарии
+  const [commentText, setCommentText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+
+  // Витрина и приватность
+  const [showcaseOpen, setShowcaseOpen] = useState(false);
+  const [selectedShowcase, setSelectedShowcase] = useState([]);
+  const [updatingShowcase, setUpdatingShowcase] = useState(false);
+  
+  // Продажа предмета
+  const [sellItem, setSellItem] = useState(null);
+  const [sellPrice, setSellPrice] = useState('');
+  const [sellingLoading, setSellingLoading] = useState(false);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const data = await api.request(`/users/${userId}/profile`);
+      setProfileData(data);
+      setSelectedShowcase((data.user?.achievementShowcase || []).map(a => a._id || a));
+      setError('');
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Не удалось загрузить профиль');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetchProfile();
+    }
+  }, [userId]);
+
+  const isSelf = currentUser && currentUser._id === userId;
+
+  const handleTogglePrivacy = async () => {
+    try {
+      const data = await api.request('/users/profile/privacy', { method: 'POST' });
+      setProfileData(prev => ({
+        ...prev,
+        user: { ...prev.user, isPrivateProfile: data.isPrivateProfile }
+      }));
+    } catch (err) {
+      alert(err.message || 'Ошибка изменения настроек приватности');
+    }
+  };
+
+  const handlePostComment = async (e) => {
+    e.preventDefault();
+    if (!commentText.trim()) return;
+    setSubmittingComment(true);
+    try {
+      const newComment = await api.request(`/users/${userId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ text: commentText })
+      });
+      setProfileData(prev => ({
+        ...prev,
+        comments: [newComment, ...prev.comments]
+      }));
+      setCommentText('');
+    } catch (err) {
+      alert(err.message || 'Не удалось отправить комментарий');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Удалить этот комментарий со стены?')) return;
+    try {
+      await api.request(`/users/${userId}/comments/${commentId}`, { method: 'DELETE' });
+      setProfileData(prev => ({
+        ...prev,
+        comments: prev.comments.filter(c => c._id !== commentId)
+      }));
+    } catch (err) {
+      alert(err.message || 'Не удалось удалить комментарий');
+    }
+  };
+
+  const handleSaveShowcase = async () => {
+    setUpdatingShowcase(true);
+    try {
+      const data = await api.request('/users/profile/showcase', {
+        method: 'POST',
+        body: JSON.stringify({ achievementIds: selectedShowcase })
+      });
+      setProfileData(prev => ({
+        ...prev,
+        user: { ...prev.user, achievementShowcase: data.user.achievementShowcase }
+      }));
+      setShowcaseOpen(false);
+    } catch (err) {
+      alert(err.message || 'Не удалось обновить витрину');
+    } finally {
+      setUpdatingShowcase(false);
+    }
+  };
+
+  const toggleAchievementInShowcase = (id) => {
+    setSelectedShowcase(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(x => x !== id);
+      }
+      if (prev.length >= 4) {
+        alert('Максимальный размер витрины — 4 достижения');
+        return prev;
+      }
+      return [...prev, id];
+    });
+  };
+
+  const handleListMarketItem = async () => {
+    if (!sellPrice || Number(sellPrice) <= 0) {
+      alert('Укажите корректную цену в Карме');
+      return;
+    }
+    setSellingLoading(true);
+    try {
+      await api.request('/market/sell', {
+        method: 'POST',
+        body: JSON.stringify({ itemId: sellItem.itemId, price: Math.round(Number(sellPrice)) })
+      });
+      alert('Предмет успешно выставлен на торговую площадку!');
+      setSellItem(null);
+      setSellPrice('');
+      fetchProfile(); // Перезагружаем профиль
+    } catch (err) {
+      alert(err.message || 'Ошибка продажи предмета');
+    } finally {
+      setSellingLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-gray-400">
+        <div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        Загрузка Steam-профиля...
+      </div>
+    );
+  }
+
+  if (error || !profileData) {
+    return (
+      <div className="p-6 bg-red-950/20 border border-red-900/30 rounded-2xl text-center">
+        <p className="text-red-400 font-bold mb-4">{error || 'Профиль недоступен'}</p>
+        <button onClick={onBack} className="px-4 py-2 bg-gray-800 text-gray-200 rounded-xl font-bold">Назад</button>
+      </div>
+    );
+  }
+
+  const { user, canView, comments, debts, inventory } = profileData;
+  const currentSkin = user.activeProfileSkin || 'default';
+  const currentFrame = user.activeProfileFrame || 'none';
+  const elo = user.eloRating || 1000;
+
+  const getRankLabel = (eloRating) => {
+    if (eloRating < 1000) return 'Железо';
+    if (eloRating < 1100) return 'Бронза';
+    if (eloRating < 1200) return 'Серебро';
+    if (eloRating < 1300) return 'Золото';
+    if (eloRating < 1400) return 'Платина';
+    if (eloRating < 1500) return 'Алмаз';
+    return 'Global Elite';
+  };
+
+  return (
+    <div className={`rounded-3xl p-6 transition-all duration-500 ${SKIN_STYLES[currentSkin] || SKIN_STYLES.default}`}>
+      
+      {/* Шапка профиля */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-6 border-b border-gray-800/40">
+        <div className="flex flex-col md:flex-row items-center gap-5">
+          {/* Аватар в рамке */}
+          <div className="relative shrink-0">
+            <img
+              src={user.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.username}`}
+              alt={user.name}
+              className={`w-24 h-24 rounded-2xl object-cover ${FRAME_STYLES[currentFrame] || FRAME_STYLES.none}`}
+            />
+            {user.role === 'admin' && (
+              <span className="absolute -top-2.5 -right-2.5 bg-purple-650 border border-purple-500 text-white font-bold text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider shadow">
+                Admin
+              </span>
+            )}
+          </div>
+
+          <div className="text-center md:text-left">
+            <h1 className="text-2xl font-black tracking-tight">{user.name}</h1>
+            <p className="text-sm opacity-60">@{user.username}</p>
+            
+            {/* Значки/Ачивки рядом с аватаркой */}
+            {user.badges && user.badges.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2 justify-center md:justify-start">
+                {user.badges.map((badge, idx) => {
+                  let badgeLabel = 'Участник';
+                  let badgeColor = 'bg-gray-800/50 border-gray-700 text-gray-300';
+                  if (badge.includes('gold')) {
+                    badgeLabel = 'Чемпион 🥇';
+                    badgeColor = 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400';
+                  } else if (badge.includes('silver')) {
+                    badgeLabel = 'Топ-2 🥈';
+                    badgeColor = 'bg-gray-300/10 border-gray-300/30 text-gray-300';
+                  } else if (badge.includes('bronze')) {
+                    badgeLabel = 'Топ-3 🥉';
+                    badgeColor = 'bg-amber-600/10 border-amber-600/30 text-amber-500';
+                  }
+                  return (
+                    <span key={idx} className={`text-[9px] border px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${badgeColor}`}>
+                      {badgeLabel}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ELO и кнопки приватности */}
+        <div className="flex flex-col items-center md:items-end gap-3">
+          <div className="text-center md:text-right">
+            <div className="text-2xl font-black flex items-center gap-1.5 justify-center md:justify-end text-cyan-400">
+              <Flame className="w-6 h-6 animate-pulse" /> {elo} ELO
+            </div>
+            <div className="text-xs font-bold opacity-75">{getRankLabel(elo)}</div>
+          </div>
+
+          <div className="flex gap-2">
+            {isSelf && (
+              <button
+                onClick={handleTogglePrivacy}
+                className="flex items-center gap-1 text-[11px] font-bold py-1.5 px-3 rounded-xl border border-gray-800 bg-[#0b0f19]/80 hover:bg-[#151c2c] transition"
+              >
+                {user.isPrivateProfile ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                    Только для друзей
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                    Публичный
+                  </>
+                )}
+              </button>
+            )}
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="text-[11px] font-bold py-1.5 px-3 rounded-xl border border-gray-800 bg-[#0b0f19]/80 hover:bg-gray-800 transition"
+              >
+                Назад
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {!canView ? (
+        /* Закрытый профиль */
+        <div className="py-16 text-center">
+          <EyeOff className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+          <h2 className="text-lg font-bold">Этот профиль скрыт настройками приватности</h2>
+          <p className="text-xs text-gray-400 mt-1">Добавляйте пользователя в друзья для доступа к его профилю.</p>
+        </div>
+      ) : (
+        /* Открытый профиль */
+        <div className="mt-6 space-y-6">
+          
+          {/* Игровые метрики */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-4 text-center">
+              <div className="text-xs opacity-50 uppercase tracking-widest text-[9px] font-bold">Карма</div>
+              <div className="text-lg font-black text-amber-400 mt-1">{user.karma || 0} ₸</div>
+            </div>
+            <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-4 text-center">
+              <div className="text-xs opacity-50 uppercase tracking-widest text-[9px] font-bold">Монеты</div>
+              <div className="text-lg font-black text-yellow-400 mt-1">{user.coins || 0} 🪙</div>
+            </div>
+            <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-4 text-center">
+              <div className="text-xs opacity-50 uppercase tracking-widest text-[9px] font-bold">Стрик Побед</div>
+              <div className="text-lg font-black text-red-400 mt-1">{user.winStreak || 0} 🔥</div>
+            </div>
+            <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-4 text-center">
+              <div className="text-xs opacity-50 uppercase tracking-widest text-[9px] font-bold">Закрыто долгов</div>
+              <div className="text-lg font-black text-emerald-400 mt-1">{user.stats?.totalDebtsPaid || 0}</div>
+            </div>
+          </div>
+
+          {/* Витрина достижений (Showcase) */}
+          <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-black flex items-center gap-1.5 uppercase tracking-wider text-cyan-400">
+                <Trophy className="w-4 h-4 text-yellow-500" />
+                Витрина достижений
+              </h2>
+              {isSelf && (
+                <button
+                  onClick={() => setShowcaseOpen(!showcaseOpen)}
+                  className="text-[10px] font-bold text-gray-400 hover:text-cyan-400 transition"
+                >
+                  Настроить
+                </button>
+              )}
+            </div>
+
+            {/* Слайдер настройки витрины */}
+            {showcaseOpen && (
+              <div className="mb-5 p-4 bg-[#0b0f19]/90 border border-cyan-500/20 rounded-xl space-y-4">
+                <p className="text-[11px] text-gray-300">Выберите до 4-х достижений для вашей витрины:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
+                  {user.achievements && user.achievements.length > 0 ? (
+                    user.achievements.map((ach, idx) => {
+                      const item = ach.achievement;
+                      const selected = selectedShowcase.includes(item._id);
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => toggleAchievementInShowcase(item._id)}
+                          className={`p-2 rounded-lg border text-xs cursor-pointer flex items-center justify-between transition ${
+                            selected ? 'border-cyan-500 bg-cyan-500/10' : 'border-gray-800 bg-black/40 hover:border-gray-700'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span>{item.emoji}</span>
+                            <span className="font-semibold">{item.title}</span>
+                          </span>
+                          <span className="text-[9px] uppercase tracking-wider text-gray-500">{item.rarity}</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-[11px] text-gray-500 col-span-2">У вас еще нет разблокированных достижений</p>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setShowcaseOpen(false)} className="px-3 py-1.5 bg-gray-800 text-gray-300 rounded-lg text-xs font-bold">Отмена</button>
+                  <button onClick={handleSaveShowcase} disabled={updatingShowcase} className="px-3 py-1.5 bg-cyan-600 text-white rounded-lg text-xs font-bold">Сохранить</button>
+                </div>
+              </div>
+            )}
+
+            {/* Сетка витрины */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {user.achievementShowcase && user.achievementShowcase.length > 0 ? (
+                user.achievementShowcase.map((ach) => (
+                  <div key={ach._id} className="relative p-3 bg-black/30 border border-gray-800/30 rounded-xl flex flex-col items-center text-center group">
+                    <div className="text-3xl mb-1.5">{ach.emoji}</div>
+                    <div className="text-xs font-bold text-gray-200">{ach.title}</div>
+                    <div className="text-[10px] text-gray-500 mt-1 line-clamp-2">{ach.description}</div>
+                    
+                    {/* Метка редкости */}
+                    <span className={`text-[8px] uppercase tracking-widest font-extrabold mt-2 px-1.5 py-0.5 rounded-full ${
+                      ach.rarity === 'legendary' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' :
+                      ach.rarity === 'rare' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30' :
+                      'bg-gray-800/30 text-gray-400 border border-gray-700/20'
+                    }`}>
+                      {ach.rarity}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-4 text-center py-4 text-xs text-gray-500 font-semibold">
+                  Витрина достижений не заполнена.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Инвентарь и стена комментариев */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* Инвентарь (lg:col-span-6) */}
+            <div className="lg:col-span-6 bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-5">
+              <h2 className="text-sm font-black flex items-center gap-1.5 uppercase tracking-wider text-cyan-400 mb-4">
+                <Award className="w-4 h-4 text-purple-400" />
+                Инвентарь Cosmetics
+              </h2>
+
+              {sellItem && (
+                <div className="mb-4 p-4 bg-[#0b0f19] border border-purple-500/30 rounded-xl space-y-3">
+                  <div className="text-xs font-bold text-purple-400">Продать предмет: {sellItem.details.name}</div>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Цена в Карме (₸)"
+                      value={sellPrice}
+                      onChange={e => setSellPrice(e.target.value)}
+                      className="bg-black/60 border border-gray-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-purple-500 flex-1"
+                    />
+                    <button
+                      onClick={handleListMarketItem}
+                      disabled={sellingLoading}
+                      className="bg-purple-650 text-white font-bold text-xs py-2 px-3 rounded-lg hover:opacity-90 transition disabled:opacity-50"
+                    >
+                      Выставить
+                    </button>
+                    <button onClick={() => setSellItem(null)} className="bg-gray-800 text-gray-300 text-xs py-2 px-3 rounded-lg">Отмена</button>
+                  </div>
+                </div>
+              )}
+
+              {inventory && inventory.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {inventory.map((item, idx) => (
+                    <div key={idx} className="bg-black/20 border border-gray-800/40 rounded-xl p-3 flex flex-col justify-between">
+                      <div>
+                        <div className="text-xs font-bold truncate">{item.details?.name}</div>
+                        <div className="text-[10px] text-gray-500 capitalize">{item.itemType}</div>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-1.5">
+                        <span className="text-[10px] text-cyan-400 font-bold">Qty: {item.quantity}</span>
+                        {isSelf && item.itemType !== 'boost' && (
+                          <button
+                            onClick={() => { setSellItem(item); setSellPrice(''); }}
+                            className="bg-purple-600/10 border border-purple-500/30 hover:bg-purple-600/30 text-purple-400 text-[9px] font-black uppercase tracking-wider py-1 px-2 rounded-lg transition"
+                          >
+                            Продать
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 text-center py-6">В инвентаре пока нет предметов</p>
+              )}
+            </div>
+
+            {/* Стена комментариев (lg:col-span-6) */}
+            <div className="lg:col-span-6 bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-5">
+              <h2 className="text-sm font-black flex items-center gap-1.5 uppercase tracking-wider text-cyan-400 mb-4">
+                <MessageSquare className="w-4 h-4" />
+                Стена комментариев
+              </h2>
+
+              {/* Форма добавления коммента */}
+              <form onSubmit={handlePostComment} className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  placeholder="Оставьте комментарий на этой стене..."
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  className="bg-[#0b0f19]/80 border border-gray-800 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 flex-1 transition"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={submittingComment}
+                  className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold p-2.5 rounded-xl transition disabled:opacity-50 shrink-0"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </form>
+
+              {/* Список комментариев */}
+              <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                {comments && comments.length > 0 ? (
+                  comments.map((c) => {
+                    const isCommentAuthor = currentUser && c.authorId?._id === currentUser._id;
+                    const canDelete = isSelf || isCommentAuthor || (currentUser && currentUser.role === 'admin');
+                    return (
+                      <div key={c._id} className="p-3 bg-black/20 border border-gray-800/30 rounded-xl flex items-start gap-2.5 group">
+                        <img
+                          src={c.authorId?.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${c.authorId?.username}`}
+                          alt={c.authorId?.name}
+                          className="w-7.5 h-7.5 rounded-lg border border-gray-800/50"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-black text-cyan-400">
+                              {c.authorId?.name || 'Пользователь'}
+                            </span>
+                            <span className="text-[9px] text-gray-500">
+                              {new Date(c.createdAt).toLocaleDateString('ru-RU')}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-300 mt-1 break-words">{c.text}</p>
+                        </div>
+                        {canDelete && (
+                          <button
+                            onClick={() => handleDeleteComment(c._id)}
+                            className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition shrink-0 p-0.5"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-gray-500 text-center py-6">Пока никто не оставил комментариев.</p>
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* История долгов с приватным графом */}
+          <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-3xl p-5">
+            <h2 className="text-sm font-black uppercase tracking-wider text-cyan-400 mb-4 flex items-center gap-1.5">
+              <DollarSign className="w-4 h-4" />
+              История долгов (Граф Друзей)
+            </h2>
+            {debts && debts.length > 0 ? (
+              <DebtList
+                debts={debts}
+                currentUser={currentUser}
+                onPayProof={async (debtId, fd) => {
+                  await api.request(`/debts/${debtId}/pay-proof`, {
+                    method: 'POST',
+                    body: fd,
+                    headers: {
+                      'Content-Type': 'none' // Будет установлено автоматически при FormData
+                    }
+                  });
+                  fetchProfile();
+                }}
+                onConfirm={async (id) => { await api.confirmDebt(id); fetchProfile(); }}
+                onDecline={async (id) => { await api.declineDebt(id); fetchProfile(); }}
+                onWitness={async (id, action) => { await api.request(`/debts/${id}/witness`, { method: 'POST', body: JSON.stringify({ action }) }); fetchProfile(); }}
+                onForgive={async (id) => { await api.request(`/debts/${id}/forgive`, { method: 'POST' }); fetchProfile(); }}
+                onTransfer={async (id, target) => { await api.request(`/debts/${id}/transfer`, { method: 'POST', body: JSON.stringify({ newDebtorId: target }) }); fetchProfile(); }}
+                friends={currentUser?.friends || []}
+              />
+            ) : (
+              <p className="text-xs text-gray-500 text-center py-6">Нет доступных записей о долгах с этим пользователем.</p>
+            )}
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+}

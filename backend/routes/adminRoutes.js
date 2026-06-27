@@ -3,7 +3,8 @@ const router  = express.Router();
 const {
   getUsers, banUser, unbanUser, deleteUser,
   getAllDebts, deleteDebt, cancelTransaction,
-  resetUserPassword, getAdminLogs, grantKarma
+  resetUserPassword, getAdminLogs, grantKarma,
+  getAchievements, createAchievement, updateAchievement, deleteAchievement
 } = require('../controllers/adminController');
 const authMiddleware  = require('../middlewares/authMiddleware');
 const adminMiddleware = require('../middlewares/adminMiddleware');
@@ -24,6 +25,12 @@ router.post('/users/:id/grant-karma',    grantKarma);
 router.get('/debts',               getAllDebts);
 router.delete('/debts/:id',        deleteDebt);
 router.post('/debts/:id/cancel',   cancelTransaction);
+
+// ── Достижения (Achievements CRUD) ──────────────────────────────────────────
+router.get('/achievements',        getAchievements);
+router.post('/achievements',       createAchievement);
+router.put('/achievements/:id',    updateAchievement);
+router.delete('/achievements/:id', deleteAchievement);
 
 // ── Логи ──────────────────────────────────────────────────────────────────────
 router.get('/logs',                getAdminLogs);

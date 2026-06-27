@@ -15,6 +15,7 @@ const betRoutes   = require('./routes/betRoutes');
 const fundRoutes  = require('./routes/fundRoutes');
 const questRoutes = require('./routes/questRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const marketRoutes = require('./routes/marketRoutes');
 const { startReminderScheduler } = require('./services/reminderService');
 const { startCronScheduler } = require('./services/cronService');
 
@@ -44,6 +45,7 @@ app.use('/api/bets', betRoutes);
 app.use('/api/fund', fundRoutes);
 app.use('/api/quests', questRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/market', marketRoutes);
 
 // Статика загруженных пруфов оплаты
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -73,7 +75,76 @@ app.get('*', (req, res) => {
 async function seedDatabase() {
   const User        = require('./models/User');
   const Transaction = require('./models/Transaction');
+  const Achievement = require('./models/Achievement');
   const bcrypt      = require('bcryptjs');
+
+  // Семена достижений
+  const achCount = await Achievement.countDocuments();
+  if (achCount === 0) {
+    console.log('[SEED] Создаём стандартные достижения Azadolg...');
+    await Achievement.insertMany([
+      {
+        slug: 'declined_loan_streak',
+        title: 'ПИДАРАС НЕ ДАЮЩИЙ',
+        description: 'Отклонил 4 входящих запроса в долг подряд.',
+        emoji: '🤬',
+        rarity: 'rare',
+        trigger: 'declined_loan_streak',
+        threshold: 4,
+        isActive: true
+      },
+      {
+        slug: 'overdue_365',
+        title: 'Еблан года',
+        description: 'Имеет активный долг с просрочкой более 365 дней.',
+        emoji: '💩',
+        rarity: 'legendary',
+        trigger: 'overdue_365',
+        threshold: 1,
+        isActive: true
+      },
+      {
+        slug: 'active_debts_count',
+        title: 'Мамкин инвестор',
+        description: 'Набрал 5 и более активных долгов одновременно.',
+        emoji: '🤑',
+        rarity: 'rare',
+        trigger: 'active_debts_count',
+        threshold: 5,
+        isActive: true
+      },
+      {
+        slug: 'debts_paid_count',
+        title: 'Честный должник',
+        description: 'Успешно закрыл 10 долгов.',
+        emoji: '🤝',
+        rarity: 'common',
+        trigger: 'debts_paid_count',
+        threshold: 10,
+        isActive: true
+      },
+      {
+        slug: 'forgiven_count',
+        title: 'Добряк',
+        description: 'Простил долг другому пользователю 5 раз.',
+        emoji: '💖',
+        rarity: 'rare',
+        trigger: 'forgiven_count',
+        threshold: 5,
+        isActive: true
+      },
+      {
+        slug: 'witnesses_count',
+        title: 'Честный свидетель',
+        description: 'Выступил свидетелем и подтвердил долг 5 раз.',
+        emoji: '⚖️',
+        rarity: 'common',
+        trigger: 'witnesses_count',
+        threshold: 5,
+        isActive: true
+      }
+    ]);
+  }
 
   // Очистка БД от устаревших учетных записей (без логина/пароля), чтобы не засорять ленту
   const deletedLegacy = await User.deleteMany({

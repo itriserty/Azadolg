@@ -242,8 +242,107 @@ async function grantKarma(req, res) {
   }
 }
 
+// ── CRUD Достижений ──────────────────────────────────────────────────────────
+async function getAchievements(req, res) {
+  try {
+    const Achievement = require('../models/Achievement');
+    const achievements = await Achievement.find().sort({ createdAt: -1 });
+    res.status(200).json(achievements);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Ошибка получения достижений' });
+  }
+}
+
+async function createAchievement(req, res) {
+  try {
+    const { slug, title, description, emoji, rarity, trigger, threshold, isSecret, isRepeatable } = req.body;
+    const adminId = req.user;
+
+    if (!slug || !title || !description) {
+      return res.status(400).json({ error: 'Slug, title, description обязательны' });
+    }
+
+    const Achievement = require('../models/Achievement');
+    const existing = await Achievement.findOne({ slug: slug.toLowerCase().trim() });
+    if (existing) {
+      return res.status(400).json({ error: 'Достижение с таким slug уже существует' });
+    }
+
+    const ach = new Achievement({
+      slug: slug.toLowerCase().trim(),
+      title,
+      description,
+      emoji: emoji || '🏆',
+      rarity: rarity || 'common',
+      trigger: trigger || 'custom',
+      threshold: threshold !== undefined ? Number(threshold) : 1,
+      isSecret: !!isSecret,
+      isRepeatable: !!isRepeatable,
+      createdByAdmin: true
+    });
+    await ach.save();
+
+    await logAction(adminId, 'create_achievement', ach._id, 'Achievement', `Создана ачивка: ${title}`);
+    res.status(201).json(ach);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Ошибка создания достижения' });
+  }
+}
+
+async function updateAchievement(req, res) {
+  try {
+    const { id } = req.params;
+    const { title, description, emoji, rarity, trigger, threshold, isSecret, isRepeatable, isActive } = req.body;
+    const adminId = req.user;
+
+    const Achievement = require('../models/Achievement');
+    const ach = await Achievement.findById(id);
+    if (!ach) return res.status(404).json({ error: 'Достижение не найдено' });
+
+    if (title) ach.title = title;
+    if (description) ach.description = description;
+    if (emoji) ach.emoji = emoji;
+    if (rarity) ach.rarity = rarity;
+    if (trigger) ach.trigger = trigger;
+    if (threshold !== undefined) ach.threshold = Number(threshold);
+    if (isSecret !== undefined) ach.isSecret = !!isSecret;
+    if (isRepeatable !== undefined) ach.isRepeatable = !!isRepeatable;
+    if (isActive !== undefined) ach.isActive = !!isActive;
+
+    await ach.save();
+    await logAction(adminId, 'update_achievement', id, 'Achievement', `Обновлена ачивка: ${ach.title}`);
+    
+    res.status(200).json(ach);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Ошибка обновления достижения' });
+  }
+}
+
+async function deleteAchievement(req, res) {
+  try {
+    const { id } = req.params;
+    const adminId = req.user;
+
+    const Achievement = require('../models/Achievement');
+    const ach = await Achievement.findById(id);
+    if (!ach) return res.status(404).json({ error: 'Достижение не найдено' });
+
+    await Achievement.findByIdAndDelete(id);
+    await logAction(adminId, 'delete_achievement', id, 'Achievement', `Удалена ачивка: ${ach.title}`);
+
+    res.status(200).json({ message: 'Достижение успешно удалено' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Ошибка удаления достижения' });
+  }
+}
+
 module.exports = {
   getUsers, banUser, unbanUser, deleteUser,
   getAllDebts, deleteDebt, cancelTransaction,
-  resetUserPassword, getAdminLogs, grantKarma
+  resetUserPassword, getAdminLogs, grantKarma,
+  getAchievements, createAchievement, updateAchievement, deleteAchievement
 };

@@ -57,10 +57,10 @@ async function drawJackpot() {
   }
 }
 
-// Проверка и смена сезона
+// Проверка и смена сезона (запускается 1-го числа каждого месяца в 00:00)
 async function checkSeasonReset() {
   try {
-    console.log('[CronService] Проверка смены сезонов...');
+    console.log('[CronService] Запуск ежемесячного сброса Сезона...');
     
     let state = await SystemState.findOne();
     if (!state) {
@@ -68,44 +68,66 @@ async function checkSeasonReset() {
       await state.save();
     }
 
-    const now = new Date();
-    if (now >= state.seasonEndsAt) {
-      const oldSeason = state.currentSeason;
-      const newSeason = oldSeason + 1;
-      
-      // Смена сезона
-      state.currentSeason = newSeason;
-      const nextEnd = new Date();
-      nextEnd.setDate(nextEnd.getDate() + 30);
-      state.seasonEndsAt = nextEnd;
-      await state.save();
+    const oldSeason = state.currentSeason;
+    const newSeason = oldSeason + 1;
+    
+    // Смена сезона
+    state.currentSeason = newSeason;
+    const nextEnd = new Date();
+    nextEnd.setMonth(nextEnd.getMonth() + 1);
+    nextEnd.setDate(1);
+    nextEnd.setHours(0, 0, 0, 0);
+    state.seasonEndsAt = nextEnd;
+    await state.save();
 
-      // Сброс ELO-рейтингов (софт-ресет) для всех пользователей
-      const users = await User.find();
-      for (const user of users) {
-        // Мягкий сброс рейтинга к 1000 ELO (сохраняем половину отклонения от базы)
-        user.eloRating = Math.round(1000 + (user.eloRating - 1000) * 0.5);
-        user.winStreak = 0;
-        
-        // Сброс Боевого Пропуска
-        user.battlePassLevel = 1;
-        user.battlePassXP = 0;
-        await user.save();
-      }
+    // Находим победителей прошлого сезона (топ-3) по ELO
+    const topUsers = await User.find({ role: 'user', isBanned: { $ne: true } })
+      .sort({ eloRating: -1 })
+      .limit(3);
 
-      console.log(`[CronService] Сезон ${oldSeason} завершен! Новый сезон: ${newSeason}`);
+    const badges = [
+      `season_${oldSeason}_gold`,
+      `season_${oldSeason}_silver`,
+      `season_${oldSeason}_bronze`
+    ];
 
-      // Telegram-уведомление
-      const text = `🏁 <b>СЕЗОН ${oldSeason} ЗАВЕРШЕН!</b> 🏁\n\n` +
-        `⚔️ Начался новый <b>Сезон ${newSeason}</b>!\n` +
-        `📈 Все ELO-рейтинги прошли мягкий сброс (софт-ресет).\n` +
-        `🎒 Уровни Боевого Пропуска сброшены к 1.\n\n` +
-        `Самое время начать восхождение к Global Elite и заработать новые рамки и скины! 🏆`;
-
-      tg.sendMessage(text);
-    } else {
-      console.log(`[CronService] Текущий сезон ${state.currentSeason} активен до ${state.seasonEndsAt.toLocaleDateString('ru-RU')}`);
+    for (let i = 0; i < topUsers.length; i++) {
+      const winner = topUsers[i];
+      winner.badges = winner.badges || [];
+      winner.badges.push(badges[i]);
+      await winner.save();
+      console.log(`[CronService] Выдан значок ${badges[i]} пользователю ${winner.name}`);
     }
+
+    // Сброс ELO-рейтингов (жесткий ресет до 1000 ELO) для всех пользователей
+    const users = await User.find();
+    for (const user of users) {
+      user.eloRating = 1000;
+      user.winStreak = 0;
+      
+      // Сброс Боевого Пропуска
+      user.battlePassLevel = 1;
+      user.battlePassXP = 0;
+      await user.save();
+    }
+
+    console.log(`[CronService] Сезон ${oldSeason} завершен! Новый сезон: ${newSeason}`);
+
+    // Telegram-уведомление с перечислением топ-3
+    let winnersText = '';
+    if (topUsers[0]) winnersText += `🥇 1-е место: <b>${topUsers[0].name}</b> (@${topUsers[0].username || 'нет'}) - ELO: ${topUsers[0].eloRating}\n`;
+    if (topUsers[1]) winnersText += `🥈 2-е место: <b>${topUsers[1].name}</b> (@${topUsers[1].username || 'нет'}) - ELO: ${topUsers[1].eloRating}\n`;
+    if (topUsers[2]) winnersText += `🥉 3-е место: <b>${topUsers[2].name}</b> (@${topUsers[2].username || 'нет'}) - ELO: ${topUsers[2].eloRating}\n`;
+
+    const text = `🏁 <b>СЕЗОН ${oldSeason} ЗАВЕРШЕН!</b> 🏁\n\n` +
+      `🏆 <b>Победители прошлого сезона:</b>\n${winnersText || 'Нет победителей'}\n` +
+      `Победители получили уникальные памятные значки в профиль! 🎖️\n\n` +
+      `⚔️ Начался новый <b>Сезон ${newSeason}</b>!\n` +
+      `📈 Все ELO-рейтинги сброшены до базовых <b>1000 ELO</b>.\n` +
+      `🎒 Уровни Боевого Пропуска сброшены к 1.\n\n` +
+      `Самое время начать новое восхождение с чистого листа! 🏆`;
+
+    tg.sendMessage(text);
   } catch (error) {
     console.error('[CronService] Ошибка смены сезона:', error);
   }
@@ -165,12 +187,12 @@ function startCronScheduler() {
     drawJackpot();
   });
 
-  // Проверка смены сезонов каждый день в 00:00
-  cron.schedule('0 0 * * *', () => {
+  // Проверка смены сезонов 1-го числа каждого месяца в 00:00
+  cron.schedule('0 0 1 * *', () => {
     checkSeasonReset();
   });
 
-  console.log('[CronService] Планировщик cron запущен (Карма: Пн 09:00 | Джекпот: Вс 23:59 | Сезон: ежедневно)');
+  console.log('[CronService] Планировщик cron запущен (Карма: Пн 09:00 | Джекпот: Вс 23:59 | Сезон: 1-е число месяца)');
 }
 
 module.exports = {

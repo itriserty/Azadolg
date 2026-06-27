@@ -17,25 +17,12 @@ const FRAME_STYLES = {
   'none': ''
 };
 
-export default function Leaderboard({ users, currentUser }) {
+export default function Leaderboard({ users, currentUser, onViewProfile }) {
   const medals = ['🥇', '🥈', '🥉'];
   
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [userDebts, setUserDebts] = useState([]);
-  const [modalLoading, setModalLoading] = useState(false);
-
-  const handleRowClick = async (user) => {
-    try {
-      setSelectedUser(user);
-      setModalLoading(true);
-      setUserDebts([]);
-      // Загружаем долги выбранного пользователя
-      const debtsData = await api.getDebts(user._id);
-      setUserDebts(debtsData);
-    } catch (err) {
-      console.error('Ошибка загрузки долгов профиля:', err);
-    } finally {
-      setModalLoading(false);
+  const handleRowClick = (user) => {
+    if (onViewProfile) {
+      onViewProfile(user._id);
     }
   };
 
@@ -131,121 +118,6 @@ export default function Leaderboard({ users, currentUser }) {
           );
         })}
       </div>
-
-      {/* Модальное окно просмотра профиля */}
-      <AnimatePresence>
-        {selectedUser && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={`w-full max-w-lg border rounded-2xl overflow-hidden relative ${SKIN_STYLES[selectedUser.activeProfileSkin] || SKIN_STYLES.default}`}
-            >
-              {/* Кнопка закрытия */}
-              <button
-                onClick={() => setSelectedUser(null)}
-                className="absolute top-4 right-4 p-1.5 rounded-full bg-black/40 text-slate-400 hover:text-white transition-all hover:bg-black/60 z-10"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="p-6 space-y-6">
-                
-                {/* Шапка профиля */}
-                <div className="flex items-center space-x-4 pt-2">
-                  <div className={`w-16 h-16 rounded-full overflow-hidden shrink-0 ${FRAME_STYLES[selectedUser.activeProfileFrame] || ''}`}>
-                    {selectedUser.avatar ? (
-                      <img src={selectedUser.avatar} alt={selectedUser.name} className="w-16 h-16 object-cover" />
-                    ) : (
-                      <div className="w-16 h-16 flex items-center justify-center font-black text-2xl bg-slate-800 text-gray-300">
-                        {selectedUser.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black text-white">{selectedUser.name}</h3>
-                    <p className="text-xs text-slate-400">@{selectedUser.username || 'username'}</p>
-                    
-                    <div className="flex items-center space-x-2 mt-1.5">
-                      <span className="text-xs font-semibold bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                        {selectedUser.rank || 'Iron'}
-                      </span>
-                      <span className="text-xs text-slate-400">• ELO: {selectedUser.eloRating}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <hr className="border-slate-800" />
-
-                {/* Баланс сборов */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-950/60 border border-slate-800/80 p-4 rounded-xl text-center">
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">Должен вернуть</div>
-                    <div className="text-xl font-black text-red-400 mt-1">{totalOwesOthers} ₸</div>
-                  </div>
-                  <div className="bg-slate-950/60 border border-slate-800/80 p-4 rounded-xl text-center">
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">Должны вернуть ему</div>
-                    <div className="text-xl font-black text-emerald-400 mt-1">{totalOthersOweHim} ₸</div>
-                  </div>
-                </div>
-
-                {/* Детализация долгов */}
-                {modalLoading ? (
-                  <div className="text-center py-8 text-slate-500 text-sm flex flex-col items-center justify-center space-y-3">
-                    <div className="w-8 h-8 border-2 border-t-indigo-500 border-slate-800 rounded-full animate-spin" />
-                    <span>Загрузка финансовых связей...</span>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    
-                    {/* Список: Кому должен */}
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Кому должен:</h4>
-                      {debtsHeOwes.length === 0 ? (
-                        <div className="text-xs text-slate-500 bg-slate-950/30 p-3 rounded-lg border border-slate-900/50">
-                          Чист! Не должен ни копейки. 🎉
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1">
-                          {debtsHeOwes.map(d => (
-                            <div key={d._id} className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-lg border border-slate-900 text-xs">
-                              <span className="text-white">Кредитор: <b>{d.creditor.name}</b> <span className="text-slate-500">({d.description})</span></span>
-                              <span className="text-red-400 font-bold">{d.amount} ₸</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Список: Кто должен ему */}
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Кто должен ему:</h4>
-                      {debtsOwedToHim.length === 0 ? (
-                        <div className="text-xs text-slate-500 bg-slate-950/30 p-3 rounded-lg border border-slate-900/50">
-                          Никто не должен этому игроку.
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1">
-                          {debtsOwedToHim.map(d => (
-                            <div key={d._id} className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-lg border border-slate-900 text-xs">
-                              <span className="text-white">Должник: <b>{d.debtor.name}</b> <span className="text-slate-500">({d.description})</span></span>
-                              <span className="text-emerald-400 font-bold">{d.amount} ₸</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-                )}
-
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
     </div>
   );
 }

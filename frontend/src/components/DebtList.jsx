@@ -98,7 +98,14 @@ export default function DebtList({
               {isOwe ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
             </div>
             <div>
-              <div className="font-bold text-sm text-gray-200">{debt.description}</div>
+              <div className="font-bold text-sm text-gray-200 flex items-center gap-1.5 flex-wrap">
+                {debt.description}
+                {debt.promisedReturnAmount && (
+                  <span className="text-[9px] bg-purple-500/15 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded-full font-bold">
+                    🤝 Оффер (+{debt.promisedReturnAmount - debt.originalAmount} ₸)
+                  </span>
+                )}
+              </div>
               <div className="text-xs text-gray-400 mt-0.5">
                 {isOwe ? 'Кредитор: ' : 'Должник: '}
                 <span className="font-medium text-gray-300">{otherUser?.name || '?'}</span>
@@ -121,6 +128,11 @@ export default function DebtList({
               <div className={`text-base font-black ${isOwe ? 'text-red-400' : 'text-emerald-400'}`}>
                 {isOwe ? '-' : '+'}{currentAmount} ₸
               </div>
+              {debt.promisedReturnAmount && (
+                <div className="text-[10px] text-gray-550">
+                  Займ: {debt.originalAmount} ₸
+                </div>
+              )}
               {debt.penaltyAccrued > 0 && (
                 <div className="text-[10px] text-red-400 font-semibold">+{debt.penaltyAccrued} ₸ пеня</div>
               )}

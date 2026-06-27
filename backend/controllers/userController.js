@@ -149,11 +149,347 @@ async function updateAvatar(req, res) {
   }
 }
 
+// Получение профиля (Steam-подобная страница) с фильтрацией долгов по графу друзей
+async function getUserProfile(req, res) {
+  try {
+    const { id } = req.params;
+    const viewerId = req.user;
+
+    // Проверяем достижение "Еблан года" (просрочка > 365 дней) перед загрузкой профиля
+    const { checkAndAward } = require('../utils/achievementHelper');
+    await checkAndAward(id, 'overdue_365');
+
+    const [targetUser, viewerUser] = await Promise.all([
+      User.findById(id)
+        .select('-password -resetCode -resetCodeExpires')
+        .populate('achievements.achievement')
+        .populate('achievementShowcase'),
+      User.findById(viewerId)
+    ]);
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+
+    const isSelf = id.toString() === viewerId.toString();
+    const isFriend = targetUser.friends.map(String).includes(viewerId.toString());
+    const isAdmin = viewerUser.role === 'admin';
+    const canView = isSelf || isAdmin || !targetUser.isPrivateProfile || isFriend;
+
+    if (!canView) {
+      // Если профиль скрыт, возвращаем ограниченные данные
+      return res.status(200).json({
+        user: {
+          _id: targetUser._id,
+          name: targetUser.name,
+          username: targetUser.username,
+          avatar: targetUser.avatar,
+          isPrivateProfile: true
+        },
+        isFriend,
+        canView: false,
+        comments: [],
+        debts: [],
+        inventory: []
+      });
+    }
+
+    // Загрузка комментариев
+    const ProfileComment = require('../models/ProfileComment');
+    const comments = await ProfileComment.find({ profileUserId: id })
+      .populate('authorId', 'name username avatar activeProfileSkin activeProfileFrame')
+      .sort({ createdAt: -1 });
+
+    // Загрузка инвентаря косметики
+    const Inventory = require('../models/Inventory');
+    const { SHOP_ITEMS } = require('./shopController');
+    const inventory = await Inventory.find({ userId: id });
+    const enrichedInventory = inventory.map(inv => {
+      const details = SHOP_ITEMS[inv.itemId];
+      return {
+        ...inv.toObject(),
+        details: details || { name: 'Неизвестный предмет', description: 'Нет описания' }
+      };
+    });
+
+    // Загрузка истории долгов с фильтрацией по графу друзей
+    const Transaction = require('../models/Transaction');
+    const myFriendIds = viewerUser ? viewerUser.friends : [];
+    
+    // Агрегация долгов с фильтрацией
+    const mongoose = require('mongoose');
+    const targetUserId = new mongoose.Types.ObjectId(id);
+    const viewerObjectId = new mongoose.Types.ObjectId(viewerId);
+    const myFriendObjectIds = myFriendIds.map(fid => new mongoose.Types.ObjectId(fid));
+
+    const rawDebts = await Transaction.aggregate([
+      {
+        $match: {
+          $and: [
+            {
+              $or: [
+                { creditor: targetUserId },
+                { debtor: targetUserId }
+              ]
+            },
+            {
+              $or: [
+                { creditor: viewerObjectId },
+                { debtor: viewerObjectId },
+                { witness: viewerObjectId },
+                { $and: [{ debtor: targetUserId }, { creditor: { $in: myFriendObjectIds } }] },
+                { $and: [{ creditor: targetUserId }, { debtor: { $in: myFriendObjectIds } }] }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'creditor',
+          foreignField: '_id',
+          as: 'creditorInfo'
+        }
+      },
+      { $unwind: '$creditorInfo' },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'debtor',
+          foreignField: '_id',
+          as: 'debtorInfo'
+        }
+      },
+      { $unwind: '$debtorInfo' },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'witness',
+          foreignField: '_id',
+          as: 'witnessInfo'
+        }
+      },
+      {
+        $unwind: {
+          path: '$witnessInfo',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          amount: 1,
+          originalAmount: 1,
+          promisedReturnAmount: 1,
+          paidAmount: 1,
+          description: 1,
+          dueDate: 1,
+          incurredAt: 1,
+          penaltyRate: 1,
+          status: 1,
+          witnessStatus: 1,
+          payments: 1,
+          createdAt: 1,
+          resolvedAt: 1,
+          creditor: {
+            _id: '$creditorInfo._id',
+            name: '$creditorInfo.name',
+            username: '$creditorInfo.username',
+            avatar: '$creditorInfo.avatar',
+            eloRating: '$creditorInfo.eloRating'
+          },
+          debtor: {
+            _id: '$debtorInfo._id',
+            name: '$debtorInfo.name',
+            username: '$debtorInfo.username',
+            avatar: '$debtorInfo.avatar',
+            eloRating: '$debtorInfo.eloRating'
+          },
+          witness: {
+            _id: '$witnessInfo._id',
+            name: '$witnessInfo.name',
+            username: '$witnessInfo.username',
+            avatar: '$witnessInfo.avatar',
+            eloRating: '$witnessInfo.eloRating'
+          }
+        }
+      },
+      { $sort: { createdAt: -1 } }
+    ]);
+
+    // Пост-обработка долгов (пени, остаток)
+    const { getCalculatedAmount } = require('../utils/debtHelper');
+    const now = new Date();
+    const processedDebts = rawDebts.map(t => {
+      if (t.status === 'pending_approval' || t.status === 'pending_witness') {
+        const base = t.promisedReturnAmount || t.originalAmount;
+        return { ...t, amount: base, penaltyAccrued: 0, isOverdue: false, daysSinceCreation: 0, remaining: base };
+      }
+
+      const currentAmount = getCalculatedAmount(t, now);
+      const base = t.promisedReturnAmount || t.originalAmount;
+      const penaltyAccrued = Number((currentAmount - base).toFixed(2));
+      const startDate = t.incurredAt || t.createdAt;
+      const diffDays = Math.floor((now - new Date(startDate)) / (1000 * 60 * 60 * 24));
+      const isOverdue = diffDays > 7;
+      const remaining = Math.max(0, currentAmount - (t.paidAmount || 0));
+
+      return {
+        ...t,
+        amount: currentAmount,
+        penaltyAccrued,
+        isOverdue,
+        daysSinceCreation: diffDays,
+        remaining
+      };
+    });
+
+    res.status(200).json({
+      user: targetUser,
+      isFriend,
+      canView: true,
+      comments,
+      debts: processedDebts,
+      inventory: enrichedInventory
+    });
+  } catch (error) {
+    console.error('Ошибка getUserProfile:', error);
+    res.status(500).json({ error: 'Ошибка загрузки профиля' });
+  }
+}
+
+// Переключение приватности профиля
+async function toggleProfilePrivacy(req, res) {
+  try {
+    const userId = req.user;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    user.isPrivateProfile = !user.isPrivateProfile;
+    await user.save();
+
+    res.status(200).json({ message: 'Настройки приватности обновлены', isPrivateProfile: user.isPrivateProfile });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+}
+
+// Обновление витрины ачивок (максимум 4)
+async function updateShowcase(req, res) {
+  try {
+    const userId = req.user;
+    const { achievementIds } = req.body;
+
+    if (!Array.isArray(achievementIds)) {
+      return res.status(400).json({ error: 'achievementIds должен быть массивом' });
+    }
+
+    if (achievementIds.length > 4) {
+      return res.status(400).json({ error: 'В витрину можно поместить максимум 4 ачивки' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    // У пользователя должны быть эти ачивки
+    const earnedIds = user.achievements.map(a => a.achievement.toString());
+    const validIds = achievementIds.filter(id => earnedIds.includes(id));
+
+    user.achievementShowcase = validIds;
+    await user.save();
+
+    const updatedUser = await User.findById(userId).populate('achievementShowcase').select('-password');
+    res.status(200).json({ message: 'Витрина успешно обновлена', user: updatedUser });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Ошибка обновления витрины' });
+  }
+}
+
+// Добавление комментария на стену профиля
+async function addProfileComment(req, res) {
+  try {
+    const profileUserId = req.params.id;
+    const authorId = req.user;
+    const { text } = req.body;
+
+    if (!text || text.trim() === '') {
+      return res.status(400).json({ error: 'Текст комментария пуст' });
+    }
+
+    const [profileUser, authorUser] = await Promise.all([
+      User.findById(profileUserId),
+      User.findById(authorId)
+    ]);
+
+    if (!profileUser) {
+      return res.status(404).json({ error: 'Профиль не найден' });
+    }
+
+    // Проверяем приватность: комментировать могут друзья
+    const isSelf = profileUserId.toString() === authorId.toString();
+    const isFriend = profileUser.friends.map(String).includes(authorId.toString());
+    if (!isSelf && profileUser.isPrivateProfile && !isFriend) {
+      return res.status(403).json({ error: 'Профиль скрыт настройками приватности' });
+    }
+
+    const ProfileComment = require('../models/ProfileComment');
+    const comment = new ProfileComment({
+      profileUserId,
+      authorId,
+      text: text.trim()
+    });
+    await comment.save();
+
+    const populatedComment = await ProfileComment.findById(comment._id)
+      .populate('authorId', 'name username avatar activeProfileSkin activeProfileFrame');
+
+    res.status(201).json(populatedComment);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Ошибка публикации комментария' });
+  }
+}
+
+// Удаление комментария
+async function deleteProfileComment(req, res) {
+  try {
+    const { id, commentId } = req.params;
+    const userId = req.user;
+
+    const ProfileComment = require('../models/ProfileComment');
+    const comment = await ProfileComment.findById(commentId);
+    if (!comment) return res.status(404).json({ error: 'Комментарий не найден' });
+
+    const user = await User.findById(userId);
+    const isAuthor = comment.authorId.toString() === userId.toString();
+    const isOwner = comment.profileUserId.toString() === userId.toString();
+    const isAdmin = user && user.role === 'admin';
+
+    if (!isAuthor && !isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'У вас нет прав для удаления этого комментария' });
+    }
+
+    await ProfileComment.findByIdAndDelete(commentId);
+    res.status(200).json({ message: 'Комментарий удален' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Ошибка при удалении комментария' });
+  }
+}
+
 module.exports = {
   getUsers,
   getLeaderboard,
   createUser,
   addFriend,
   updateTelegramId,
-  updateAvatar
+  updateAvatar,
+  getUserProfile,
+  toggleProfilePrivacy,
+  updateShowcase,
+  addProfileComment,
+  deleteProfileComment
 };

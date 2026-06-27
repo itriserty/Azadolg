@@ -1,67 +1,130 @@
 const User = require('../models/User');
-const Transaction = require('../models/Transaction');
+const Inventory = require('../models/Inventory');
 const tg = require('../services/telegramService');
+const { SHOP_ITEMS } = require('./shopController');
 
-const CASE_COST = 100;
+const COMMON_CASE_COST = 100;
+const COSMETIC_CASE_COST = 250;
 
-const PRIZE_POOL = [
-  { type: 'penalty',           value: -10,  weight: 20, label: '-10 ELO',    emoji: '🤬', rarity: 'Ширпотреб'   },
-  { type: 'elo_bonus',         value:  50,  weight: 35, label: '+50 ELO',    emoji: '🔥', rarity: 'Запрещенное' },
-  { type: 'karma_super_bonus', value: 300,  weight: 25, label: '+300 Кармы & +50 XP', emoji: '💎', rarity: 'Тайное' },
-  { type: 'cashback',          value: 150,  weight: 20, label: '+150 Кармы', emoji: '🪙', rarity: 'Армейское'   }
+// Обычный кейс (Содержит ELO-изменения и Карму, а также мелкий 2% шанс на базовую косметику)
+const COMMON_PRIZE_POOL = [
+  { type: 'penalty',           value: -10,  weight: 25, label: '-10 ELO',    emoji: '🤬', rarity: 'Ширпотреб'   },
+  { type: 'elo_bonus',         value:  15,  weight: 35, label: '+15 ELO',    emoji: '🔥', rarity: 'Запрещенное' }, // ELO НЕРФ (макс +15 ELO)
+  { type: 'karma_super_bonus', value: 300,  weight: 20, label: '+300 Кармы & +50 XP', emoji: '💎', rarity: 'Тайное' },
+  { type: 'cashback',          value: 150,  weight: 18, label: '+150 Кармы', emoji: '🪙', rarity: 'Армейское'   },
+  { type: 'cosmetic_common',   value: 0,    weight: 2,  label: 'Косметический Дроп', emoji: '🎁', rarity: 'Тайное' } // 2% шанс выпадения предметов
 ];
 
-function selectWeightedPrize() {
-  const total = PRIZE_POOL.reduce((s, p) => s + p.weight, 0);
+// Косметический кейс (Содержит рамки и скины с 2% шансом на Rare/Immortal предметы)
+const COSMETIC_PRIZE_POOL = [
+  { itemId: 'neon_red_frame',  weight: 30 },
+  { itemId: 'neon_cyan_frame', weight: 30 },
+  { itemId: 'vaporwave_skin',  weight: 19 },
+  { itemId: 'cyberpunk_skin',  weight: 19 },
+  // Rare/Immortal (2% суммарный шанс)
+  { itemId: 'gold_frame',      weight: 1.0 },  // 1%
+  { itemId: 'matrix_skin',     weight: 0.5 },  // 0.5%
+  { itemId: 'diamond_frame',   weight: 0.25 }, // 0.25%
+  { itemId: 'galaxy_skin',     weight: 0.25 }  // 0.25%
+];
+
+function selectWeightedPrize(pool) {
+  const total = pool.reduce((s, p) => s + p.weight, 0);
   let r = Math.random() * total;
-  for (const prize of PRIZE_POOL) { r -= prize.weight; if (r <= 0) return prize; }
-  return PRIZE_POOL[PRIZE_POOL.length - 1];
+  for (const prize of pool) {
+    r -= prize.weight;
+    if (r <= 0) return prize;
+  }
+  return pool[pool.length - 1];
 }
 
-// POST /api/open-case
+// POST /api/cases/open
 async function openCase(req, res) {
   try {
-    const { userId } = req.body;
+    const userId = req.user || req.body.userId;
+    const caseType = req.body.caseType || 'common'; // 'common' | 'cosmetic'
+
     if (!userId) return res.status(400).json({ error: 'Не указан ID пользователя' });
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
-    if (user.karma < CASE_COST)
-      return res.status(400).json({ error: `Недостаточно Кармы. Нужно ${CASE_COST} Кармы, у вас ${user.karma}.` });
 
-    user.karma -= CASE_COST;
+    const cost = caseType === 'cosmetic' ? COSMETIC_CASE_COST : COMMON_CASE_COST;
 
-    const prize = selectWeightedPrize();
+    if (user.karma < cost) {
+      return res.status(400).json({ error: `Недостаточно Кармы. Нужно ${cost} Кармы, у вас ${user.karma}.` });
+    }
+
+    // Списываем Карму
+    user.karma -= cost;
+
+    let dropLabel = '';
+    let dropRarity = '';
+    let dropEmoji = '🎁';
     let description = '';
     let detail = {};
+    let inventoryItem = null;
 
-    switch (prize.type) {
-      case 'penalty': {
-        const eloPenalty = Math.abs(prize.value);
-        user.eloRating = Math.max(100, user.eloRating - eloPenalty);
-        description = `Шуточный штраф: -${eloPenalty} ELO. Карма не одобряет!`;
-        detail = { eloChange: -eloPenalty };
-        break;
-      }
-      case 'elo_bonus': {
-        user.eloRating += prize.value;
-        description = `Благословение кармы! +${prize.value} ELO!`;
-        detail = { eloChange: prize.value };
-        break;
-      }
-      case 'cashback': {
-        user.karma += prize.value;
-        description = `Кэшбек! +${prize.value} Кармы!`;
-        detail = { karmaChange: prize.value };
-        break;
-      }
-      case 'karma_super_bonus': {
-        user.karma = (user.karma || 0) + prize.value;
+    if (caseType === 'common') {
+      const prize = selectWeightedPrize(COMMON_PRIZE_POOL);
+      dropLabel = prize.label;
+      dropRarity = prize.rarity;
+      dropEmoji = prize.emoji;
+
+      if (prize.type === 'penalty') {
+        user.eloRating = Math.max(100, user.eloRating - 10);
+        description = `Шуточный штраф: -10 ELO. Карма не одобряет!`;
+        detail = { eloChange: -10 };
+      } else if (prize.type === 'elo_bonus') {
+        user.eloRating += 15;
+        description = `Благословение кармы! +15 ELO!`;
+        detail = { eloChange: 15 };
+      } else if (prize.type === 'cashback') {
+        user.karma += 150;
+        description = `Кэшбек! +150 Кармы!`;
+        detail = { karmaChange: 150 };
+      } else if (prize.type === 'karma_super_bonus') {
+        user.karma += 300;
         const { addXP } = require('../utils/battlePassHelper');
         await addXP(user, 50);
         description = `Супер-дроп! +300 Кармы и +50 XP Боевого Пропуска!`;
         detail = { karmaChange: 300, xpChange: 50 };
-        break;
+      } else if (prize.type === 'cosmetic_common') {
+        // Выпадение случайного базового предмета
+        const baseItems = ['neon_red_frame', 'neon_cyan_frame', 'vaporwave_skin', 'cyberpunk_skin'];
+        const randomItem = baseItems[Math.floor(Math.random() * baseItems.length)];
+        const item = SHOP_ITEMS[randomItem];
+        
+        dropLabel = item.name;
+        dropRarity = item.rarity;
+        description = `Сверхвезение! Вы выбили предмет: ${item.name}!`;
+        
+        inventoryItem = await Inventory.findOne({ userId, itemId: item.id });
+        if (inventoryItem) {
+          inventoryItem.quantity += 1;
+          await inventoryItem.save();
+        } else {
+          inventoryItem = new Inventory({ userId, itemType: item.type, itemId: item.id, quantity: 1 });
+          await inventoryItem.save();
+        }
+      }
+    } else {
+      // Косметический кейс
+      const prize = selectWeightedPrize(COSMETIC_PRIZE_POOL);
+      const item = SHOP_ITEMS[prize.itemId];
+
+      dropLabel = item.name;
+      dropRarity = item.rarity;
+      dropEmoji = item.type === 'skin' ? '🎨' : '🖼️';
+      description = `Вы выиграли косметический предмет: ${item.name}! [Ранг: ${item.rarity}]`;
+
+      inventoryItem = await Inventory.findOne({ userId, itemId: item.id });
+      if (inventoryItem) {
+        inventoryItem.quantity += 1;
+        await inventoryItem.save();
+      } else {
+        inventoryItem = new Inventory({ userId, itemType: item.type, itemId: item.id, quantity: 1 });
+        await inventoryItem.save();
       }
     }
 
@@ -70,16 +133,17 @@ async function openCase(req, res) {
     // 📣 Telegram: уведомление об открытии кейса
     tg.notifyCase({
       userName:    user.name,
-      dropLabel:   prize.label,
-      dropRarity:  prize.rarity,
+      dropLabel,
+      dropRarity,
       description,
       telegramId:  user.telegramId
     });
 
     res.status(200).json({
       message: 'Кейс успешно открыт!',
-      drop: { type: prize.type, value: prize.value, label: prize.label, emoji: prize.emoji, rarity: prize.rarity, description, detail },
-      user: { _id: user._id, name: user.name, coins: user.coins, karma: user.karma, eloRating: user.eloRating }
+      drop: { label: dropLabel, rarity: dropRarity, emoji: dropEmoji, description, detail },
+      user: { _id: user._id, name: user.name, coins: user.coins, karma: user.karma, eloRating: user.eloRating },
+      inventoryItem
     });
   } catch (error) {
     console.error('Ошибка при открытии кейса:', error);

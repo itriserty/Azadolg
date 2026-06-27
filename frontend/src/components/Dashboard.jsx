@@ -20,7 +20,8 @@ export default function Dashboard({
   onRejectRequest,
   onUpdateTelegramId,
   onUpdateAvatar,
-  isTop3 = false
+  isTop3 = false,
+  onViewProfile
 }) {
   const [friendUsername, setFriendUsername] = useState('');
   const [tgInput, setTgInput] = useState(user?.telegramId || '');
@@ -368,7 +369,8 @@ export default function Dashboard({
               return (
                 <div
                   key={friend._id}
-                  className="flex items-center justify-between p-2.5 bg-[#0b0f19]/40 border border-gray-850/40 rounded-xl hover:border-gray-800/80 transition"
+                  onClick={() => onViewProfile && onViewProfile(friend._id)}
+                  className="flex items-center justify-between p-2.5 bg-[#0b0f19]/40 border border-gray-850/40 rounded-xl hover:border-gray-800/80 cursor-pointer transition"
                 >
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">

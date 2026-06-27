@@ -16,13 +16,15 @@ function getCalculatedAmount(transaction, now = new Date()) {
   const diffTime = now.getTime() - createdAt.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
+  const baseAmount = transaction.promisedReturnAmount || transaction.originalAmount;
+
   // Если прошло более 7 дней
   if (diffDays > 7) {
-    const penalty = transaction.originalAmount * 0.05;
-    return Number((transaction.originalAmount + penalty).toFixed(2));
+    const penalty = baseAmount * 0.05;
+    return Number((baseAmount + penalty).toFixed(2));
   }
 
-  return transaction.originalAmount;
+  return baseAmount;
 }
 
 module.exports = {

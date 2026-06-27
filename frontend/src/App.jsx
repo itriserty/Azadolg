@@ -10,6 +10,8 @@ import DuelsAndBets   from './components/DuelsAndBets';
 import SocialBoard    from './components/SocialBoard';
 import BattlePass     from './components/BattlePass';
 import AdminPanel     from './components/AdminPanel';
+import Profile        from './components/Profile';
+import Marketplace    from './components/Marketplace';
 import { LogOut, Lock, Mail, User as UserIcon, HelpCircle, Shield } from 'lucide-react';
 
 export default function App() {
@@ -22,6 +24,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('debts');
+  const [viewingProfileId, setViewingProfileId] = useState(null);
 
   // Состояния для форм авторизации
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot' | 'reset'
@@ -643,6 +646,7 @@ export default function App() {
               onUpdateTelegramId={handleUpdateTelegramId}
               onUpdateAvatar={handleUpdateAvatar}
               isTop3={users.slice(0, 3).some(u => u._id === currentUser?._id)}
+              onViewProfile={setViewingProfileId}
             />
 
             {/* Рулетка кейсов (показываем/скрываем по кнопке в Dashboard) */}
@@ -655,25 +659,25 @@ export default function App() {
             )}
 
             {/* ELO-лидерборд */}
-            <Leaderboard users={users} currentUser={currentUser} />
+            <Leaderboard users={users} currentUser={currentUser} onViewProfile={setViewingProfileId} />
           </div>
 
           {/* ── Правая колонка (Табы + Их контент) ───────────── */}
           <div className="lg:col-span-7 space-y-6">
             {/* Панель вкладок */}
             <div className="flex flex-wrap bg-[#151c2c]/85 border border-gray-800 p-1.5 rounded-2xl gap-1">
-              {[['debts','💸 Долги'],['duels','⚔️ Дуэли и Ставки'],['social','🏺 Община'],['battlepass','🎒 Battle Pass'],['shop','🛒 Магазин']].map(([tab, label]) => (
-                <button key={tab} onClick={() => setActiveTab(tab)}
+              {[['profile','👤 Профиль'],['debts','💸 Долги'],['duels','⚔️ Дуэли и Ставки'],['social','🏺 Община'],['battlepass','🎒 BP'],['shop','🛒 Магазин'],['market','🛍️ Рынок']].map(([tab, label]) => (
+                <button key={tab} onClick={() => { setActiveTab(tab); if (tab === 'profile') setViewingProfileId(null); }}
                   className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
-                    activeTab === tab
+                    (activeTab === tab && !viewingProfileId)
                       ? 'bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/10'
                       : 'text-gray-400 hover:text-gray-250 border border-transparent'
                   }`}>{label}</button>
               ))}
               {currentUser?.role === 'admin' && (
-                <button onClick={() => setActiveTab('admin')}
+                <button onClick={() => { setActiveTab('admin'); setViewingProfileId(null); }}
                   className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1 ${
-                    activeTab === 'admin'
+                    activeTab === 'admin' && !viewingProfileId
                       ? 'bg-purple-600/20 border border-purple-500/30 text-purple-400 font-extrabold shadow shadow-purple-500/10'
                       : 'text-gray-500 hover:text-purple-400 border border-transparent'
                   }`}>
@@ -683,46 +687,72 @@ export default function App() {
             </div>
 
             {/* Контент активной вкладки */}
-            {activeTab === 'debts' && (
-              <div className="space-y-8 animate-fadeIn">
-                <DebtForm
-                  users={debtFormUsers}
-                  currentUser={currentUser}
-                  onSubmit={handleCreateDebt}
-                />
-                <DebtList
-                  debts={debts}
-                  currentUser={currentUser}
-                  onPay={handlePayDebt}
-                  onConfirm={handleConfirmDebt}
-                  onDecline={handleDeclineDebt}
-                  onWitness={handleWitnessDecision}
-                  onPayProof={handlePayProof}
-                  onForgive={handleForgiveDebt}
-                  onTransfer={handleTransferDebt}
-                  friends={friends}
-                />
-              </div>
-            )}
+            {viewingProfileId ? (
+              <Profile
+                userId={viewingProfileId}
+                currentUser={currentUser}
+                onBack={() => setViewingProfileId(null)}
+              />
+            ) : (
+              <>
+                {activeTab === 'profile' && (
+                  <Profile
+                    userId={currentUser._id}
+                    currentUser={currentUser}
+                    onBack={null}
+                  />
+                )}
 
-            {activeTab === 'duels' && (
-              <DuelsAndBets user={currentUser} onUpdateUser={handleUserUpdate} />
-            )}
+                {activeTab === 'debts' && (
+                  <div className="space-y-8 animate-fadeIn">
+                    <DebtForm
+                      users={debtFormUsers}
+                      currentUser={currentUser}
+                      onSubmit={handleCreateDebt}
+                    />
+                    <DebtList
+                      debts={debts}
+                      currentUser={currentUser}
+                      onPay={handlePayDebt}
+                      onConfirm={handleConfirmDebt}
+                      onDecline={handleDeclineDebt}
+                      onWitness={handleWitnessDecision}
+                      onPayProof={handlePayProof}
+                      onForgive={handleForgiveDebt}
+                      onTransfer={handleTransferDebt}
+                      friends={friends}
+                    />
+                  </div>
+                )}
 
-            {activeTab === 'social' && (
-              <SocialBoard user={currentUser} onUpdateUser={handleUserUpdate} />
-            )}
+                {activeTab === 'duels' && (
+                  <DuelsAndBets user={currentUser} onUpdateUser={handleUserUpdate} />
+                )}
 
-            {activeTab === 'battlepass' && (
-              <BattlePass user={currentUser} />
-            )}
+                {activeTab === 'social' && (
+                  <SocialBoard user={currentUser} onUpdateUser={handleUserUpdate} />
+                )}
 
-            {activeTab === 'shop' && (
-              <Shop user={currentUser} onUpdateUser={handleUserUpdate} />
-            )}
+                {activeTab === 'battlepass' && (
+                  <BattlePass user={currentUser} />
+                )}
 
-            {activeTab === 'admin' && currentUser?.role === 'admin' && (
-              <AdminPanel token={localStorage.getItem('token')} />
+                {activeTab === 'shop' && (
+                  <Shop user={currentUser} onUpdateUser={handleUserUpdate} />
+                )}
+
+                {activeTab === 'market' && (
+                  <Marketplace
+                    user={currentUser}
+                    onUpdateUser={handleUserUpdate}
+                    onViewProfile={setViewingProfileId}
+                  />
+                )}
+
+                {activeTab === 'admin' && currentUser?.role === 'admin' && (
+                  <AdminPanel token={token} />
+                )}
+              </>
             )}
           </div>
         </div>
