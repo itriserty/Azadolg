@@ -1,4 +1,12 @@
 require('dotenv').config();
+
+// Исправление DNS-резолвинга SRV записей MongoDB Atlas (решает проблему ECONNREFUSED)
+try {
+  require('dns').setServers(['8.8.8.8', '1.1.1.1']);
+} catch (err) {
+  console.warn('[DNS] Не удалось установить публичные DNS-серверы:', err.message);
+}
+
 const express  = require('express');
 const mongoose = require('mongoose');
 const cors     = require('cors');
