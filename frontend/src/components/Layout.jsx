@@ -50,15 +50,12 @@ export default function Layout({ user, onLogout }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-gray-800/40 text-[10px]">
+            <div className="flex flex-col gap-1.5 pt-2 border-t border-gray-800/40 text-[10px]">
               <div className="flex items-center gap-1 text-cyan-400 font-bold">
-                <Flame className="w-3 h-3 text-red-500" /> {user.eloRating} 🔥
+                <Flame className="w-3 h-3 text-red-500" /> {user.eloRating} ELO 🔥
               </div>
-              <div className="flex items-center gap-1 text-yellow-400 font-bold">
-                🪙 {user.coins || 0}
-              </div>
-              <div className="flex items-center gap-1 text-emerald-400 font-bold col-span-2">
-                💠 {user.karma} ✧
+              <div className="flex items-center gap-1 text-amber-400 font-bold">
+                💠 {user.karma} ✧ Карма
               </div>
             </div>
           </div>
@@ -72,7 +69,7 @@ export default function Layout({ user, onLogout }) {
                 className={({ isActive }) => 
                   `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all border ${
                     isActive 
-                      ? 'bg-gradient-to-r from-purple-600/15 to-cyan-500/15 border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/5'
+                      ? 'bg-gradient-to-r from-purple-650/15 to-cyan-500/15 border-cyan-500/30 text-cyan-400 font-extrabold shadow shadow-cyan-500/5'
                       : 'border-transparent text-gray-400 hover:bg-gray-850 hover:text-gray-200'
                   } ${item.color}`
                 }
@@ -121,8 +118,7 @@ export default function Layout({ user, onLogout }) {
         </div>
         <div className="flex items-center gap-2.5 text-[10px] sm:text-xs">
           <span className="text-cyan-400 font-bold shrink-0">{user.eloRating} 🔥</span>
-          <span className="text-yellow-400 font-bold shrink-0">🪙 {user.coins || 0}</span>
-          <span className="text-emerald-400 font-bold shrink-0">💠 {user.karma} ✧</span>
+          <span className="text-amber-400 font-bold shrink-0">💠 {user.karma} ✧</span>
           <button onClick={onLogout} className="text-gray-550 hover:text-red-400 shrink-0 p-0.5 ml-1">
             <LogOut className="w-4 h-4" />
           </button>

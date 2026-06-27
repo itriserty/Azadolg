@@ -320,14 +320,10 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile }) 
         <div className="mt-6 space-y-6">
           
           {/* Игровые метрики */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-4 text-center">
               <div className="text-xs opacity-50 uppercase tracking-widest text-[9px] font-bold">Карма</div>
-              <div className="text-lg font-black text-amber-400 mt-1">{user.karma || 0} ₸</div>
-            </div>
-            <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-4 text-center">
-              <div className="text-xs opacity-50 uppercase tracking-widest text-[9px] font-bold">Монеты</div>
-              <div className="text-lg font-black text-yellow-400 mt-1">{user.coins || 0} 🪙</div>
+              <div className="text-lg font-black text-amber-400 mt-1">{user.karma || 0} ✧</div>
             </div>
             <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-4 text-center">
               <div className="text-xs opacity-50 uppercase tracking-widest text-[9px] font-bold">Стрик Побед</div>

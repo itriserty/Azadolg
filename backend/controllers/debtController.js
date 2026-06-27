@@ -312,7 +312,6 @@ async function submitPaymentProof(req, res) {
       if (applyRewards) {
         if (debtor) {
           debtor.eloRating = Math.max(100, debtor.eloRating + debtorElo);
-          debtor.coins     += coinsReward;
           debtor.karma     += coinsReward;
           if (!isOverdue) { debtor.winStreak++; debtor.stats.debtsPaidOnTime++; }
           else              debtor.winStreak = 0;

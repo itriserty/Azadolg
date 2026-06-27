@@ -59,7 +59,7 @@ async function register(req, res) {
         username: newUser.username,
         email: newUser.email,
         eloRating: newUser.eloRating,
-        coins: newUser.coins
+        karma: newUser.karma
       }
     });
   } catch (error) {
@@ -102,7 +102,7 @@ async function login(req, res) {
         username: user.username,
         email: user.email,
         eloRating: user.eloRating,
-        coins: user.coins,
+        karma: user.karma,
         telegramId: user.telegramId
       }
     });
