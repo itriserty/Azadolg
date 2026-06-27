@@ -26,13 +26,6 @@ export default function Leaderboard({ users, currentUser, onViewProfile }) {
     }
   };
 
-  // Вычисления долгов для профиля
-  const debtsHeOwes = userDebts.filter(d => d.debtor._id === selectedUser?._id && d.status === 'active');
-  const debtsOwedToHim = userDebts.filter(d => d.creditor._id === selectedUser?._id && d.status === 'active');
-
-  const totalOwesOthers = debtsHeOwes.reduce((sum, d) => sum + d.amount, 0);
-  const totalOthersOweHim = debtsOwedToHim.reduce((sum, d) => sum + d.amount, 0);
-
   return (
     <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-6 shadow-xl shadow-black/40">
       <div className="flex items-center justify-between mb-6">
