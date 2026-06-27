@@ -22,6 +22,7 @@ async function request(url, options = {}) {
 }
 
 export const api = {
+  request,
   // Авторизация
   register:          (name, username, email, password) => request('/users/register', { method: 'POST', body: JSON.stringify({ name, username, email, password }) }),
   login:             (username, password) => request('/users/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
