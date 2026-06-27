@@ -4,7 +4,7 @@ const tg = require('../services/telegramService');
 // Получение списка всех пользователей (для выпадающих списков)
 async function getUsers(req, res) {
   try {
-    const users = await User.find({}).sort({ eloRating: -1 });
+    const users = await User.find({ role: { $ne: 'admin' } }).sort({ eloRating: -1 });
     res.status(200).json(users);
   } catch (error) {
     console.error(error);
@@ -26,7 +26,7 @@ function getRankLabel(elo) {
 // GET /api/leaderboard
 async function getLeaderboard(req, res) {
   try {
-    const users = await User.find({})
+    const users = await User.find({ role: { $ne: 'admin' } })
       .select('name username email eloRating coins karma avatar activeProfileSkin activeProfileFrame')
       .sort({ eloRating: -1 }); // Сортируем по убыванию ELO
 
@@ -163,7 +163,8 @@ async function getUserProfile(req, res) {
       User.findById(id)
         .select('-password -resetCode -resetCodeExpires')
         .populate('achievements.achievement')
-        .populate('achievementShowcase'),
+        .populate('achievementShowcase')
+        .populate('friends', 'name username avatar eloRating karma activeProfileFrame activeProfileSkin'),
       User.findById(viewerId)
     ]);
 
@@ -172,18 +173,21 @@ async function getUserProfile(req, res) {
     }
 
     const isSelf = id.toString() === viewerId.toString();
-    const isFriend = targetUser.friends.map(String).includes(viewerId.toString());
-    const isAdmin = viewerUser.role === 'admin';
-    const canView = isSelf || isAdmin || !targetUser.isPrivateProfile || isFriend;
+    const isFriend = targetUser.friends.map(f => f._id.toString()).includes(viewerId.toString());
+    const isAdmin = viewerUser && viewerUser.role === 'admin';
+    const canView = isSelf || isAdmin || isFriend;
 
     if (!canView) {
-      // Если профиль скрыт, возвращаем ограниченные данные
+      // Если не друзья — возвращаем ограниченные данные (заблокированный профиль)
       return res.status(200).json({
         user: {
           _id: targetUser._id,
           name: targetUser.name,
           username: targetUser.username,
           avatar: targetUser.avatar,
+          eloRating: targetUser.eloRating,
+          activeProfileSkin: targetUser.activeProfileSkin,
+          activeProfileFrame: targetUser.activeProfileFrame,
           isPrivateProfile: true
         },
         isFriend,
