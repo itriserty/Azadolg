@@ -419,14 +419,15 @@ export default function App() {
     if (!localStorage.getItem('token')) return;
     try {
       setLoading(true);
-      const [profile, lb, fList, reqList, debtsList] = await Promise.all([
-        api.getMe(),
+      const profile = await api.getMe();
+      setCurrentUser(profile);
+
+      const [lb, fList, reqList, debtsList] = await Promise.all([
         api.getLeaderboard(),
         api.getFriends(),
         api.getPendingFriendRequests(),
-        api.getDebts()
+        api.getDebts(profile._id)
       ]);
-      setCurrentUser(profile);
       setUsers(lb);
       setFriends(fList);
       setPendingRequests(reqList);
