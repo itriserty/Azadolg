@@ -119,10 +119,11 @@ export default function Layout({ user, onLogout }) {
           </div>
           <span className="font-black text-xs text-white">AZADOLG</span>
         </div>
-        <div className="flex items-center gap-3 text-xs">
-          <span className="text-cyan-400 font-bold">{user.eloRating} 🔥</span>
-          <span className="text-emerald-400 font-bold">💠 {user.karma} ✧</span>
-          <button onClick={onLogout} className="text-gray-500 hover:text-red-400">
+        <div className="flex items-center gap-2.5 text-[10px] sm:text-xs">
+          <span className="text-cyan-400 font-bold shrink-0">{user.eloRating} 🔥</span>
+          <span className="text-yellow-400 font-bold shrink-0">🪙 {user.coins || 0}</span>
+          <span className="text-emerald-400 font-bold shrink-0">💠 {user.karma} ✧</span>
+          <button onClick={onLogout} className="text-gray-550 hover:text-red-400 shrink-0 p-0.5 ml-1">
             <LogOut className="w-4 h-4" />
           </button>
         </div>

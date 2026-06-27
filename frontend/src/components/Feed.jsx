@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Leaderboard from './Leaderboard';
 
 export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUsers, friends, pendingRequests, onAddFriend, onAcceptRequest, onRejectRequest }) {
+  const [activeMobileTab, setActiveMobileTab] = useState('posts');
   const [posts, setPosts] = useState([]);
   const [postContent, setPostContent] = useState('');
   
@@ -277,7 +278,31 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-xs">
+    <div className="flex flex-col gap-4 text-xs">
+      {/* Мобильный переключатель вкладок */}
+      <div className="lg:hidden flex gap-1.5 p-1 bg-[#0b0f19]/60 border border-gray-850 rounded-2xl overflow-x-auto select-none mb-2">
+        {[
+          { id: 'posts', label: 'Лента', emoji: '💬' },
+          { id: 'activities', label: 'Котлы & Квесты', emoji: '🏺' },
+          { id: 'leaderboard', label: 'Рейтинг ELO', emoji: '🏆' },
+          { id: 'friends', label: 'Община', emoji: '👥' }
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setActiveMobileTab(t.id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
+              activeMobileTab === t.id
+                ? 'bg-gradient-to-r from-purple-650/20 to-cyan-500/20 border border-cyan-500/40 text-cyan-400 shadow-md'
+                : 'border border-transparent text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <span>{t.emoji}</span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       
       {/* ── ЛЕВАЯ КОЛОНКА: Лента + Сборы/Квесты (col-span-8) ── */}
       <div className="lg:col-span-8 space-y-6">
@@ -295,7 +320,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
         )}
 
         {/* Создать Пост */}
-        <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-4 shadow-xl">
+        <div className={`${activeMobileTab === 'posts' ? 'block' : 'hidden lg:block'} bg-[#151c2c] border border-gray-800 rounded-2xl p-4 shadow-xl`}>
           <form onSubmit={handleCreatePost} className="flex gap-3">
             <img
               src={user.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.username}`}
@@ -321,7 +346,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
         </div>
 
         {/* Лента Постов */}
-        <div className="space-y-4">
+        <div className={`${activeMobileTab === 'posts' ? 'block' : 'hidden lg:block'} space-y-4`}>
           {posts.map((post) => {
             const hasLiked = post.likes?.includes(user._id);
             const isAuthor = post.author?._id === user._id;
@@ -445,7 +470,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
         </div>
 
         {/* 🏺 ОБЩИЕ КОТЛЫ (CROWDFUNDING) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+        <div className={`${activeMobileTab === 'activities' ? 'grid' : 'hidden lg:grid'} grid-cols-1 md:grid-cols-2 gap-6 pt-4`}>
           
           <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4">
             <h3 className="text-sm font-black uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
@@ -544,7 +569,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
         </div>
 
         {/* 📜 БЮЛЛЕТЕНЬ ПОРУЧЕНИЙ (КВЕСТЫ) */}
-        <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4">
+        <div className={`${activeMobileTab === 'activities' ? 'block' : 'hidden lg:block'} bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4`}>
           <h3 className="text-sm font-black uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
             <span>🛡️</span> Бюллетень поручений (Квесты за Карму)
           </h3>
@@ -683,14 +708,16 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
       <div className="lg:col-span-4 space-y-6">
         
         {/* Виджет Лидерборда */}
-        <Leaderboard 
-          users={leaderboardUsers} 
-          currentUser={user} 
-          onViewProfile={onViewProfile} 
-        />
+        <div className={activeMobileTab === 'leaderboard' ? 'block' : 'hidden lg:block'}>
+          <Leaderboard 
+            users={leaderboardUsers} 
+            currentUser={user} 
+            onViewProfile={onViewProfile} 
+          />
+        </div>
 
         {/* Управление друзьями и социальная панель */}
-        <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4">
+        <div className={`${activeMobileTab === 'friends' ? 'block' : 'hidden lg:block'} bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4`}>
           <div className="flex items-center gap-2 font-black text-gray-100 uppercase tracking-wider text-xs border-b border-gray-850 pb-2 flex-wrap">
             <Users className="w-4 h-4 text-cyan-400" />
             <span>Моя Община ({friends.length} друзей)</span>
@@ -777,5 +804,6 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
       </div>
 
     </div>
+  </div>
   );
 }
