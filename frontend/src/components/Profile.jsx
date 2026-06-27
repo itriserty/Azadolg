@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
-import { Shield, Eye, EyeOff, Trophy, Award, MessageSquare, Send, Trash2, Coins, Flame, Heart, DollarSign, Users, CheckCircle2, Lock, ChevronRight } from 'lucide-react';
+import { Shield, Eye, EyeOff, Trophy, Award, MessageSquare, Send, Trash2, Coins, Flame, Heart, DollarSign, Users, CheckCircle2, Lock, ChevronRight, Camera } from 'lucide-react';
 import DebtList from './DebtList';
 
 const SKIN_STYLES = {
@@ -20,14 +20,17 @@ const FRAME_STYLES = {
   diamond_frame: 'border-4 border-indigo-400 shadow-[0_0_25px_rgba(129,140,248,0.95)] ring-2 ring-sky-300 ring-offset-1 ring-offset-black border-double'
 };
 
-export default function Profile({ userId, currentUser, onBack, onViewProfile }) {
+export default function Profile({ userId, currentUser, onBack, onViewProfile, onUpdateAvatar }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const targetUserId = id || userId;
+  const avatarInputRef = useRef(null);
 
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
   
   // Активная подвкладка профиля
   const [activeTab, setActiveTab] = useState('debts');
@@ -209,18 +212,73 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile }) 
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-6 border-b border-gray-800/40">
         <div className="flex flex-col md:flex-row items-center gap-5">
           {/* Аватар в рамке */}
-          <div className="relative shrink-0">
+          <div className="relative shrink-0 group">
             <img
               src={user.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.username}`}
               alt={user.name}
               className={`w-24 h-24 rounded-2xl object-cover ${FRAME_STYLES[currentFrame] || FRAME_STYLES.none}`}
             />
-            {user.role === 'admin' && (
-              <span className="absolute -top-2.5 -right-2.5 bg-purple-650 border border-purple-500 text-white font-bold text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider shadow">
-                Admin
-              </span>
+            {isSelf && (
+              <>
+                <button
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  title="Изменить аватар"
+                  className="absolute inset-0 rounded-2xl bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 cursor-pointer"
+                >
+                  {avatarUploading ? (
+                    <div className="w-5 h-5 border-2 border-t-white border-gray-600 rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Camera className="w-6 h-6 text-white" />
+                      <span className="text-[9px] text-white font-bold">Изменить</span>
+                    </>
+                  )}
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) {
+                      setAvatarError('Файл слишком большой. Максимум 2 МБ.');
+                      return;
+                    }
+                    setAvatarUploading(true);
+                    setAvatarError('');
+                    try {
+                      const reader = new FileReader();
+                      reader.onloadend = async () => {
+                        try {
+                          await api.request('/users/avatar', {
+                            method: 'PUT',
+                            body: JSON.stringify({ avatar: reader.result })
+                          });
+                          if (onUpdateAvatar) onUpdateAvatar(reader.result);
+                          fetchProfile();
+                        } catch (err) {
+                          setAvatarError('Ошибка загрузки аватара');
+                        } finally {
+                          setAvatarUploading(false);
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    } catch {
+                      setAvatarUploading(false);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+              </>
             )}
           </div>
+
+          {avatarError && (
+            <p className="text-[10px] text-red-400 font-bold mt-1 text-center">{avatarError}</p>
+          )}
 
           <div className="text-center md:text-left">
             <h1 className="text-2xl font-black tracking-tight">{user.name}</h1>

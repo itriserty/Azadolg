@@ -25,31 +25,34 @@ function calcForgiveEloBonus(amount) {
   return Math.min(150, Math.round(20 * Math.log10((amount || 0) + 1)));
 }
 
-// ── Создание долга (с обязательным свидетелем) ────────────────────────────────
+const WITNESS_REQUIRED_THRESHOLD = 10000;
+
+// ── Создание долга (свидетель обязателен только при сумме ≥ 10 000) ───────────
 async function createDebt(req, res) {
   try {
     const { creditor, debtor, witnessId, amount, description, dueDate, penaltyRate, incurredAt, promisedReturnAmount } = req.body;
     const createdBy = req.user;
 
-    if (!creditor || !debtor || !witnessId || !amount || !description || !dueDate)
-      return res.status(400).json({ error: 'Обязательные поля: creditor, debtor, witnessId, amount, description, dueDate' });
+    if (!creditor || !debtor || !amount || !description || !dueDate)
+      return res.status(400).json({ error: 'Обязательные поля: creditor, debtor, amount, description, dueDate' });
     if (Number(amount) <= 0)
       return res.status(400).json({ error: 'Сумма долга должна быть больше нуля' });
     if (promisedReturnAmount && Number(promisedReturnAmount) < Number(amount))
       return res.status(400).json({ error: 'Обещанная сумма возврата не может быть меньше суммы займа' });
     if (creditor === debtor)
       return res.status(400).json({ error: 'Нельзя создать долг самому себе' });
-    if (witnessId === creditor || witnessId === debtor)
+    if (witnessId && (witnessId === creditor || witnessId === debtor))
       return res.status(400).json({ error: 'Свидетель не может быть кредитором или должником' });
+    if (Number(amount) >= WITNESS_REQUIRED_THRESHOLD && !witnessId)
+      return res.status(400).json({ error: `При сумме от ${WITNESS_REQUIRED_THRESHOLD.toLocaleString('ru')} ₸ необходим свидетель` });
 
-    const [creditorUser, debtorUser, witnessUser] = await Promise.all([
-      User.findById(creditor),
-      User.findById(debtor),
-      User.findById(witnessId)
-    ]);
+    const lookups = [User.findById(creditor), User.findById(debtor)];
+    if (witnessId) lookups.push(User.findById(witnessId));
+    const [creditorUser, debtorUser, witnessUser] = await Promise.all(lookups);
+
     if (!creditorUser || !debtorUser)
       return res.status(404).json({ error: 'Кредитор или должник не найден' });
-    if (!witnessUser)
+    if (witnessId && !witnessUser)
       return res.status(404).json({ error: 'Свидетель не найден' });
 
     // Дружба между участниками
@@ -58,10 +61,12 @@ async function createDebt(req, res) {
       return res.status(400).json({ error: 'Создавать долги можно только между друзьями' });
 
     // Свидетель должен быть другом хотя бы одной из сторон
-    const witnessFriendOfCreditor = creditorUser.friends.map(f => f.toString()).includes(witnessId);
-    const witnessFriendOfDebtor   = debtorUser.friends.map(f => f.toString()).includes(witnessId);
-    if (!witnessFriendOfCreditor && !witnessFriendOfDebtor)
-      return res.status(400).json({ error: 'Свидетель должен быть другом кредитора или должника' });
+    if (witnessId && witnessUser) {
+      const witnessFriendOfCreditor = creditorUser.friends.map(f => f.toString()).includes(witnessId);
+      const witnessFriendOfDebtor   = debtorUser.friends.map(f => f.toString()).includes(witnessId);
+      if (!witnessFriendOfCreditor && !witnessFriendOfDebtor)
+        return res.status(400).json({ error: 'Свидетель должен быть другом кредитора или должника' });
+    }
 
     // Ретроактивность: если incurredAt в прошлом — применяем пеню сразу при создании
     const actualStartDate = incurredAt ? new Date(incurredAt) : new Date();
@@ -86,25 +91,37 @@ async function createDebt(req, res) {
       dueDate:       new Date(dueDate),
       incurredAt:    actualStartDate,
       penaltyRate:   rate,
-      witness:       witnessId,
-      witnessStatus: 'pending',
-      status:        'pending_witness',
+      witness:       witnessId || null,
+      witnessStatus: witnessId ? 'pending' : 'none',
+      status:        witnessId ? 'pending_witness' : 'pending_approval',
       createdBy
     });
     await transaction.save();
 
-    // 📣 Telegram: уведомить участников и свидетеля
-    tg.notifyWitnessRequest({
-      creditorName: creditorUser.name,
-      debtorName: debtorUser.name,
-      amount: Number(amount),
-      promisedReturnAmount: promisedReturnAmount ? Number(promisedReturnAmount) : null,
-      description,
-      dueDate,
-      witnessTelegramId: witnessUser.telegramId,
-      debtorTelegramId: debtorUser.telegramId,
-      creditorTelegramId: creditorUser.telegramId
-    });
+    // 📣 Telegram: уведомить участников
+    if (witnessId && witnessUser) {
+      tg.notifyWitnessRequest({
+        creditorName: creditorUser.name,
+        debtorName: debtorUser.name,
+        amount: Number(amount),
+        promisedReturnAmount: promisedReturnAmount ? Number(promisedReturnAmount) : null,
+        description,
+        dueDate,
+        witnessTelegramId: witnessUser.telegramId,
+        debtorTelegramId: debtorUser.telegramId,
+        creditorTelegramId: creditorUser.telegramId
+      });
+    } else {
+      // Без свидетеля — уведомить только должника и кредитора
+      tg.notifyDebtCreated({
+        creditorName: creditorUser.name,
+        debtorName: debtorUser.name,
+        amount: Number(amount),
+        description,
+        dueDate,
+        debtorTelegramId: debtorUser.telegramId
+      });
+    }
 
     res.status(201).json(transaction);
   } catch (error) {

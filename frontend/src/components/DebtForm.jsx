@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, Calendar, ShieldAlert, Eye, UserCheck } from 'lucide-react';
 
+const WITNESS_THRESHOLD = 10000;
+
 export default function DebtForm({ users, currentUser, onSubmit }) {
   const [creditor,    setCreditor]    = useState('');
   const [debtor,      setDebtor]      = useState('');
@@ -19,26 +21,31 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
     if (currentUser) setCreditor(currentUser._id);
   }, [currentUser]);
 
-  // Быстрая установка дедлайна
   const setQuickDueDate = (days) => {
     const d = new Date();
     d.setDate(d.getDate() + days);
     setDueDate(d.toISOString().split('T')[0]);
   };
 
-  // Пользователи, доступные в качестве свидетеля (не кредитор и не должник)
+  const numAmount = parseFloat(amount) || 0;
+  const witnessRequired = numAmount >= WITNESS_THRESHOLD;
+
   const witnessOptions = users.filter(u => u._id !== creditor && u._id !== debtor);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!creditor || !debtor || !witnessId || !amount || !description || !dueDate) {
-      return setError('Заполните все обязательные поля, включая Свидетеля');
+    if (!creditor || !debtor || !amount || !description || !dueDate) {
+      return setError('Заполните все обязательные поля');
     }
     if (creditor === debtor) return setError('Нельзя создать долг самому себе');
-    if (witnessId === creditor || witnessId === debtor)
+    if (witnessRequired && !witnessId) {
+      return setError(`При сумме от ${WITNESS_THRESHOLD.toLocaleString('ru-RU')} ₸ свидетель обязателен`);
+    }
+    if (witnessId && (witnessId === creditor || witnessId === debtor)) {
       return setError('Свидетель не может быть кредитором или должником');
+    }
     if (promisedReturnAmount && parseFloat(promisedReturnAmount) < parseFloat(amount)) {
       return setError('Обещанная сумма возврата не может быть меньше суммы займа');
     }
@@ -48,7 +55,7 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
       await onSubmit({
         creditor,
         debtor,
-        witnessId,
+        witnessId: witnessId || null,
         amount:      parseFloat(amount),
         promisedReturnAmount: promisedReturnAmount ? parseFloat(promisedReturnAmount) : null,
         description,
@@ -106,32 +113,19 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
           </div>
         </div>
 
-        {/* Свидетель — ОБЯЗАТЕЛЬНЫЙ */}
-        <div className="border border-purple-500/20 bg-purple-500/5 rounded-xl p-4">
-          <label className="flex items-center gap-1.5 text-[10px] font-bold text-purple-400 mb-2 uppercase tracking-widest">
-            <Eye className="w-3.5 h-3.5" /> Свидетель (обязательно)
-          </label>
-          <select value={witnessId} onChange={e => setWitnessId(e.target.value)} className={inputCls} required>
-            <option value="">-- Выберите свидетеля из ваших друзей --</option>
-            {witnessOptions.map(u => (
-              <option key={u._id} value={u._id}>{u.name} (@{u.username})</option>
-            ))}
-          </select>
-          <p className="text-[10px] text-gray-500 mt-2">
-            ⚖️ Свидетель должен подтвердить реальность долга. Долг становится активным только после его одобрения.
-          </p>
-        </div>
-
         {/* Сумма, Обещано вернуть и Описание */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className={labelCls}>Сумма займа (₸)</label>
             <input
               type="number" value={amount} onChange={e => setAmount(e.target.value)}
-              placeholder="Минимум 500 ₸" min="1" required className={inputCls}
+              placeholder="Например: 5000 ₸" min="1" required className={inputCls}
             />
-            {amount && Number(amount) < 500 && (
-              <p className="text-[10px] text-yellow-500 mt-1">⚠️ Суммы менее 500 ₸ не дают ELO/Карму (защита от фарма)</p>
+            {amount && numAmount < 500 && (
+              <p className="text-[10px] text-yellow-500 mt-1">⚠️ Суммы менее 500 ₸ не дают ELO/Карму</p>
+            )}
+            {amount && numAmount >= WITNESS_THRESHOLD && (
+              <p className="text-[10px] text-purple-400 mt-1">⚖️ Сумма ≥ {WITNESS_THRESHOLD.toLocaleString('ru-RU')} ₸ — нужен свидетель</p>
             )}
           </div>
           <div>
@@ -154,6 +148,43 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
             />
           </div>
         </div>
+
+        {/* Свидетель — обязателен только при сумме ≥ 10 000 */}
+        {witnessRequired ? (
+          <div className="border border-purple-500/40 bg-purple-950/20 rounded-xl p-4">
+            <label className="flex items-center gap-1.5 text-[10px] font-bold text-purple-400 mb-2 uppercase tracking-widest">
+              <Eye className="w-3.5 h-3.5" />
+              Свидетель
+              <span className="ml-1 text-red-400 normal-case font-semibold">* обязателен при сумме ≥ {WITNESS_THRESHOLD.toLocaleString('ru-RU')} ₸</span>
+            </label>
+            <select value={witnessId} onChange={e => setWitnessId(e.target.value)} className={inputCls} required>
+              <option value="">-- Выберите свидетеля --</option>
+              {witnessOptions.map(u => (
+                <option key={u._id} value={u._id}>{u.name} (@{u.username})</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-gray-500 mt-2">
+              ⚖️ При крупных суммах свидетель подтверждает реальность долга перед активацией.
+            </p>
+          </div>
+        ) : (
+          <div className="border border-gray-800/40 bg-black/10 rounded-xl p-3">
+            <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-widest">
+              <Eye className="w-3.5 h-3.5" />
+              Свидетель
+              <span className="ml-1 text-gray-600 normal-case font-normal">(необязательно при сумме &lt; {WITNESS_THRESHOLD.toLocaleString('ru-RU')} ₸)</span>
+            </label>
+            <select value={witnessId} onChange={e => setWitnessId(e.target.value)} className={inputCls}>
+              <option value="">-- Без свидетеля --</option>
+              {witnessOptions.map(u => (
+                <option key={u._id} value={u._id}>{u.name} (@{u.username})</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-gray-600 mt-2">
+              💡 Добавьте свидетеля по желанию, чтобы повысить доверие к записи.
+            </p>
+          </div>
+        )}
 
         {/* Дедлайн */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -203,7 +234,7 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
 
         <button type="submit" disabled={loading}
           className="w-full bg-gradient-to-r from-emerald-500 to-cyan-500 text-[#0b0f19] font-black py-3 px-4 rounded-xl hover:opacity-90 shadow-emerald-500/20 shadow-md transition disabled:opacity-50 mt-1 text-sm">
-          {loading ? 'Создание...' : '⚖️ Создать долг (потребует свидетеля)'}
+          {loading ? 'Создание...' : witnessRequired ? '⚖️ Создать долг (со свидетелем)' : '✅ Создать долг'}
         </button>
       </form>
     </div>

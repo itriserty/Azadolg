@@ -366,6 +366,7 @@ function AppRoutes({
               currentUser={currentUser} 
               onBack={null} 
               onViewProfile={(id) => navigate(`/profile/${id}`)}
+              onUpdateAvatar={handleUpdateAvatar}
             />
           }
         />
@@ -378,6 +379,7 @@ function AppRoutes({
               currentUser={currentUser} 
               onBack={() => navigate(-1)} 
               onViewProfile={(id) => navigate(`/profile/${id}`)}
+              onUpdateAvatar={handleUpdateAvatar}
             />
           }
         />
