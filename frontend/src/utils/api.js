@@ -36,10 +36,13 @@ export const api = {
   getLeaderboard: ()              => request('/leaderboard'),
 
   // Друзья
-  getFriends:         () => request('/friends'),
-  addFriend:          (username) => request('/friends/add', { method: 'POST', body: JSON.stringify({ username }) }),
-  acceptFriend:       (requestId) => request('/friends/accept', { method: 'POST', body: JSON.stringify({ requestId }) }),
-  getPendingRequests: () => request('/friends/requests'),
+  getFriends:               () => request('/friends'),
+  addFriend:                (username) => request('/friends/add', { method: 'POST', body: JSON.stringify({ username }) }),
+  acceptFriend:             (requestId) => request('/friends/accept', { method: 'POST', body: JSON.stringify({ requestId }) }),
+  acceptFriendRequest:      (requestId) => request('/friends/accept', { method: 'POST', body: JSON.stringify({ requestId }) }),
+  rejectFriendRequest:      (requestId) => request('/friends/reject', { method: 'POST', body: JSON.stringify({ requestId }) }),
+  getPendingRequests:       () => request('/friends/requests'),
+  getPendingFriendRequests: () => request('/friends/requests'),
 
   // Долги
   getDebts:    (userId)        => request(`/debts/user/${userId}`),
