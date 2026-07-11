@@ -93,12 +93,12 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className={labelCls}>Кто заплатил (Кредитор)</label>
-            <select value={creditor} onChange={e => setCreditor(e.target.value)} className={inputCls}>
-              {users.map(u => (
-                <option key={u._id} value={u._id}>
-                  {u.name}{u._id === currentUser?._id ? ' (Вы)' : ''}
+            <select value={creditor} className={inputCls} disabled>
+              {currentUser && (
+                <option value={currentUser._id}>
+                  {currentUser.name} (Вы)
                 </option>
-              ))}
+              )}
             </select>
           </div>
           <div>
