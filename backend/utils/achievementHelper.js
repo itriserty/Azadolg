@@ -4,10 +4,21 @@ const Transaction = require('../models/Transaction');
 const tg = require('../services/telegramService');
 
 /**
+ * Карма-награда по редкости достижения.
+ * Начисляется при первом получении ачивки (и всегда для repeatable).
+ */
+const RARITY_KARMA = {
+  COMMON:    50,
+  RARE:     150,
+  EPIC:     200,
+  LEGENDARY:300,
+};
+
+/**
  * Проверяет и выдает ачивки пользователю по триггеру.
  * @param {string} userId - ID пользователя
- * @param {string} triggerType - Тип триггера ('declined_loan_streak', 'active_debts_count', 'overdue_365', etc.)
- * @param {number} [currentValue] - Текущее значение показателя (опционально, если можно рассчитать)
+ * @param {string} triggerType - Тип триггера
+ * @param {number} [currentValue] - Текущее значение показателя (опционально)
  */
 async function checkAndAward(userId, triggerType, currentValue = null) {
   try {
@@ -57,30 +68,44 @@ async function checkAndAward(userId, triggerType, currentValue = null) {
 
     let changed = false;
     const newlyEarned = [];
+
     for (const ach of achievements) {
       // Проверяем, получена ли уже ачивка
       const alreadyEarned = user.achievements.some(a => a.achievement.toString() === ach._id.toString());
-      if (alreadyEarned && !ach.isRepeatable) {
-        continue;
-      }
+      if (alreadyEarned && !ach.isRepeatable) continue;
 
       // Проверяем порог
       if (val >= ach.threshold) {
+        // Начисляем Карму за достижение
+        const rarityKey = (ach.rarity || '').toUpperCase();
+        const karmaReward = RARITY_KARMA[rarityKey] || 0;
+
+        if (karmaReward > 0) {
+          user.karma = (user.karma || 0) + karmaReward;
+        }
+
         // Выдаем ачивку
         user.achievements.push({ achievement: ach._id, earnedAt: new Date() });
-        newlyEarned.push(ach);
+        newlyEarned.push({
+          ...ach.toObject(),
+          karmaReward  // прокидываем на фронт чтобы показать в тосте
+        });
         changed = true;
-        
+
         // Telegram-уведомление
-        const announceText = `🏆 <b>ДОСТИЖЕНИЕ РАЗБЛОКИРОВАНО!</b> 🏆\n\n` +
+        const karmaLine = karmaReward > 0 ? `\n💠 Награда: +${karmaReward} Кармы` : '';
+        const announceText =
+          `🏆 <b>ДОСТИЖЕНИЕ РАЗБЛОКИРОВАНО!</b> 🏆\n\n` +
           `👤 Игрок: <b>${user.name}</b> (@${user.username})\n` +
-          `🎖️ Награда: <b>${ach.emoji} ${ach.title}</b> (${ach.rarity})\n` +
-          `📝 <i>${ach.description}</i>`;
-        
+          `🎖️ Награда: <b>${ach.emoji} ${ach.title}</b> (${ach.rarity})` +
+          karmaLine + `\n📝 <i>${ach.description}</i>`;
+
         tg.sendMessage(announceText);
         if (user.telegramId) {
           try {
-            await tg.sendMessage(`🎉 Поздравляем! Вы получили достижение: <b>${ach.emoji} ${ach.title}</b>!`, user.telegramId);
+            const personalMsg = `🎉 Вы получили достижение: <b>${ach.emoji} ${ach.title}</b>!` +
+              (karmaReward > 0 ? `\n💠 +${karmaReward} Кармы зачислено!` : '');
+            await tg.sendMessage(personalMsg, user.telegramId);
           } catch (e) {
             console.error('Ошибка отправки уведомления в Telegram:', e.message);
           }
@@ -97,6 +122,4 @@ async function checkAndAward(userId, triggerType, currentValue = null) {
   }
 }
 
-module.exports = {
-  checkAndAward
-};
+module.exports = { checkAndAward, RARITY_KARMA };

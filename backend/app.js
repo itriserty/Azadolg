@@ -24,7 +24,8 @@ const fundRoutes  = require('./routes/fundRoutes');
 const questRoutes = require('./routes/questRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const marketRoutes = require('./routes/marketRoutes');
-const postRoutes = require('./routes/postRoutes');
+const postRoutes    = require('./routes/postRoutes');
+const rouletteRoutes = require('./routes/rouletteRoutes');
 const { startReminderScheduler } = require('./services/reminderService');
 const { startCronScheduler } = require('./services/cronService');
 
@@ -54,8 +55,9 @@ app.use('/api/bets', betRoutes);
 app.use('/api/fund', fundRoutes);
 app.use('/api/quests', questRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/market', marketRoutes);
-app.use('/api/posts', postRoutes);
+app.use('/api/market',    marketRoutes);
+app.use('/api/posts',     postRoutes);
+app.use('/api/roulette',  rouletteRoutes);
 
 // Статика загруженных пруфов оплаты
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

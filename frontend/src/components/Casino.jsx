@@ -73,17 +73,10 @@ export default function Casino({ user, onUpdateUser }) {
         {activeSubTab === 'cases' ? (
           <CaseRoulette
             user={user}
-            onOpenCase={async (type) => {
-              const res = await api.request('/cases/open', {
-                method: 'POST',
-                body: JSON.stringify({ caseType: type })
-              });
-              // После открытия кейса обновляем джекпот и юзера
+            onUserUpdate={(updatedUser) => {
               fetchJackpot();
-              if (onUpdateUser) onUpdateUser(res.user);
-              return res;
+              if (onUpdateUser) onUpdateUser(updatedUser);
             }}
-            onUserUpdate={onUpdateUser}
           />
         ) : (
           <DuelsAndBets

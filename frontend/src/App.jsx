@@ -409,9 +409,9 @@ export default function App() {
 
   const [toasts, setToasts] = useState([]);
 
-  const addToast = useCallback((title, desc, emoji) => {
+  const addToast = useCallback((title, desc, emoji, karmaReward = 0) => {
     const id = Date.now() + Math.random();
-    setToasts(prev => [...prev, { id, title, desc, emoji }]);
+    setToasts(prev => [...prev, { id, title, desc, emoji, karmaReward }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 5500);
@@ -420,7 +420,12 @@ export default function App() {
   const checkAchievements = useCallback((res) => {
     if (res && res.newlyAwarded && res.newlyAwarded.length > 0) {
       res.newlyAwarded.forEach(ach => {
-        addToast(ach.title || ach.name, ach.description || ach.desc, ach.emoji);
+        addToast(
+          ach.title || ach.name,
+          ach.description || ach.desc,
+          ach.emoji,
+          ach.karmaReward || 0
+        );
       });
     }
   }, [addToast]);
@@ -680,6 +685,11 @@ export default function App() {
               <div className="text-[10px] text-cyan-400 font-extrabold uppercase tracking-wider mb-0.5">Разблокировано Достижение!</div>
               <div className="text-xs font-black text-white truncate">{t.title}</div>
               <div className="text-[10px] text-gray-400 leading-tight mt-0.5">{t.desc}</div>
+              {t.karmaReward > 0 && (
+                <div className="text-[10px] text-emerald-400 font-extrabold mt-1">
+                  +{t.karmaReward} 💠 Кармы!
+                </div>
+              )}
             </div>
           </div>
         ))}
