@@ -18,11 +18,20 @@ export default function AdminPanel({ token }) {
   const [search,   setSearch]   = useState('');
   const [msg,      setMsg]      = useState({ text: '', type: 'ok' });
   
+  const [distCoinsAmt,    setDistCoinsAmt]    = useState('');
+  const [distCoinsReason, setDistCoinsReason] = useState('');
+  
   // Модальные окна
   const [banModal, setBanModal] = useState(null);   // userId
   const [banReason,setBanReason]= useState('');
   const [pwModal,  setPwModal]  = useState(null);   // userId
   const [newPw,    setNewPw]    = useState('');
+  
+  // Выдача средств (коины / карма)
+  const [grantModal,      setGrantModal]      = useState(null); // null | { userId, name }
+  const [grantAmt,        setGrantAmt]        = useState('');
+  const [grantReason,     setGrantReason]     = useState('');
+  const [grantType,       setGrantType]       = useState('coins'); // 'coins' | 'karma'
   
   // Достижения
   const [achModal, setAchModal] = useState(null);   // null | 'create' | achievementObject
@@ -124,6 +133,56 @@ export default function AdminPanel({ token }) {
     const d = await r.json();
     flash(r.ok ? d.message : d.error, r.ok ? 'ok' : 'err');
     if (r.ok) { setPwModal(null); setNewPw(''); }
+  };
+
+  const doDistributeCoins = async () => {
+    if (!distCoinsAmt || Number(distCoinsAmt) <= 0) {
+      return flash('Укажите корректную сумму монет', 'err');
+    }
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/admin/users/distribute-coins`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ amount: distCoinsAmt, reason: distCoinsReason })
+      });
+      const d = await r.json();
+      if (!r.ok) return flash(d.error || 'Ошибка', 'err');
+      flash(d.message);
+      setDistCoinsAmt('');
+      setDistCoinsReason('');
+      fetchUsers();
+    } catch (err) {
+      flash('Ошибка при массовой раздаче', 'err');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const doGrantFunds = async () => {
+    if (!grantAmt || Number(grantAmt) <= 0) {
+      return flash('Укажите корректную сумму', 'err');
+    }
+    setLoading(true);
+    try {
+      const endpoint = grantType === 'coins' ? 'grant-coins' : 'grant-karma';
+      const r = await fetch(`${API}/api/admin/users/${grantModal.userId}/${endpoint}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ amount: grantAmt, reason: grantReason })
+      });
+      const d = await r.json();
+      if (!r.ok) return flash(d.error || 'Ошибка', 'err');
+      flash(d.message);
+      setGrantModal(null);
+      setGrantAmt('');
+      setGrantReason('');
+      fetchUsers();
+    } catch (err) {
+      flash('Ошибка при начислении средств', 'err');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // CRUD Достижений
@@ -233,80 +292,119 @@ export default function AdminPanel({ token }) {
 
       {/* ── ПОЛЬЗОВАТЕЛИ ── */}
       {tab === 'users' && (
-        <div className="bg-[#151c2c] border border-gray-800 rounded-2xl overflow-hidden">
-          <div className="p-4 border-b border-gray-800 flex items-center gap-2">
-            <Search className="w-4 h-4 text-gray-500" />
-            <input type="text" placeholder="Поиск пользователя..." value={search} onChange={e => setSearch(e.target.value)}
-              className="bg-transparent border-none text-white focus:outline-none text-xs w-full" />
+        <div className="space-y-4">
+          {/* Блок массовой раздачи коинов */}
+          <div className="bg-gradient-to-br from-[#111827] to-[#1f2937] border border-cyan-500/25 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-white flex items-center gap-1.5 text-sm">
+                <span>🎁 Массовая раздача коинов</span>
+              </h3>
+              <p className="text-gray-400 text-[10px]">Начислить монеты всем незаблокированным пользователям одновременно</p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-2">
+              <input 
+                type="number" 
+                placeholder="Сумма коинов" 
+                value={distCoinsAmt}
+                onChange={e => setDistCoinsAmt(e.target.value)}
+                className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 w-32" 
+              />
+              <input 
+                type="text" 
+                placeholder="Причина раздачи..." 
+                value={distCoinsReason}
+                onChange={e => setDistCoinsReason(e.target.value)}
+                className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 w-48" 
+              />
+              <button 
+                onClick={doDistributeCoins}
+                className="bg-cyan-600 hover:bg-cyan-500 text-[#0b0f19] font-black px-4 py-2 rounded-xl transition text-xs"
+              >
+                Раздать всем
+              </button>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-[#0b0f19]/60 text-gray-500 uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="px-4 py-3 text-left">Имя / Юзернейм</th>
-                  <th className="px-4 py-3 text-left">Рейтинг / Карма</th>
-                  <th className="px-4 py-3 text-left">Роль</th>
-                  <th className="px-4 py-3 text-left">Статус</th>
-                  <th className="px-4 py-3 text-right">Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map(u => (
-                  <tr key={u._id} className="border-t border-gray-800/50">
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-gray-255">{u.name}</div>
-                      <div className="text-gray-500 text-[10px]">@{u.username} | {u.email}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div>🔥 {u.eloRating} ELO</div>
-                      <div className="text-[10px] text-emerald-400">🪙 {u.karma} Карма</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${u.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-gray-800 text-gray-400'}`}>
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {u.isBanned ? (
-                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-red-500/20 text-red-400 border border-red-500/30">
-                          🔨 БАН
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          ✅ Активен
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1 justify-end flex-wrap">
-                        {u.role !== 'admin' && (
-                          <>
-                            {u.isBanned ? (
-                              <button onClick={() => doUnban(u._id)} className={`${btn} bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/40`}>
-                                ✅ Разбан
-                              </button>
-                            ) : (
-                              <button onClick={() => { setBanModal(u._id); setBanReason(''); }} className={`${btn} bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-600/40`}>
-                                <Ban className="w-3 h-3 inline" /> Бан
-                              </button>
-                            )}
-                            <button onClick={() => { setPwModal(u._id); setNewPw(''); }} className={`${btn} bg-amber-600/20 text-amber-400 border border-amber-500/30 hover:bg-amber-600/40`}>
-                              <Key className="w-3 h-3 inline" /> Пароль
-                            </button>
-                            <button onClick={() => doDeleteUser(u._id, u.name)} className={`${btn} bg-gray-800 text-gray-500 hover:bg-red-900/30 hover:text-red-400`}>
-                              <Trash2 className="w-3 h-3 inline" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
+
+          <div className="bg-[#151c2c] border border-gray-800 rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-gray-800 flex items-center gap-2">
+              <Search className="w-4 h-4 text-gray-500" />
+              <input type="text" placeholder="Поиск пользователя..." value={search} onChange={e => setSearch(e.target.value)}
+                className="bg-transparent border-none text-white focus:outline-none text-xs w-full" />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-[#0b0f19]/60 text-gray-500 uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Имя / Юзернейм</th>
+                    <th className="px-4 py-3 text-left">Балансы</th>
+                    <th className="px-4 py-3 text-left">Роль</th>
+                    <th className="px-4 py-3 text-left">Статус</th>
+                    <th className="px-4 py-3 text-right">Действия</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {filteredUsers.length === 0 && !loading && (
-              <div className="text-center py-8 text-gray-500 text-sm">Нет пользователей</div>
-            )}
+                </thead>
+                <tbody>
+                  {filteredUsers.map(u => (
+                    <tr key={u._id} className="border-t border-gray-800/50">
+                      <td className="px-4 py-3">
+                        <div className="font-bold text-gray-200">{u.name}</div>
+                        <div className="text-gray-500 text-[10px]">@{u.username} | {u.email}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>🔥 {u.eloRating} ELO</div>
+                        <div className="text-[10px] text-emerald-400">✧ {u.karma} Карма</div>
+                        <div className="text-[10px] text-cyan-400">🪙 {u.coins || 0} Коины</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${u.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-gray-800 text-gray-400'}`}>
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {u.isBanned ? (
+                          <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-red-500/20 text-red-400 border border-red-500/30">
+                            🔨 БАН
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            ✅ Активен
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1 justify-end flex-wrap">
+                          {u.role !== 'admin' && (
+                            <>
+                              {u.isBanned ? (
+                                <button onClick={() => doUnban(u._id)} className={`${btn} bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/40`}>
+                                  ✅ Разбан
+                                </button>
+                              ) : (
+                                <button onClick={() => { setBanModal(u._id); setBanReason(''); }} className={`${btn} bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-600/40`}>
+                                  <Ban className="w-3 h-3 inline" /> Бан
+                                </button>
+                              )}
+                              <button onClick={() => { setGrantModal({ userId: u._id, name: u.name }); setGrantAmt(''); setGrantReason(''); setGrantType('coins'); }} className={`${btn} bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600/40`}>
+                                🪙 Начислить
+                              </button>
+                              <button onClick={() => { setPwModal(u._id); setNewPw(''); }} className={`${btn} bg-amber-600/20 text-amber-400 border border-amber-500/30 hover:bg-amber-600/40`}>
+                                <Key className="w-3 h-3 inline" /> Пароль
+                              </button>
+                              <button onClick={() => doDeleteUser(u._id, u.name)} className={`${btn} bg-gray-800 text-gray-500 hover:bg-red-900/30 hover:text-red-400`}>
+                                <Trash2 className="w-3 h-3 inline" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filteredUsers.length === 0 && !loading && (
+                <div className="text-center py-8 text-gray-500 text-sm">Нет пользователей</div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -511,6 +609,48 @@ export default function AdminPanel({ token }) {
               <div className="flex gap-2">
                 <button onClick={doResetPw} className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-xl text-sm transition">Сбросить пароль</button>
                 <button onClick={() => setPwModal(null)} className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2.5 rounded-xl text-sm transition">Отмена</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Модал НАЧИСЛЕНИЯ СРЕДСТВ (КОИНЫ / КАРМА) ── */}
+      <AnimatePresence>
+        {grantModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="bg-[#151c2c] border border-cyan-500/30 rounded-2xl p-6 w-full max-w-sm">
+              <h3 className="font-black text-white mb-4 flex items-center gap-2">💰 Начислить средства</h3>
+              <p className="text-gray-400 text-[10px] mb-3">Пользователь: <span className="text-white font-bold">{grantModal.name}</span></p>
+              
+              <div className="mb-4">
+                <label className="text-[10px] uppercase font-bold text-gray-500 block mb-1">Тип баланса</label>
+                <select value={grantType} onChange={e => setGrantType(e.target.value)}
+                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500">
+                  <option value="coins">🪙 Коины (монеты)</option>
+                  <option value="karma">✧ Карма (рейтинг)</option>
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <label className="text-[10px] uppercase font-bold text-gray-500 block mb-1">Количество</label>
+                <input type="number" value={grantAmt} onChange={e => setGrantAmt(e.target.value)}
+                  placeholder="Сумма для начисления"
+                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500" />
+              </div>
+
+              <div className="mb-4">
+                <label className="text-[10px] uppercase font-bold text-gray-500 block mb-1">Причина</label>
+                <input type="text" value={grantReason} onChange={e => setGrantReason(e.target.value)}
+                  placeholder="Причина начисления..."
+                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500" />
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={doGrantFunds} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-[#0b0f19] font-black py-2.5 rounded-xl text-sm transition">Начислить</button>
+                <button onClick={() => setGrantModal(null)} className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2.5 rounded-xl text-sm transition">Отмена</button>
               </div>
             </motion.div>
           </motion.div>
