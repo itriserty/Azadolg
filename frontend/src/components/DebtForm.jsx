@@ -39,7 +39,6 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
     if (!creditor || !debtor || !amount || !description || !dueDate) {
       return setError('Заполните все обязательные поля');
     }
-    if (creditor === debtor) return setError('Нельзя создать долг самому себе');
     if (witnessRequired && !witnessId) {
       return setError(`При сумме от ${WITNESS_THRESHOLD.toLocaleString('ru-RU')} ₸ свидетель обязателен`);
     }
@@ -106,8 +105,10 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
             <label className={labelCls}>Кто должен (Должник)</label>
             <select value={debtor} onChange={e => setDebtor(e.target.value)} className={inputCls} required>
               <option value="">-- Выберите должника --</option>
-              {users.filter(u => u._id !== creditor).map(u => (
-                <option key={u._id} value={u._id}>{u.name}</option>
+              {users.map(u => (
+                <option key={u._id} value={u._id}>
+                  {u.name}{u._id === currentUser?._id ? ' (Вы)' : ''}
+                </option>
               ))}
             </select>
           </div>

@@ -5,11 +5,11 @@ const SystemState = require('../models/SystemState');
 const tg = require('../services/telegramService');
 
 // Найти или создать глобальное состояние системы
-async function getOrCreateSystemState() {
-  let state = await SystemState.findOne();
+async function getOrCreateSystemState(session = null) {
+  let state = await SystemState.findOne().session(session);
   if (!state) {
     state = new SystemState();
-    await state.save();
+    await state.save({ session });
   }
   return state;
 }
@@ -69,9 +69,9 @@ async function placeBet(req, res) {
 }
 
 // Разрешить ставки для закрытого долга (вызывается из payDebt)
-async function resolveBetsForDebt(debtId, isOverdue) {
+async function resolveBetsForDebt(debtId, isOverdue, session = null) {
   try {
-    const bets = await Bet.find({ debtId, status: 'pending' }).populate('better');
+    const bets = await Bet.find({ debtId, status: 'pending' }).populate('better').session(session);
     if (bets.length === 0) return;
 
     console.log(`[Totalizator] Расчет ставок для долга ${debtId}. Просрочен: ${isOverdue}`);
@@ -87,7 +87,7 @@ async function resolveBetsForDebt(debtId, isOverdue) {
     const totalWinningWagers = winningBets.reduce((sum, b) => sum + b.wager, 0);
     const totalPool = totalWinningWagers + totalLosingWagers;
 
-    const systemState = await getOrCreateSystemState();
+    const systemState = await getOrCreateSystemState(session);
 
     if (winningBets.length > 0) {
       for (const bet of winningBets) {
@@ -114,10 +114,10 @@ async function resolveBetsForDebt(debtId, isOverdue) {
         // Начисляем выигрыш
         await User.findByIdAndUpdate(bet.better._id, {
           $inc: { karma: netWin, 'stats.totalKarmaEarned': netWin - bet.wager }
-        });
+        }, { session });
 
         bet.status = 'won';
-        await bet.save();
+        await bet.save({ session });
 
         // Личное уведомление победителю
         if (bet.better.telegramId) {
@@ -134,7 +134,7 @@ async function resolveBetsForDebt(debtId, isOverdue) {
     // Помечаем проигравшие ставки
     for (const bet of losingBets) {
       bet.status = 'lost';
-      await bet.save();
+      await bet.save({ session });
 
       if (bet.better.telegramId) {
         tg.sendMessage(
@@ -146,7 +146,7 @@ async function resolveBetsForDebt(debtId, isOverdue) {
       }
     }
 
-    await systemState.save();
+    await systemState.save({ session });
     console.log(`[Totalizator] Ставки на долг ${debtId} успешно рассчитаны.`);
   } catch (error) {
     console.error('[Totalizator] Ошибка расчета ставок:', error);

@@ -75,6 +75,7 @@ const TransactionSchema = new mongoose.Schema({
       'pending_witness',   // ждёт подтверждения свидетелем
       'pending_approval',  // ждёт подтверждения должником (legacy)
       'active',            // активный
+      'partially_paid',    // частично погашен
       'paid',              // полностью оплачен
       'declined',          // отклонён
       'forgiven',          // прощён кредитором

@@ -8,7 +8,7 @@
  * @returns {number} Актуальная сумма долга
  */
 function getCalculatedAmount(transaction, now = new Date()) {
-  if (transaction.status !== 'active') {
+  if (transaction.status !== 'active' && transaction.status !== 'partially_paid') {
     return transaction.amount;
   }
 

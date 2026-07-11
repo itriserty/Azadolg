@@ -11,6 +11,10 @@ async function request(url, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  if (headers['Content-Type'] === 'none') {
+    delete headers['Content-Type'];
+  }
+
   const response = await fetch(`${API_BASE_URL}${url}`, {
     headers,
     ...options

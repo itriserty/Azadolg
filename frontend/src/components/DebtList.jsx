@@ -84,6 +84,8 @@ export default function DebtList({
       if (debt.status === 'pending_approval') return <span className="badge-yellow animate-pulse">⏳ Ждёт подтверждения</span>;
       if (debt.status === 'active' && isOverdue) return <span className="badge-red">🔥 Просрочен</span>;
       if (debt.status === 'active') return <span className="badge-green">✅ Активен</span>;
+      if (debt.status === 'partially_paid' && isOverdue) return <span className="badge-red">🔥 Просрочен (Частично)</span>;
+      if (debt.status === 'partially_paid') return <span className="badge-blue">⏳ Частично погашен</span>;
       return null;
     };
 
@@ -347,5 +349,6 @@ style.textContent = `
   .badge-yellow { display:inline-flex; align-items:center; padding: 2px 8px; border-radius: 9999px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; background:rgba(234,179,8,0.1);  color:rgb(234,179,8);  border: 1px solid rgba(234,179,8,0.3);  }
   .badge-red    { display:inline-flex; align-items:center; padding: 2px 8px; border-radius: 9999px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; background:rgba(239,68,68,0.12);  color:rgb(239,68,68);  border: 1px solid rgba(239,68,68,0.3);  }
   .badge-green  { display:inline-flex; align-items:center; padding: 2px 8px; border-radius: 9999px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; background:rgba(34,197,94,0.1);   color:rgb(34,197,94);  border: 1px solid rgba(34,197,94,0.3);  }
+  .badge-blue   { display:inline-flex; align-items:center; padding: 2px 8px; border-radius: 9999px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; background:rgba(59,130,246,0.12);  color:rgb(96,165,250); border: 1px solid rgba(59,130,246,0.3);  }
 `;
 if (!document.getElementById('debt-badges-style')) { style.id = 'debt-badges-style'; document.head.appendChild(style); }

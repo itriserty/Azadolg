@@ -1,45 +1,97 @@
 const cron = require('node-cron');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const SystemState = require('../models/SystemState');
 const tg = require('./telegramService');
+
+// Вспомогательный хелпер для запуска операций в транзакции с фолбэком
+async function runInTransaction(callback) {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const result = await callback(session);
+    await session.commitTransaction();
+    return result;
+  } catch (error) {
+    if (error.codeName === 'CommandNotSupported' || error.message.includes('transaction') || error.message.includes('session')) {
+      console.warn('[Transaction] Transactions not supported by MongoDB server. Falling back to non-transactional execution...');
+      session.endSession();
+      return await callback(null);
+    }
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+}
 
 // Розыгрыш еженедельного джекпота
 async function drawJackpot() {
   try {
     console.log('[CronService] Запуск розыгрыша еженедельного Джекпота...');
     
-    let state = await SystemState.findOne();
-    if (!state) {
-      state = new SystemState();
-      await state.save();
-    }
+    const result = await runInTransaction(async (session) => {
+      let state = await SystemState.findOne().session(session);
+      if (!state) {
+        state = new SystemState();
+        await state.save({ session });
+      }
 
-    const jackpotAmount = state.jackpotPool;
-    if (jackpotAmount <= 0) {
-      console.log('[CronService] Джекпот пуст. Розыгрыш отменен.');
-      return;
-    }
+      const jackpotAmount = state.jackpotPool;
+      if (jackpotAmount <= 0) {
+        console.log('[CronService] Джекпот пуст. Розыгрыш отменен.');
+        return null;
+      }
 
-    // Находим всех зарегистрированных пользователей
-    const users = await User.find({ username: { $exists: true, $ne: null } });
-    if (users.length === 0) {
-      console.log('[CronService] Нет пользователей для розыгрыша.');
-      return;
-    }
+      // Считаем количество подходящих пользователей
+      const count = await User.countDocuments({ username: { $exists: true, $ne: null } }).session(session);
+      if (count === 0) {
+        console.log('[CronService] Нет пользователей для розыгрыша.');
+        return null;
+      }
 
-    // Выбираем случайного победителя
-    const randomIndex = Math.floor(Math.random() * users.length);
-    const winner = users[randomIndex];
+      // Выбираем случайного победителя с помощью skip()
+      const randomIndex = Math.floor(Math.random() * count);
+      const winner = await User.findOne({ username: { $exists: true, $ne: null } })
+        .skip(randomIndex)
+        .session(session);
 
-    // Начисляем джекпот победителю
-    winner.karma += jackpotAmount;
-    winner.stats.totalKarmaEarned += jackpotAmount;
-    await winner.save();
+      if (!winner) throw new Error('Не удалось выбрать победителя джекпота');
 
-    // Сбрасываем джекпот
-    state.jackpotPool = 0;
-    await state.save();
+      // Начисляем джекпот победителю
+      winner.karma += jackpotAmount;
+      winner.stats.totalKarmaEarned += jackpotAmount;
+      await winner.save({ session });
 
+      // Находим admin-пользователя для записи лога транзакции
+      const admin = await User.findOne({ role: 'admin' }).session(session);
+      const adminId = admin ? admin._id : winner._id;
+
+      // Создаём запись в истории транзакций (Transaction)
+      const Transaction = require('../models/Transaction');
+      const tx = new Transaction({
+        creditor: adminId,
+        debtor: winner._id,
+        amount: jackpotAmount,
+        originalAmount: jackpotAmount,
+        description: '🎰 Выигрыш в еженедельном джекпоте Azadolg!',
+        dueDate: new Date(),
+        status: 'paid',
+        resolvedAt: new Date(),
+        createdBy: adminId
+      });
+      await tx.save({ session });
+
+      // Сбрасываем джекпот
+      state.jackpotPool = 0;
+      await state.save({ session });
+
+      return { winner, jackpotAmount };
+    });
+
+    if (!result) return;
+
+    const { winner, jackpotAmount } = result;
     console.log(`[CronService] Победитель джекпота: ${winner.name} (@${winner.username}), выигрыш: ${jackpotAmount} ₸ Кармы.`);
 
     // Уведомление в Телеграм
@@ -100,16 +152,17 @@ async function checkSeasonReset() {
     }
 
     // Сброс ELO-рейтингов (жесткий ресет до 1000 ELO) для всех пользователей
-    const users = await User.find();
-    for (const user of users) {
-      user.eloRating = 1000;
-      user.winStreak = 0;
-      
-      // Сброс Боевого Пропуска
-      user.battlePassLevel = 1;
-      user.battlePassXP = 0;
-      await user.save();
-    }
+    await User.updateMany(
+      {},
+      {
+        $set: {
+          eloRating: 1000,
+          winStreak: 0,
+          battlePassLevel: 1,
+          battlePassXP: 0
+        }
+      }
+    );
 
     console.log(`[CronService] Сезон ${oldSeason} завершен! Новый сезон: ${newSeason}`);
 
@@ -147,28 +200,28 @@ async function distributeWeeklyKarma() {
     const activeCreditorIds = await Transaction.distinct('creditor', { status: 'active' });
     const activeDebtUsers = [...new Set([...activeDebtorIds.map(String), ...activeCreditorIds.map(String)])];
 
-    const users = await User.find({
-      isBanned: { $ne: true },
-      $or: [
-        { lastLoginAt: { $gte: cutoff } },
-        { _id: { $in: activeDebtUsers } }
-      ]
-    });
+    const result = await User.updateMany(
+      {
+        isBanned: { $ne: true },
+        $or: [
+          { lastLoginAt: { $gte: cutoff } },
+          { _id: { $in: activeDebtUsers } }
+        ]
+      },
+      {
+        $inc: {
+          karma: WEEKLY_KARMA,
+          "stats.totalKarmaEarned": WEEKLY_KARMA,
+          "stats.totalKarmaWeeklyReceived": WEEKLY_KARMA
+        }
+      }
+    );
 
-    let count = 0;
-    for (const user of users) {
-      user.karma                           += WEEKLY_KARMA;
-      user.stats.totalKarmaEarned          += WEEKLY_KARMA;
-      user.stats.totalKarmaWeeklyReceived  = (user.stats.totalKarmaWeeklyReceived || 0) + WEEKLY_KARMA;
-      await user.save();
-      count++;
-    }
-
-    console.log(`[CronService] Еженедельная Карма: +${WEEKLY_KARMA} начислено ${count} активным пользователям`);
+    console.log(`[CronService] Еженедельная Карма: +${WEEKLY_KARMA} начислено ${result.modifiedCount} активным пользователям`);
 
     tg.sendMessage(
       `📅 <b>Еженедельная Карма распределена!</b>\n\n` +
-      `💰 <b>+${WEEKLY_KARMA} ₸ Кармы</b> получили <b>${count}</b> активных пользователей.\n` +
+      `💰 <b>+${WEEKLY_KARMA} ₸ Кармы</b> получили <b>${result.modifiedCount}</b> активных пользователей.\n` +
       `Продолжайте пользоваться Azadolg — и карма растёт! 🚀`
     );
   } catch (error) {
@@ -176,10 +229,82 @@ async function distributeWeeklyKarma() {
   }
 }
 
+// ── Еженедельное списание (падение) Кармы ─────────────────────────────────────
+async function deductWeeklyKarma() {
+  try {
+    console.log('[CronService] Запуск еженедельного списания Кармы...');
+    const Transaction = require('../models/Transaction');
+    const DECAY_KARMA = 50; // значение списания
+    const ACTIVITY_DAYS = 30;
+    const cutoff = new Date(Date.now() - ACTIVITY_DAYS * 24 * 60 * 60 * 1000);
+
+    // Активные: зашли за последние 30 дней ИЛИ имеют активный долг
+    const activeDebtorIds = await Transaction.distinct('debtor',   { status: 'active' });
+    const activeCreditorIds = await Transaction.distinct('creditor', { status: 'active' });
+    const activeDebtUsers = [...new Set([...activeDebtorIds.map(String), ...activeCreditorIds.map(String)])];
+
+    // Находим неактивных пользователей (не заходили 30 дней и нет активных долгов)
+    // Списываем у них карму (не уменьшая ниже 0)
+    const result = await User.updateMany(
+      {
+        isBanned: { $ne: true },
+        $or: [
+          { lastLoginAt: { $lt: cutoff } },
+          { lastLoginAt: null },
+          { lastLoginAt: { $exists: false } }
+        ],
+        _id: { $not: { $in: activeDebtUsers } },
+        karma: { $gt: 0 }
+      },
+      [
+        {
+          $set: {
+            karma: {
+              $max: [0, { $subtract: ["$karma", DECAY_KARMA] }]
+            }
+          }
+        }
+      ]
+    );
+
+    // Также списываем карму у пользователей с просроченными долгами (dueDate < now)
+    const now = new Date();
+    const overdueDebts = await Transaction.find({
+      status: 'active',
+      dueDate: { $lt: now }
+    }).distinct('debtor');
+
+    let overdueCount = 0;
+    if (overdueDebts.length > 0) {
+      const overdueResult = await User.updateMany(
+        {
+          _id: { $in: overdueDebts },
+          karma: { $gt: 0 }
+        },
+        [
+          {
+            $set: {
+              karma: {
+                $max: [0, { $subtract: ["$karma", DECAY_KARMA] }]
+              }
+            }
+          }
+        ]
+      );
+      overdueCount = overdueResult.modifiedCount;
+    }
+
+    console.log(`[CronService] Еженедельное списание кармы: списано у ${result.modifiedCount} неактивных пользователей и ${overdueCount} должников с просрочкой.`);
+  } catch (error) {
+    console.error('[CronService] Ошибка еженедельного списания Кармы:', error);
+  }
+}
+
 function startCronScheduler() {
-  // Еженедельный базовый доход Кармы: каждый понедельник в 09:00
-  cron.schedule('0 9 * * 1', () => {
-    distributeWeeklyKarma();
+  // Еженедельный базовый доход и падение Кармы: каждый понедельник в 09:00
+  cron.schedule('0 9 * * 1', async () => {
+    await distributeWeeklyKarma();
+    await deductWeeklyKarma();
   });
 
   // Розыгрыш джекпота каждое воскресенье в 23:59
@@ -224,6 +349,7 @@ module.exports = {
   drawJackpot,
   checkSeasonReset,
   distributeWeeklyKarma,
+  deductWeeklyKarma,
   startCronScheduler,
   cleanExpiredCrowdfunds
 };
