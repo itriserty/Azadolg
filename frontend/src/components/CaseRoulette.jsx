@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import { Coins, Gift, AlertCircle, RefreshCw, X, Zap, ChevronRight } from 'lucide-react';
+import { Coins, AlertCircle, RefreshCw, X, Zap, ChevronRight } from 'lucide-react';
 import { api } from '../utils/api';
 
-// ── Тиры ─────────────────────────────────────────────────────────────────────
+// ── Тиры (идентичны бэкенду rouletteController.js) ──────────────────────────
 const TIERS_META = [
   {
     cost:     100,
@@ -55,7 +55,7 @@ const TIERS_META = [
   },
 ];
 
-// ── Цвет карточки в ленте по тегу ────────────────────────────────────────────
+// ── Цвет карточки по тегу ─────────────────────────────────────────────────────
 const TAG_CARD_COLOR = {
   zero:       'border-gray-700   bg-gray-900/80    text-gray-400',
   cashback:   'border-cyan-600   bg-cyan-950/60    text-cyan-300',
@@ -64,36 +64,89 @@ const TAG_CARD_COLOR = {
   jackpot:    'border-yellow-400 bg-yellow-950/60  text-yellow-300',
 };
 
-const CARD_WIDTH = 110;
-const CARD_GAP   = 8;
-const WIN_INDEX  = 32;  // позиция выигрышной карточки в ленте
+// Цвет модалки результата
+const RESULT_COLOR = {
+  zero:       'border-gray-600   bg-gray-900       text-gray-300',
+  cashback:   'border-cyan-500   bg-cyan-950       text-cyan-300',
+  break_even: 'border-green-500  bg-green-950      text-green-300',
+  double:     'border-purple-500 bg-purple-950     text-purple-300',
+  jackpot:    'border-yellow-400 bg-yellow-950     text-yellow-300',
+};
 
-// Строим ленту из 50 карточек, позиция WIN_INDEX — выигрыш
+// ── Размеры ленты ─────────────────────────────────────────────────────────────
+const CARD_WIDTH = 110;  // px
+const CARD_GAP   = 8;    // px
+const STEP       = CARD_WIDTH + CARD_GAP;
+
+// Позиция выигрышной карточки в ленте (0-indexed).
+// Используем 34 чтобы лента всегда прокручивалась через много карточек.
+const WIN_INDEX = 34;
+
+// Общее кол-во карточек: WIN_INDEX + буфер справа
+const TAPE_LENGTH = WIN_INDEX + 12;
+
+/**
+ * Строит ленту с гарантированным расположением выигрышной карточки
+ * на позиции WIN_INDEX. Остальные позиции — псевдослучайные карточки
+ * (только для визуального декора — они не влияют на результат).
+ *
+ * @param {Array}  prizes  - призовой пул тира
+ * @param {string} winTag  - тег выигрышной карточки (null = без выигрыша)
+ */
 function buildTape(prizes, winTag = null) {
   const items = [];
-  for (let i = 0; i < WIN_INDEX + 14; i++) {
+  for (let i = 0; i < TAPE_LENGTH; i++) {
     let card;
-    if (i === WIN_INDEX && winTag) {
-      card = prizes.find(p => p.tag === winTag) || prizes[1];
+    if (i === WIN_INDEX && winTag !== null) {
+      // ВЫИГРЫШНАЯ КАРТОЧКА — берём строго из prizes по тегу
+      card = prizes.find(p => p.tag === winTag);
+      if (!card) card = prizes[1]; // fallback на cashback
     } else {
-      // Псевдослучайная карточка для декора (смещённые веса, чтобы не угадать)
-      const weights = prizes.map(p => p.weight);
-      const total   = weights.reduce((a, b) => a + b, 0);
+      // Декоративные карточки — взвешенный рандом
+      const total = prizes.reduce((s, p) => s + p.weight, 0);
       let r = Math.random() * total;
       let idx = 0;
-      for (const w of weights) { r -= w; if (r <= 0) break; idx++; }
+      for (const p of prizes) { r -= p.weight; if (r <= 0) break; idx++; }
       card = prizes[Math.min(idx, prizes.length - 1)];
+      // Запрещаем декоративной карточке быть джекпотом рядом с WIN_INDEX
+      // (чтобы визуально не было "ложного" джекпота у выигрыша)
+      if (card.tag === 'jackpot' && Math.abs(i - WIN_INDEX) <= 2 && winTag !== 'jackpot') {
+        card = prizes.find(p => p.tag === 'cashback') || prizes[1];
+      }
     }
-    items.push({ ...card, key: `${card.tag}-${i}-${Math.random()}` });
+    items.push({ ...card, _key: `${i}-${card.tag}-${Math.random().toString(36).slice(2)}` });
   }
   return items;
 }
 
-// ── Компонент карточки ленты ──────────────────────────────────────────────────
-function TapeCard({ item }) {
+/**
+ * Вычисляет ТОЧНЫЙ finalX для остановки ленты так, чтобы карточка
+ * с индексом WIN_INDEX оказалась строго по центру указателя.
+ *
+ * Формула:
+ *   leftEdge  = WIN_INDEX * STEP        — левый край выигрышной карточки
+ *   cardCenter = leftEdge + CARD_WIDTH/2 — центр выигрышной карточки
+ *   containerCenter = containerW / 2    — центр контейнера (указатель)
+ *   finalX = containerCenter - cardCenter  (→ это отрицательное число)
+ *
+ * Внутри-карточный допуск: мы разрешаем ±(CARD_WIDTH/2 - 4)px,
+ * чтобы стрелка не выходила за границу карточки.
+ * MAX_JITTER = CARD_WIDTH / 2 - 6 = 49px
+ */
+function calcFinalX(containerW, winIndex) {
+  const cardCenter = winIndex * STEP + CARD_WIDTH / 2;
+  const containerCenter = containerW / 2;
+  // Небольшой "косметический" jitter — строго внутри карточки (±18px max)
+  const MAX_INNER_JITTER = 18;
+  const innerJitter = (Math.random() - 0.5) * 2 * MAX_INNER_JITTER;
+  return containerCenter - cardCenter + innerJitter;
+}
+
+// ── Компонент одной карточки ──────────────────────────────────────────────────
+const TapeCard = React.memo(function TapeCard({ item }) {
   return (
     <div
-      style={{ width: CARD_WIDTH, height: 100, flexShrink: 0 }}
+      style={{ width: CARD_WIDTH, height: 104, flexShrink: 0 }}
       className={`rounded-xl border flex flex-col items-center justify-center gap-1 select-none ${TAG_CARD_COLOR[item.tag] || TAG_CARD_COLOR.cashback}`}
     >
       <span className="text-[7px] uppercase tracking-wider opacity-60 font-bold">{item.rarity}</span>
@@ -101,104 +154,127 @@ function TapeCard({ item }) {
       <span className="text-[10px] font-black truncate max-w-[96px] text-center">{item.label}</span>
     </div>
   );
-}
+});
 
-// ── Основной компонент ────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 export default function CaseRoulette({ user, onUserUpdate }) {
   const [tierIdx, setTierIdx]       = useState(0);
   const [spinning, setSpinning]     = useState(false);
-  const [tape, setTape]             = useState([]);
-  const [wonPrize, setWonPrize]     = useState(null);
+  // tape и spinResult хранятся в ref-ах чтобы не провоцировать лишние ре-рендеры
+  // во время анимации
+  const [tape, setTape]             = useState(() => buildTape(TIERS_META[0].prizes));
+  const [wonPrize, setWonPrize]     = useState(null);   // приз из бэкенда
   const [showResult, setShowResult] = useState(false);
   const [error, setError]           = useState('');
 
   const controls  = useAnimation();
   const tapeRef   = useRef(null);
+  // ref для хранения актуального winTag во время анимации
+  const winTagRef = useRef(null);
 
   const tier  = TIERS_META[tierIdx];
   const karma = user?.karma ?? 0;
 
-  // Инициализируем ленту при смене тира
-  useEffect(() => {
-    setTape(buildTape(tier.prizes));
+  // ── Сброс при смене тира ───────────────────────────────────────────────────
+  const resetTier = useCallback((idx) => {
+    if (spinning) return;
+    setTierIdx(idx);
+    winTagRef.current = null;
     setWonPrize(null);
     setShowResult(false);
     setError('');
     controls.set({ x: 0 });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tierIdx]);
+    setTape(buildTape(TIERS_META[idx].prizes));
+  }, [spinning, controls]);
 
+  // ── Инициализация ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    setTape(buildTape(tier.prizes));
+    controls.set({ x: 0 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Главная функция спина ──────────────────────────────────────────────────
   const handleSpin = async () => {
     if (spinning || karma < tier.cost) return;
+
     setError('');
     setSpinning(true);
     setWonPrize(null);
     setShowResult(false);
 
     try {
-      // ── Запрос к бэкенду ──────────────────────────────────────────────────
+      // ── ШАГ 1: ПОЛУЧАЕМ РЕЗУЛЬТАТ ОТ БЭКЕНДА ─────────────────────────────
+      // Бэкенд — единственный источник истины. Мы запрашиваем его ДО анимации,
+      // чтобы гарантированно знать, на какой карточке нужно остановиться.
       const result = await api.request('/roulette/spin', {
         method: 'POST',
-        body: JSON.stringify({ tier: tier.cost }),
+        body:   JSON.stringify({ tier: tier.cost }),
       });
 
-      const winTag = result.prize.tag;
+      // Сохраняем выигрышный тег в ref — он будет использован при построении ленты
+      const winTag = result.prize.tag; // 'zero' | 'cashback' | 'break_even' | 'double' | 'jackpot'
+      winTagRef.current = winTag;
 
-      // ── Перестраиваем ленту с выигрышем на WIN_INDEX ──────────────────────
+      // ── ШАГ 2: СТРОИМ ЛЕНТУ С ВЫИГРЫШЕМ НА WIN_INDEX ─────────────────────
+      // Лента строится ПОСЛЕ получения результата, выигрышная карточка
+      // гарантированно размещается на позиции WIN_INDEX.
       const newTape = buildTape(tier.prizes, winTag);
+
+      // Сначала сбрасываем x в 0 (без анимации), потом заменяем ленту,
+      // чтобы пользователь не увидел скачка.
+      controls.set({ x: 0 });
       setTape(newTape);
 
-      // Сбрасываем позицию
-      await controls.set({ x: 0 });
+      // ── ШАГ 3: ЖДЁМ ОДИН BROWSER-PAINT ───────────────────────────────────
+      // Даём React время смонтировать новую ленту в DOM.
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-      // Ждём 1 тик, чтобы React обновил DOM
-      await new Promise(r => setTimeout(r, 30));
+      // ── ШАГ 4: ВЫЧИСЛЯЕМ ТОЧНУЮ ПОЗИЦИЮ ОСТАНОВКИ ────────────────────────
+      // calcFinalX гарантирует, что стрелка попадает СТРОГО внутрь
+      // карточки WIN_INDEX (допуск ±18px — меньше половины карточки).
+      const containerW = tapeRef.current?.offsetWidth ?? 560;
+      const finalX = calcFinalX(containerW, WIN_INDEX);
 
-      // Вычисляем смещение
-      const containerW = tapeRef.current?.offsetWidth || 560;
-      const leftEdge   = WIN_INDEX * (CARD_WIDTH + CARD_GAP);
-      const center     = leftEdge - containerW / 2 + CARD_WIDTH / 2;
-      const jitter     = (Math.random() - 0.5) * (CARD_WIDTH * 0.5);
-      const finalX     = -(center + jitter);
-
-      // Анимация прокрутки
+      // ── ШАГ 5: АНИМАЦИЯ ПРОКРУТКИ ─────────────────────────────────────────
+      // ease: быстрый разгон → плавное торможение до точной остановки
       await controls.start({
         x:          finalX,
-        transition: { type: 'tween', ease: [0.05, 0.82, 0.05, 1], duration: 5.5 },
+        transition: {
+          type:     'tween',
+          ease:     [0.12, 0.0, 0.08, 1.0],   // кубическая кривая Безье
+          duration: 5.8,
+        },
       });
 
-      // ── Показываем результат ──────────────────────────────────────────────
+      // ── ШАГ 6: ПОКАЗЫВАЕМ РЕЗУЛЬТАТ ──────────────────────────────────────
+      // wonPrize — данные из бэкенда, та же карточка что и на ленте
       setWonPrize(result.prize);
       setShowResult(true);
 
-      // Обновляем юзера в родителе
+      // Обновляем баланс пользователя в родительском компоненте
       if (onUserUpdate && result.user) {
         onUserUpdate(result.user);
       }
+
     } catch (err) {
-      console.error('[CaseRoulette]', err);
+      console.error('[CaseRoulette] spin error:', err);
       setError(err.message || 'Ошибка спина рулетки');
+      // На ошибку — сбрасываем анимацию
+      controls.set({ x: 0 });
+      setTape(buildTape(tier.prizes));
     } finally {
       setSpinning(false);
     }
   };
 
-  // Определяем цвет результата по тегу
-  const getResultColor = (tag) => {
-    const map = {
-      zero:       'border-gray-600   bg-gray-900       text-gray-300',
-      cashback:   'border-cyan-500   bg-cyan-950       text-cyan-300',
-      break_even: 'border-green-500  bg-green-950      text-green-300',
-      double:     'border-purple-500 bg-purple-950     text-purple-300',
-      jackpot:    'border-yellow-400 bg-yellow-950     text-yellow-300',
-    };
-    return map[tag] || map.cashback;
-  };
+  // ── Цвет указателя по тиру ────────────────────────────────────────────────
+  const pointerColor = tierIdx === 0 ? '#f59e0b' : tierIdx === 1 ? '#06b6d4' : '#10b981';
 
   return (
     <div className="space-y-5">
 
-      {/* ── Выбор Тира ───────────────────────────────────────────────────────── */}
+      {/* ── Выбор Тира ──────────────────────────────────────────────────────── */}
       <div className="bg-[#0d1220] border border-gray-800 rounded-2xl p-4">
         <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-3 text-center">
           Выберите ставку
@@ -207,7 +283,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
           {TIERS_META.map((t, i) => (
             <button
               key={t.cost}
-              onClick={() => !spinning && setTierIdx(i)}
+              onClick={() => resetTier(i)}
               disabled={spinning}
               className={`relative overflow-hidden flex flex-col items-center justify-center py-3 px-2 rounded-xl border transition-all duration-200 ${
                 tierIdx === i
@@ -228,7 +304,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
           ))}
         </div>
 
-        {/* Таблица шансов выбранного тира */}
+        {/* Таблица шансов */}
         <div className="mt-3 grid grid-cols-5 gap-1">
           {tier.prizes.map(p => (
             <div key={p.tag} className="text-center">
@@ -240,8 +316,9 @@ export default function CaseRoulette({ user, onUserUpdate }) {
         </div>
       </div>
 
-      {/* ── Рулетка ──────────────────────────────────────────────────────────── */}
+      {/* ── Рулетка ─────────────────────────────────────────────────────────── */}
       <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 relative overflow-hidden">
+
         {/* Баланс */}
         <div className="flex justify-between items-center mb-4">
           <div className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border font-black text-xs ${
@@ -259,26 +336,35 @@ export default function CaseRoulette({ user, onUserUpdate }) {
         </div>
 
         {/* Лента */}
-        <div
-          className="relative w-full py-3 bg-[#0b0f19]/90 border border-gray-800 rounded-xl overflow-hidden mb-4"
-        >
-          {/* Указатель */}
-          <div className="absolute inset-y-0 left-1/2 -ml-px w-0.5 z-10 pointer-events-none"
-            style={{ background: `linear-gradient(to bottom, transparent, ${tierIdx === 0 ? '#f59e0b' : tierIdx === 1 ? '#06b6d4' : '#10b981'}, transparent)`, boxShadow: `0 0 12px ${tierIdx === 0 ? '#f59e0b' : tierIdx === 1 ? '#06b6d4' : '#10b981'}` }}
+        <div className="relative w-full py-3 bg-[#0b0f19]/90 border border-gray-800 rounded-xl overflow-hidden mb-4">
+          {/* Вертикальная стрелка-указатель (строго по центру) */}
+          <div
+            className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[3px] z-20 pointer-events-none rounded-full"
+            style={{
+              background: `linear-gradient(to bottom, transparent 0%, ${pointerColor} 30%, ${pointerColor} 70%, transparent 100%)`,
+              boxShadow:  `0 0 14px 3px ${pointerColor}88`,
+            }}
+          />
+          {/* Треугольные засечки сверху и снизу */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 pointer-events-none"
+            style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: `8px solid ${pointerColor}` }}
+          />
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 pointer-events-none"
+            style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: `8px solid ${pointerColor}` }}
           />
 
           <div
             ref={tapeRef}
             className="overflow-hidden w-full"
-            style={{ maskImage: 'linear-gradient(to right, transparent, black 12%, black 88%, transparent)' }}
+            style={{ maskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)' }}
           >
             <motion.div
               animate={controls}
               className="flex px-[50%]"
-              style={{ gap: CARD_GAP, width: 'max-content' }}
+              style={{ gap: CARD_GAP, width: 'max-content', willChange: 'transform' }}
             >
               {tape.map(item => (
-                <TapeCard key={item.key} item={item} />
+                <TapeCard key={item._key} item={item} />
               ))}
             </motion.div>
           </div>
@@ -306,7 +392,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
         </button>
       </div>
 
-      {/* ── Модалка результата ────────────────────────────────────────────────── */}
+      {/* ── Модалка результата ───────────────────────────────────────────────── */}
       <AnimatePresence>
         {showResult && wonPrize && (
           <motion.div
@@ -320,7 +406,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
               initial={{ scale: 0.85, y: 20 }}
               animate={{ scale: 1,    y: 0  }}
               exit={{ scale: 0.85,    y: 20 }}
-              className={`relative w-full max-w-sm rounded-2xl border p-7 text-center shadow-2xl ${getResultColor(wonPrize.tag)}`}
+              className={`relative w-full max-w-sm rounded-2xl border p-7 text-center shadow-2xl ${RESULT_COLOR[wonPrize.tag] || RESULT_COLOR.cashback}`}
             >
               <button
                 onClick={() => setShowResult(false)}
@@ -333,9 +419,12 @@ export default function CaseRoulette({ user, onUserUpdate }) {
                 {tier.label} · Ставка {tier.cost} ✧
               </p>
               <h4 className="text-sm font-black uppercase tracking-wide mb-4">
-                {wonPrize.tag === 'zero' ? '😬 Не повезло...' : wonPrize.tag === 'jackpot' ? '🎊 ДЖЕКПОТ!!!' : '🎉 Выигрыш!'}
+                {wonPrize.tag === 'zero'    ? '😬 Не повезло...'
+                 : wonPrize.tag === 'jackpot' ? '🎊 ДЖЕКПОТ!!!'
+                 : '🎉 Выигрыш!'}
               </h4>
 
+              {/* Иконка — ТА ЖЕ, что и карточка на которой остановилась лента */}
               <div className="w-20 h-20 rounded-full bg-black/30 border border-white/10 flex items-center justify-center text-4xl mx-auto mb-4">
                 {wonPrize.emoji}
               </div>
@@ -346,7 +435,8 @@ export default function CaseRoulette({ user, onUserUpdate }) {
               {/* Итог транзакции */}
               <div className="mt-3 mb-5 bg-black/30 rounded-xl p-3 text-xs space-y-1">
                 <div className="flex justify-between text-gray-400">
-                  <span>Ставка</span><span className="text-red-400 font-bold">−{tier.cost} ✧</span>
+                  <span>Ставка</span>
+                  <span className="text-red-400 font-bold">−{tier.cost} ✧</span>
                 </div>
                 <div className="flex justify-between text-gray-400">
                   <span>Выигрыш</span>
