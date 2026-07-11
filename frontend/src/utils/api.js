@@ -1,4 +1,9 @@
-const API_BASE_URL = '/api'; // Всегда относительный путь — работает и локально (через Vite proxy), и на Render
+const API_BASE_URL = '/api';
+let successCallback = null;
+
+export const setSuccessCallback = (cb) => {
+  successCallback = cb;
+};
 
 async function request(url, options = {}) {
   const token = localStorage.getItem('token');
@@ -22,6 +27,15 @@ async function request(url, options = {}) {
   
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Что-то пошло не так');
+  
+  if (successCallback) {
+    try {
+      successCallback(data);
+    } catch (e) {
+      console.error('[API Success Callback Error]:', e);
+    }
+  }
+
   return data;
 }
 

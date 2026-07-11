@@ -246,6 +246,12 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
   .then(async () => {
     console.log('✅ MongoDB Atlas: подключено.');
     await seedDatabase();
+    try {
+      const seedAchievements = require('./scripts/seedAchievements');
+      await seedAchievements();
+    } catch (err) {
+      console.error('[app.js] Ошибка запуска сидирования ачивок:', err);
+    }
     startReminderScheduler();
     startCronScheduler();
     app.listen(PORT, () => console.log(`🚀 Сервер запущен на порту ${PORT}`));

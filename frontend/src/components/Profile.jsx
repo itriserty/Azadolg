@@ -49,6 +49,39 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
   const [sellPrice, setSellPrice] = useState('');
   const [sellingLoading, setSellingLoading] = useState(false);
 
+  const getAchievementProgress = (ach) => {
+    if (!profileData || !profileData.user) return 0;
+    const user = profileData.user;
+    const debts = profileData.debts || [];
+    const triggerType = ach.trigger;
+    
+    if (triggerType === 'declined_loan_streak') {
+      return user.consecutiveDeclines || 0;
+    }
+    if (triggerType === 'active_debts_count') {
+      return debts.filter(d => d.debtor?._id?.toString() === user._id?.toString() && d.status === 'active').length;
+    }
+    if (triggerType === 'overdue_365') {
+      const oneYearAgo = new Date();
+      oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+      return debts.filter(d => d.debtor?._id?.toString() === user._id?.toString() && d.status === 'active' && new Date(d.dueDate) < oneYearAgo).length;
+    }
+    if (triggerType === 'debts_paid_count') {
+      return user.stats?.totalDebtsPaid || 0;
+    }
+    if (triggerType === 'forgiven_count') {
+      return user.stats?.totalDebtsForgivenByMe || 0;
+    }
+    if (triggerType === 'witnesses_count') {
+      return user.stats?.totalDebtsWitnessed || 0;
+    }
+    if (triggerType === 'empty_promises') {
+      const now = new Date();
+      return debts.filter(d => d.debtor?._id?.toString() === user._id?.toString() && d.status === 'active' && new Date(d.dueDate) < now).length;
+    }
+    return 0;
+  };
+
   const fetchProfile = async () => {
     try {
       setLoading(true);
@@ -592,28 +625,107 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                   </div>
                 </div>
 
-                {/* Все разблокированные достижения */}
-                <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-5">
-                  <h2 className="text-sm font-black uppercase tracking-wider text-cyan-400 mb-4 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    Разблокированные достижения ({user.achievements?.length || 0})
-                  </h2>
-                  {user.achievements && user.achievements.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {user.achievements.map((ach, idx) => (
-                        <div key={idx} className="p-3 bg-black/20 border border-gray-850 rounded-xl flex items-center gap-3">
-                          <div className="text-3xl shrink-0">{ach.achievement?.emoji}</div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-xs font-bold text-gray-250 truncate">{ach.achievement?.title}</div>
-                            <div className="text-[9px] text-gray-500 truncate mt-0.5">{ach.achievement?.description}</div>
-                            <div className="text-[8px] text-gray-650 mt-1 uppercase tracking-wider">Получено: {new Date(ach.awardedAt).toLocaleDateString('ru-RU')}</div>
+                {/* Все достижения: полученные и неполученные */}
+                <div className="space-y-6">
+                  {/* Разблокированные достижения */}
+                  <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-5">
+                    <h2 className="text-sm font-black uppercase tracking-wider text-cyan-400 mb-4 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      Разблокированные достижения ({user.achievements?.length || 0})
+                    </h2>
+                    {user.achievements && user.achievements.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {user.achievements.map((userAch, idx) => {
+                          const ach = userAch.achievement;
+                          if (!ach) return null;
+                          const rarityStyle = 
+                            ach.rarity === 'legendary' ? 'border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.15)] text-amber-400' :
+                            ach.rarity === 'epic' ? 'border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.15)] text-purple-400' :
+                            ach.rarity === 'rare' ? 'border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.15)] text-cyan-400' :
+                            'border-gray-800 text-gray-400';
+
+                          return (
+                            <div key={idx} className={`p-3 bg-black/40 border ${rarityStyle} rounded-xl flex items-center gap-3 relative overflow-hidden group`}>
+                              <div className="text-3xl shrink-0 filter drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">{ach.emoji}</div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-black text-gray-250 truncate">{ach.title}</div>
+                                <div className="text-[9px] text-gray-400 mt-0.5 line-clamp-2">{ach.description}</div>
+                                <div className="text-[8px] text-gray-500 mt-1 uppercase tracking-wider">
+                                  Получено: {new Date(userAch.earnedAt || userAch.earnedAt || userAch.awardedAt).toLocaleDateString('ru-RU')}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 text-center py-6">У этого игрока пока нет разблокированных достижений.</p>
+                    )}
+                  </div>
+
+                  {/* Еще не полученные достижения */}
+                  <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-5">
+                    <h2 className="text-sm font-black uppercase tracking-wider text-purple-400 mb-4 flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-purple-400" />
+                      Неполученные достижения ({allAchievements.length - (user.achievements?.length || 0)})
+                    </h2>
+                    {(() => {
+                      const earnedIds = (user.achievements || []).map(a => (a.achievement?._id || a.achievement || '').toString());
+                      const unearned = allAchievements.filter(ach => !earnedIds.includes(ach._id.toString()));
+
+                      if (unearned.length > 0) {
+                        return (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {unearned.map((ach) => {
+                              const isSecret = ach.isSecret;
+                              const title = isSecret ? '???' : ach.title;
+                              const desc = isSecret ? 'Секретное достижение' : ach.description;
+                              const emoji = isSecret ? '🔒' : ach.emoji;
+                              const rarityText = isSecret ? '???' : ach.rarity;
+
+                              // Calculate progress for progress bar
+                              const progressVal = getAchievementProgress(ach);
+                              const progressPercent = Math.min(100, Math.floor((progressVal / ach.threshold) * 100));
+
+                              return (
+                                <div key={ach._id} className="p-3 bg-black/20 border border-gray-900/65 rounded-xl flex flex-col justify-between opacity-50 grayscale hover:opacity-80 hover:grayscale-0 transition-all duration-300">
+                                  <div className="flex items-start gap-3">
+                                    <div className="text-3xl shrink-0">{emoji}</div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-xs font-bold text-gray-300 truncate">{title}</div>
+                                      <div className="text-[9px] text-gray-500 mt-0.5 line-clamp-2">{desc}</div>
+                                      {!isSecret && (
+                                        <span className="text-[7px] font-extrabold uppercase px-1.5 py-0.2 bg-gray-800/50 rounded-full border border-gray-700/30 text-gray-400 inline-block mt-1">
+                                          {rarityText}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Progress Bar */}
+                                  {!isSecret && ach.threshold > 1 && (
+                                    <div className="mt-3">
+                                      <div className="flex justify-between items-center text-[8px] font-bold text-gray-500 mb-1">
+                                        <span>Прогресс</span>
+                                        <span>{progressVal} / {ach.threshold}</span>
+                                      </div>
+                                      <div className="w-full h-1 bg-gray-900 rounded-full overflow-hidden border border-gray-850">
+                                        <div 
+                                          className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 transition-all duration-500"
+                                          style={{ width: `${progressPercent}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500 text-center py-6">У этого игрока пока нет разблокированных достижений.</p>
-                  )}
+                        );
+                      }
+                      return <p className="text-xs text-gray-500 text-center py-6">Все достижения разблокированы! Вы легенда! 🏆</p>;
+                    })()}
+                  </div>
                 </div>
               </div>
             )}

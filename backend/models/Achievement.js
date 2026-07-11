@@ -25,7 +25,7 @@ const AchievementSchema = new mongoose.Schema({
   },
   rarity: {
     type: String,
-    enum: ['common', 'rare', 'legendary', 'seasonal'],
+    enum: ['common', 'rare', 'epic', 'legendary', 'seasonal'],
     default: 'common'
   },
   // Тип тригера (для автоматической выдачи)
@@ -40,6 +40,10 @@ const AchievementSchema = new mongoose.Schema({
       'witnesses_count',        // был свидетелем N раз
       'marketplace_sales',      // продал N предметов
       'season_champion',        // топ-3 по итогам сезона
+      'empty_promises',         // просрочил N долгов
+      'jackpot_winner',         // выиграл джекпот
+      'self_borrow',            // занял у себя
+      'negative_karma',         // карма опустилась ниже 0
       'custom'                  // выдаётся вручную администратором
     ],
     default: 'custom'

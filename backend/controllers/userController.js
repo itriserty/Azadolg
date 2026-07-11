@@ -349,13 +349,17 @@ async function getUserProfile(req, res) {
       };
     });
 
+    const Achievement = require('../models/Achievement');
+    const allAchievements = await Achievement.find({ isActive: true });
+
     res.status(200).json({
       user: targetUser,
       isFriend,
       canView: true,
       comments,
       debts: processedDebts,
-      inventory: enrichedInventory
+      inventory: enrichedInventory,
+      allAchievements
     });
   } catch (error) {
     console.error('Ошибка getUserProfile:', error);

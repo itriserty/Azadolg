@@ -39,10 +39,24 @@ async function checkAndAward(userId, triggerType, currentValue = null) {
         val = user.stats.totalDebtsForgivenByMe || 0;
       } else if (triggerType === 'witnesses_count') {
         val = user.stats.totalDebtsWitnessed || 0;
+      } else if (triggerType === 'empty_promises') {
+        const now = new Date();
+        val = await Transaction.countDocuments({
+          debtor: userId,
+          status: 'active',
+          dueDate: { $lt: now }
+        });
+      } else if (triggerType === 'jackpot_winner') {
+        val = 1;
+      } else if (triggerType === 'self_borrow') {
+        val = 1;
+      } else if (triggerType === 'negative_karma') {
+        val = user.karma < 0 ? 1 : 0;
       }
     }
 
     let changed = false;
+    const newlyEarned = [];
     for (const ach of achievements) {
       // Проверяем, получена ли уже ачивка
       const alreadyEarned = user.achievements.some(a => a.achievement.toString() === ach._id.toString());
@@ -54,6 +68,7 @@ async function checkAndAward(userId, triggerType, currentValue = null) {
       if (val >= ach.threshold) {
         // Выдаем ачивку
         user.achievements.push({ achievement: ach._id, earnedAt: new Date() });
+        newlyEarned.push(ach);
         changed = true;
         
         // Telegram-уведомление
@@ -76,6 +91,7 @@ async function checkAndAward(userId, triggerType, currentValue = null) {
     if (changed) {
       await user.save();
     }
+    return newlyEarned;
   } catch (err) {
     console.error(`[checkAndAward] Ошибка проверки ачивок для ${userId}:`, err);
   }

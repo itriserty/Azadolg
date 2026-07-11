@@ -94,6 +94,13 @@ async function drawJackpot() {
     const { winner, jackpotAmount } = result;
     console.log(`[CronService] Победитель джекпота: ${winner.name} (@${winner.username}), выигрыш: ${jackpotAmount} ₸ Кармы.`);
 
+    try {
+      const achievementService = require('./AchievementService');
+      await achievementService.trigger('jackpot_won', { winnerId: winner._id });
+    } catch (err) {
+      console.error('[CronService] Ошибка вызова AchievementService для джекпота:', err);
+    }
+
     // Уведомление в Телеграм
     const text = `🎉 <b>ЕЖЕНЕДЕЛЬНЫЙ ДЖЕКПОТ АZADOLG!</b> 🎉\n\n` +
       `👑 Счастливчик недели: <b>${winner.name}</b> (@${winner.username || 'нет'})\n` +

@@ -104,4 +104,22 @@ const UserSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// ── Middleware для автоматической проверки негативной кармы ────────────────────
+UserSchema.pre('save', function(next) {
+  if (this.isModified('karma') && this.karma < 0) {
+    this._karmaDroppedNegative = true;
+  }
+  next();
+});
+
+UserSchema.post('save', function(doc) {
+  if (doc._karmaDroppedNegative) {
+    doc._karmaDroppedNegative = false;
+    const achievementService = require('../services/AchievementService');
+    achievementService.onKarmaChanged(doc._id).catch(err => {
+      console.error('[UserSchema post-save] Ошибка вызова AchievementService:', err);
+    });
+  }
+});
+
 module.exports = mongoose.model('User', UserSchema);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { api } from './utils/api';
+import { api, setSuccessCallback } from './utils/api';
 import Layout         from './components/Layout';
 import Feed           from './components/Feed';
 import Casino         from './components/Casino';
@@ -407,6 +407,31 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const [toasts, setToasts] = useState([]);
+
+  const addToast = useCallback((title, desc, emoji) => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, title, desc, emoji }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 5500);
+  }, []);
+
+  const checkAchievements = useCallback((res) => {
+    if (res && res.newlyAwarded && res.newlyAwarded.length > 0) {
+      res.newlyAwarded.forEach(ach => {
+        addToast(ach.title || ach.name, ach.description || ach.desc, ach.emoji);
+      });
+    }
+  }, [addToast]);
+
+  useEffect(() => {
+    setSuccessCallback((data) => {
+      checkAchievements(data);
+    });
+    return () => setSuccessCallback(null);
+  }, [checkAchievements]);
+
   // Состояния для форм авторизации
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot' | 'reset'
   const [authError, setAuthError] = useState('');
@@ -641,6 +666,33 @@ export default function App() {
         handleAuthSubmit={handleAuthSubmit}
         handleLogout={handleLogout}
       />
+      {/* Toast Achievements Notification System */}
+      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+        {toasts.map(t => (
+          <div
+            key={t.id}
+            className="p-4 bg-gradient-to-r from-purple-950 via-slate-900 to-black/90 border border-cyan-500/40 rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.15)] flex items-center gap-3 animate-slide-in pointer-events-auto"
+          >
+            <div className="text-3xl filter drop-shadow-[0_0_8px_rgba(255,255,255,0.2)] select-none">
+              {t.emoji || '🏆'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] text-cyan-400 font-extrabold uppercase tracking-wider mb-0.5">Разблокировано Достижение!</div>
+              <div className="text-xs font-black text-white truncate">{t.title}</div>
+              <div className="text-[10px] text-gray-400 leading-tight mt-0.5">{t.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes slideIn {
+          from { transform: translateX(120%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        .animate-slide-in {
+          animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}} />
     </BrowserRouter>
   );
 }

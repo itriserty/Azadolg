@@ -4,6 +4,7 @@ const { getCalculatedAmount } = require('../utils/debtHelper');
 const tg = require('../services/telegramService');
 const path = require('path');
 const mongoose = require('mongoose');
+const achievementService = require('../services/AchievementService');
 
 // Вспомогательный хелпер для запуска операций в транзакции с фолбэком
 async function runInTransaction(callback) {
@@ -157,7 +158,10 @@ async function createDebt(req, res) {
       });
     }
 
-    res.status(201).json(transaction);
+    const newlyAwarded = await achievementService.trigger('debt_created', { creditorId: transaction.creditor, debtorId: transaction.debtor });
+    const txObj = transaction.toObject();
+    txObj.newlyAwarded = newlyAwarded;
+    res.status(201).json(txObj);
   } catch (error) {
     console.error('[createDebt]', error);
     res.status(500).json({ error: error.message || 'Ошибка создания долга' });
@@ -187,13 +191,10 @@ async function witnessDecision(req, res) {
         tx.status        = 'pending_approval'; // теперь должник подтверждает
         await tx.save({ session });
 
-        // Обновляем статистику свидетеля и проверяем достижения
         const witnessUser = await User.findById(userId).session(session);
         if (witnessUser) {
           witnessUser.stats.totalDebtsWitnessed = (witnessUser.stats.totalDebtsWitnessed || 0) + 1;
           await witnessUser.save({ session });
-          const { checkAndAward } = require('../utils/achievementHelper');
-          await checkAndAward(userId, 'witnesses_count');
         }
       } else if (action === 'reject') {
         tx.witnessStatus = 'rejected';
@@ -222,7 +223,13 @@ async function witnessDecision(req, res) {
     if (result.witness?.telegramId)  tg.sendMessage(notifyText, result.witness.telegramId);
     tg.sendMessage(notifyText);
 
-    res.status(200).json({ message: `Решение свидетеля: ${action}`, transaction: result });
+    const newlyAwarded = [];
+    if (action === 'approve') {
+      const triggerResult = await achievementService.trigger('witness_decision', { witnessId: userId });
+      newlyAwarded.push(...triggerResult);
+    }
+
+    res.status(200).json({ message: `Решение свидетеля: ${action}`, transaction: result, newlyAwarded });
   } catch (error) {
     console.error('[witnessDecision]', error);
     res.status(500).json({ error: error.message || 'Ошибка при обработке решения свидетеля' });
@@ -460,6 +467,12 @@ async function submitPaymentProof(req, res) {
       };
     });
 
+    const newlyAwarded = await achievementService.trigger('debt_paid', {
+      debtorId: result.tx.debtor,
+      creditorId: result.tx.creditor,
+      isOverdue: result.isOverdue
+    });
+
     if (result.isFullyPaid) {
       tg.notifyDebtPaid({
         debtorName:   result.debtorName   || 'Неизвестно',
@@ -475,7 +488,7 @@ async function submitPaymentProof(req, res) {
 
       return res.status(200).json({
         message:   'Долг полностью оплачен! 🎉',
-        fullyPaid: true, note: result.note, transaction: result.tx
+        fullyPaid: true, note: result.note, transaction: result.tx, newlyAwarded
       });
     } else {
       const remainingAfter = Math.max(0, result.currentAmount - result.tx.paidAmount);
@@ -493,7 +506,8 @@ async function submitPaymentProof(req, res) {
         fullyPaid:  false,
         paidAmount: result.tx.paidAmount,
         remaining:  remainingAfter,
-        transaction: result.tx
+        transaction: result.tx,
+        newlyAwarded
       });
     }
   } catch (error) {
@@ -536,8 +550,7 @@ async function forgiveDebt(req, res) {
 
     const { tx, eloBonus } = result;
 
-    const { checkAndAward } = require('../utils/achievementHelper');
-    await checkAndAward(tx.creditor._id, 'forgiven_count');
+    const newlyAwarded = await achievementService.trigger('debt_forgiven', { creditorId: tx.creditor._id });
 
     const notifyText = `💝 <b>Долг прощён!</b>\n\n` +
       `👤 Кредитор <b>${tx.creditor.name}</b> простил долг <b>${tx.debtor.name}</b>!\n` +
@@ -550,7 +563,7 @@ async function forgiveDebt(req, res) {
 
     res.status(200).json({
       message:   `Долг прощён! Вы получили +${eloBonus} ELO за благородство`,
-      eloBonus, transaction: tx
+      eloBonus, transaction: tx, newlyAwarded
     });
   } catch (error) {
     console.error('[forgiveDebt]', error);
@@ -641,9 +654,10 @@ async function confirmDebt(req, res) {
       return tx;
     });
 
-    // Проверяем достижение "Мамкин инвестор" для должника
-    const { checkAndAward } = require('../utils/achievementHelper');
-    await checkAndAward(result.debtor._id, 'active_debts_count');
+    const newlyAwarded = await achievementService.trigger('debt_created', {
+      creditorId: result.creditor._id,
+      debtorId: result.debtor._id
+    });
 
     const text = `✅ <b>Долг подтверждён!</b>\n\n` +
       `👤 Кредитор: <b>${result.creditor.name}</b>\n` +
@@ -655,7 +669,7 @@ async function confirmDebt(req, res) {
     if (result.debtor.telegramId)   tg.sendMessage(text, result.debtor.telegramId);
     if (result.creditor.telegramId) tg.sendMessage(text, result.creditor.telegramId);
 
-    res.status(200).json({ message: 'Долг успешно подтверждён!', transaction: result });
+    res.status(200).json({ message: 'Долг успешно подтверждён!', transaction: result, newlyAwarded });
   } catch (error) {
     console.error('[confirmDebt]', error);
     res.status(500).json({ error: error.message || 'Ошибка подтверждения долга' });
@@ -692,8 +706,7 @@ async function declineDebt(req, res) {
       return tx;
     });
 
-    const { checkAndAward } = require('../utils/achievementHelper');
-    await checkAndAward(userId, 'declined_loan_streak');
+    const newlyAwarded = await achievementService.trigger('declined_loan', { debtorId: userId });
 
     const text = `❌ <b>Долг отклонён!</b>\n\n` +
       `👤 Кредитор: <b>${result.creditor.name}</b>\n` +
@@ -704,7 +717,7 @@ async function declineDebt(req, res) {
     if (result.debtor.telegramId)   tg.sendMessage(text, result.debtor.telegramId);
     if (result.creditor.telegramId) tg.sendMessage(text, result.creditor.telegramId);
 
-    res.status(200).json({ message: 'Долг успешно отклонён', transaction: result });
+    res.status(200).json({ message: 'Долг успешно отклонён', transaction: result, newlyAwarded });
   } catch (error) {
     console.error('[declineDebt]', error);
     res.status(500).json({ error: error.message || 'Ошибка отклонения долга' });
