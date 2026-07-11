@@ -5,6 +5,7 @@ import {
   User, ShieldAlert, LogOut, Flame, Coins, Shield
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { api } from '../utils/api';
 
 const NAV_ITEMS = [
   { path: '/feed',       label: 'Лента',     icon: Rss,          color: 'hover:text-cyan-400' },
@@ -17,6 +18,42 @@ const NAV_ITEMS = [
 
 export default function Layout({ user, onLogout }) {
   const navigate = useNavigate();
+  
+  const [seasonInfo, setSeasonInfo] = React.useState(null);
+  const [timeLeft, setTimeLeft] = React.useState({ days: 0, hours: 0 });
+
+  React.useEffect(() => {
+    let active = true;
+    api.getSeason().then(data => {
+      if (active) setSeasonInfo(data);
+    }).catch(err => console.error('Error fetching season:', err));
+    return () => { active = false; };
+  }, []);
+
+  const calculateTimeLeft = React.useCallback(() => {
+    if (!seasonInfo || !seasonInfo.seasonEndsAt) {
+      const now = new Date();
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+      const diffMs = nextMonth.getTime() - now.getTime();
+      if (diffMs <= 0) return { days: 0, hours: 0 };
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      return { days: Math.floor(diffHours / 24), hours: diffHours % 24 };
+    }
+    const ends = new Date(seasonInfo.seasonEndsAt);
+    const diffMs = ends.getTime() - Date.now();
+    if (diffMs <= 0) return { days: 0, hours: 0 };
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    return { days: Math.floor(diffHours / 24), hours: diffHours % 24 };
+  }, [seasonInfo]);
+
+  React.useEffect(() => {
+    setTimeLeft(calculateTimeLeft());
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [calculateTimeLeft]);
+
   if (!user) return null;
 
   return (
@@ -32,7 +69,9 @@ export default function Layout({ user, onLogout }) {
             </div>
             <div>
               <h1 className="font-black text-sm tracking-tight text-white leading-none">AZADOLG</h1>
-              <span className="text-[9px] text-cyan-400 font-extrabold uppercase tracking-widest leading-none">Season 1</span>
+              <span className="text-[9px] text-cyan-400 font-extrabold uppercase tracking-widest leading-none">
+                Season {seasonInfo?.currentSeason || 1}
+              </span>
             </div>
           </div>
 
@@ -56,6 +95,22 @@ export default function Layout({ user, onLogout }) {
               </div>
               <div className="flex items-center gap-1 text-amber-400 font-bold">
                 💠 {user.karma} ✧ Карма
+              </div>
+            </div>
+          </div>
+
+          {/* Сезонный таймер */}
+          <div className="p-3 bg-gradient-to-r from-purple-950/20 via-cyan-950/15 to-black/35 border border-cyan-500/20 rounded-2xl flex flex-col items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(6,182,212,0.05)] text-center select-none animate-pulse-slow">
+            <span className="text-[8px] text-cyan-400/90 font-extrabold uppercase tracking-widest leading-none">Конец сезона через</span>
+            <div className="flex gap-2 text-white items-center">
+              <div className="flex flex-col items-center">
+                <span className="text-sm font-black tracking-tight text-white leading-none">{timeLeft.days}</span>
+                <span className="text-[7px] text-gray-505 font-bold uppercase mt-0.5">дн</span>
+              </div>
+              <span className="text-xs font-black leading-none text-cyan-500/80">:</span>
+              <div className="flex flex-col items-center">
+                <span className="text-sm font-black tracking-tight text-white leading-none">{timeLeft.hours}</span>
+                <span className="text-[7px] text-gray-505 font-bold uppercase mt-0.5">ч</span>
               </div>
             </div>
           </div>
@@ -116,9 +171,12 @@ export default function Layout({ user, onLogout }) {
           </div>
           <span className="font-black text-xs text-white">AZADOLG</span>
         </div>
-        <div className="flex items-center gap-2.5 text-[10px] sm:text-xs">
-          <span className="text-cyan-400 font-bold shrink-0">{user.eloRating} 🔥</span>
-          <span className="text-amber-400 font-bold shrink-0">💠 {user.karma} ✧</span>
+        <div className="flex items-center gap-2.5 text-[10px] sm:text-xs font-mono">
+          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-cyan-950/40 border border-cyan-500/20 rounded-lg text-[9px] text-cyan-400 font-bold shrink-0">
+            🏁 {timeLeft.days}д {timeLeft.hours}ч
+          </div>
+          <span className="text-cyan-400 font-bold shrink-0 font-sans">{user.eloRating} 🔥</span>
+          <span className="text-amber-400 font-bold shrink-0 font-sans">💠 {user.karma} ✧</span>
           <button onClick={onLogout} className="text-gray-550 hover:text-red-400 shrink-0 p-0.5 ml-1">
             <LogOut className="w-4 h-4" />
           </button>

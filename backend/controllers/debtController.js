@@ -1,6 +1,6 @@
 const Transaction = require('../models/Transaction');
 const User        = require('../models/User');
-const { getCalculatedAmount } = require('../utils/debtHelper');
+const { getCalculatedAmount, calculateEloReward } = require('../utils/debtHelper');
 const tg = require('../services/telegramService');
 const path = require('path');
 const mongoose = require('mongoose');
@@ -537,8 +537,9 @@ async function forgiveDebt(req, res) {
       tx.resolvedAt  = now;
       await tx.save({ session });
 
-      // ELO кредитора: логарифмический бонус за благородство
-      const eloBonus = calcForgiveEloBonus(tx.originalAmount);
+      // ELO кредитора: изначально полученное Elo * 2 (в сумме получается x3 от базы)
+      const baseEloReward = tx.eloAwardedToCreditor || calculateEloReward(tx.originalAmount);
+      const eloBonus = baseEloReward * 2;
       const creditor = await User.findById(tx.creditor._id).session(session);
       if (creditor) {
         creditor.eloRating += eloBonus;
@@ -641,6 +642,17 @@ async function confirmDebt(req, res) {
         throw new Error('Вы не являетесь участником этого долга');
 
       tx.status = 'active';
+
+      // Начисление Elo кредитору в момент подтверждения долга
+      const eloReward = calculateEloReward(tx.originalAmount);
+      tx.eloAwardedToCreditor = eloReward;
+
+      const creditor = await User.findById(tx.creditor._id).session(session);
+      if (creditor) {
+        creditor.eloRating += eloReward;
+        await creditor.save({ session });
+      }
+
       await tx.save({ session });
 
       // Сбрасываем подряд идущие отклонения, если подтвердили запрос

@@ -615,9 +615,8 @@ export default function App() {
     setCurrentUser(updated);
   };
 
-  const handleUpdateAvatar = async (base64Avatar) => {
-    const updated = await api.updateAvatar(base64Avatar);
-    setCurrentUser(updated);
+  const handleUpdateAvatar = (updatedUser) => {
+    setCurrentUser(updatedUser);
   };
 
   return (

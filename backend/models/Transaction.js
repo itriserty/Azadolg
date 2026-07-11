@@ -103,6 +103,7 @@ const TransactionSchema = new mongoose.Schema({
     required: true
   },
   overdueReminderSent: { type: Boolean, default: false },
+  eloAwardedToCreditor: { type: Number, default: 0 },
   resolvedAt:          { type: Date,    default: null  }
 }, {
   timestamps: true

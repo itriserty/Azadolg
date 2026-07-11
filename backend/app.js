@@ -80,6 +80,23 @@ app.get('/api/system/jackpot', authMiddleware, async (req, res) => {
   }
 });
 
+app.get('/api/system/season', authMiddleware, async (req, res) => {
+  try {
+    const SystemState = require('./models/SystemState');
+    let state = await SystemState.findOne();
+    if (!state) {
+      state = new SystemState();
+      await state.save();
+    }
+    res.status(200).json({
+      currentSeason: state.currentSeason,
+      seasonEndsAt: state.seasonEndsAt
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка получения информации о сезоне' });
+  }
+});
+
 // ── Раздача собранного React-фронтенда ────────────────────────────────────────
 // На Render фронтенд собирается перед стартом (см. render.yaml buildCommand).
 // В production backend отдаёт статику из ../frontend/dist

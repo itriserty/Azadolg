@@ -27,7 +27,7 @@ function getRankLabel(elo) {
 async function getLeaderboard(req, res) {
   try {
     const users = await User.find({ role: { $ne: 'admin' } })
-      .select('name username email eloRating karma avatar activeProfileSkin activeProfileFrame')
+      .select('name username email eloRating karma avatar avatar_url activeProfileSkin activeProfileFrame')
       .sort({ eloRating: -1 }); // Сортируем по убыванию ELO
 
     const enrichedUsers = users.map(u => {
@@ -120,15 +120,19 @@ async function updateTelegramId(req, res) {
   }
 }
 
-// Обновить аватар пользователя (поддерживает URL или Base64)
+// Обновить аватар пользователя (загруженный файл через multer)
 async function updateAvatar(req, res) {
   try {
-    const { avatar } = req.body;
     const userId = req.user;
+    if (!req.file) {
+      return res.status(400).json({ error: 'Необходимо прикрепить файл изображения' });
+    }
+
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
 
     const user = await User.findByIdAndUpdate(
       userId,
-      { avatar },
+      { avatar: avatarUrl, avatar_url: avatarUrl },
       { new: true }
     ).select('-password');
 
@@ -136,7 +140,7 @@ async function updateAvatar(req, res) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
-    // 📣 Telegram-уведомление
+    // Telegram-уведомление
     tg.sendMessage(`🖼️ <b>Новое фото профиля!</b>\n\nПользователь <b>${user.name}</b> (@${user.username}) загрузил новый аватар.`);
     if (user.telegramId) {
       tg.sendMessage(`🖼️ Вы успешно обновили свой аватар в Azadolg!`, user.telegramId);
@@ -164,7 +168,7 @@ async function getUserProfile(req, res) {
         .select('-password -resetCode -resetCodeExpires')
         .populate('achievements.achievement')
         .populate('achievementShowcase')
-        .populate('friends', 'name username avatar eloRating karma activeProfileFrame activeProfileSkin'),
+        .populate('friends', 'name username avatar avatar_url eloRating karma activeProfileFrame activeProfileSkin'),
       User.findById(viewerId)
     ]);
 

@@ -6,6 +6,7 @@ const {
 } = require('../controllers/userController');
 const { register, login, getMe, forgotPassword, resetPassword } = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
+const { uploadAvatarMiddleware } = require('../middlewares/uploadMiddleware');
 
 router.post('/register', register);
 router.post('/login', login);
@@ -13,7 +14,7 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.get('/me', authMiddleware, getMe);
 router.put('/telegram', authMiddleware, updateTelegramId);
-router.put('/avatar', authMiddleware, updateAvatar);
+router.put('/avatar', authMiddleware, uploadAvatarMiddleware, updateAvatar);
 
 router.get('/', authMiddleware, getUsers);
 router.get('/leaderboard', authMiddleware, getLeaderboard);

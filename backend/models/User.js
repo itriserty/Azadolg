@@ -78,6 +78,7 @@ const UserSchema = new mongoose.Schema({
   activeProfileSkin:  { type: String, default: 'default' },
   activeProfileFrame: { type: String, default: 'none'    },
   avatar:             { type: String, default: null       },
+  avatar_url:         { type: String, default: null       },
   // ── Приватность и Витрина ─────────────────────────────────────────────────────
   isPrivateProfile:   { type: Boolean, default: false },
   badges:             [{ type: String }],

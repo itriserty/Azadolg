@@ -283,23 +283,15 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                     setAvatarUploading(true);
                     setAvatarError('');
                     try {
-                      const reader = new FileReader();
-                      reader.onloadend = async () => {
-                        try {
-                          await api.request('/users/avatar', {
-                            method: 'PUT',
-                            body: JSON.stringify({ avatar: reader.result })
-                          });
-                          if (onUpdateAvatar) onUpdateAvatar(reader.result);
-                          fetchProfile();
-                        } catch (err) {
-                          setAvatarError('Ошибка загрузки аватара');
-                        } finally {
-                          setAvatarUploading(false);
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                    } catch {
+                      const formData = new FormData();
+                      formData.append('avatar', file);
+
+                      const data = await api.updateAvatar(formData);
+                      if (onUpdateAvatar) onUpdateAvatar(data.user);
+                      fetchProfile();
+                    } catch (err) {
+                      setAvatarError(err.message || 'Ошибка загрузки аватара');
+                    } finally {
                       setAvatarUploading(false);
                     }
                     e.target.value = '';

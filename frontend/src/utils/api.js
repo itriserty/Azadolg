@@ -48,7 +48,7 @@ export const api = {
   resetPassword:     (username, code, newPassword) => request('/users/reset-password', { method: 'POST', body: JSON.stringify({ username, code, newPassword }) }),
   getMe:             () => request('/users/me'),
   updateTelegramId:  (telegramId) => request('/users/telegram', { method: 'PUT', body: JSON.stringify({ telegramId }) }),
-  updateAvatar:      (avatar) => request('/users/avatar', { method: 'PUT', body: JSON.stringify({ avatar }) }),
+  updateAvatar:      (formData) => request('/users/avatar', { method: 'PUT', headers: { 'Content-Type': 'none' }, body: formData }),
 
   // Пользователи
   getUsers:       ()              => request('/users'),
@@ -96,5 +96,6 @@ export const api = {
   completeQuest:    (questId) => request('/quests/complete', { method: 'POST', body: JSON.stringify({ questId }) }),
   verifyQuest:      (questId, action) => request('/quests/verify', { method: 'POST', body: JSON.stringify({ questId, action }) }),
   cancelQuest:      (questId) => request('/quests/cancel', { method: 'POST', body: JSON.stringify({ questId }) }),
-  getQuests:        () => request('/quests')
+  getQuests:        () => request('/quests'),
+  getSeason:        () => request('/system/season')
 };
