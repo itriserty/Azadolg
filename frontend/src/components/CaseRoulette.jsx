@@ -93,53 +93,85 @@ const TAPE_LENGTH = WIN_INDEX + 12;
  * @param {Array}  prizes  - призовой пул тира
  * @param {string} winTag  - тег выигрышной карточки (null = без выигрыша)
  */
-function buildTape(prizes, winTag = null) {
+/**
+ * buildTape — строит массив карточек ленты.
+ *
+ * КРИТИЧЕСКИ ВАЖНО: после генерации всего массива мы жёстко
+ * перезаписываем слот WIN_INDEX объектом с бэкенда (backendPrize).
+ * Это гарантирует, что render-данные карточки на позиции WIN_INDEX
+ * и данные в стейте wonPrize — ОДИН И ТОТ ЖЕ объект.
+ *
+ * @param {Array}   prizes       - призовой пул тира
+ * @param {Object|null} backendPrize - приз из ответа бэкенда (prize.*)
+ */
+function buildTape(prizes, backendPrize = null) {
   const items = [];
   for (let i = 0; i < TAPE_LENGTH; i++) {
-    let card;
-    if (i === WIN_INDEX && winTag !== null) {
-      // ВЫИГРЫШНАЯ КАРТОЧКА — берём строго из prizes по тегу
-      card = prizes.find(p => p.tag === winTag);
-      if (!card) card = prizes[1]; // fallback на cashback
-    } else {
-      // Декоративные карточки — взвешенный рандом
-      const total = prizes.reduce((s, p) => s + p.weight, 0);
-      let r = Math.random() * total;
-      let idx = 0;
-      for (const p of prizes) { r -= p.weight; if (r <= 0) break; idx++; }
-      card = prizes[Math.min(idx, prizes.length - 1)];
-      // Запрещаем декоративной карточке быть джекпотом рядом с WIN_INDEX
-      // (чтобы визуально не было "ложного" джекпота у выигрыша)
-      if (card.tag === 'jackpot' && Math.abs(i - WIN_INDEX) <= 2 && winTag !== 'jackpot') {
-        card = prizes.find(p => p.tag === 'cashback') || prizes[1];
-      }
+    // Декоративные карточки — взвешенный рандом (только для визуала)
+    const total = prizes.reduce((s, p) => s + p.weight, 0);
+    let r = Math.random() * total;
+    let idx = 0;
+    for (const p of prizes) { r -= p.weight; if (r <= 0) break; idx++; }
+    let card = prizes[Math.min(idx, prizes.length - 1)];
+
+    // Убираем джекпот с позиций вблизи WIN_INDEX если выигрыш не джекпот
+    if (
+      card.tag === 'jackpot' &&
+      Math.abs(i - WIN_INDEX) <= 2 &&
+      backendPrize?.tag !== 'jackpot'
+    ) {
+      card = prizes.find(p => p.tag === 'cashback') || prizes[1];
     }
+
     items.push({ ...card, _key: `${i}-${card.tag}-${Math.random().toString(36).slice(2)}` });
   }
+
+  // ── ЖЁСТКАЯ ПЕРЕЗАПИСЬ WIN_INDEX ─────────────────────────────────────────
+  // Делается ПОСЛЕ всего цикла, чтобы ничто не могло перетереть этот слот.
+  if (backendPrize !== null) {
+    items[WIN_INDEX] = {
+      ...backendPrize,              // все поля с бэкенда: tag, emoji, label, rarity, win
+      _key: 'win-card-forced',      // уникальный ключ — React не перепутает DOM-узел
+    };
+  }
+
   return items;
 }
 
 /**
- * Вычисляет ТОЧНЫЙ finalX для остановки ленты так, чтобы карточка
- * с индексом WIN_INDEX оказалась строго по центру указателя.
+ * calcFinalX — вычисляет ТОЧНЫЙ финальный сдвиг ленты (px).
  *
- * Формула:
- *   leftEdge  = WIN_INDEX * STEP        — левый край выигрышной карточки
- *   cardCenter = leftEdge + CARD_WIDTH/2 — центр выигрышной карточки
- *   containerCenter = containerW / 2    — центр контейнера (указатель)
- *   finalX = containerCenter - cardCenter  (→ это отрицательное число)
+ * ── Доказательство формулы ────────────────────────────────────────────────
+ * motion.div имеет px-[50%] → padding-left = containerW/2 (px-% считается
+ * от ширины РОДИТЕЛЯ, а не самого элемента — это стандарт CSS).
  *
- * Внутри-карточный допуск: мы разрешаем ±(CARD_WIDTH/2 - 4)px,
- * чтобы стрелка не выходила за границу карточки.
- * MAX_JITTER = CARD_WIDTH / 2 - 6 = 49px
+ * Значит, центр карточки i ДО анимации (при x=0) находится:
+ *   pos_i = containerW/2  +  i * STEP  +  CARD_WIDTH/2
+ *
+ * После применения transform x=finalX:
+ *   pos_i_after = containerW/2  +  i * STEP  +  CARD_WIDTH/2  +  finalX
+ *
+ * Нужно pos_WIN_after = containerW/2 (= позиция стрелки):
+ *   containerW/2 + WIN_INDEX * STEP + CARD_WIDTH/2 + finalX = containerW/2
+ *   finalX = -(WIN_INDEX * STEP + CARD_WIDTH/2)
+ *
+ * containerW ПОЛНОСТЬЮ СОКРАЩАЕТСЯ — формула не зависит от ширины контейнера.
+ *
+ * Предыдущая формула добавляла +containerW/2, что давало дрейф ~280px
+ * (~2.4 карточки) — именно это и было причиной багa.
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * @param {number} winIndex - индекс выигрышной карточки в ленте
  */
-function calcFinalX(containerW, winIndex) {
-  const cardCenter = winIndex * STEP + CARD_WIDTH / 2;
-  const containerCenter = containerW / 2;
-  // Небольшой "косметический" jitter — строго внутри карточки (±18px max)
-  const MAX_INNER_JITTER = 18;
-  const innerJitter = (Math.random() - 0.5) * 2 * MAX_INNER_JITTER;
-  return containerCenter - cardCenter + innerJitter;
+function calcFinalX(winIndex) {
+  // Строгое математическое попадание в центр карточки
+  const exactCenter = -(winIndex * STEP + CARD_WIDTH / 2);
+
+  // Косметический jitter: СТРОГО внутри карточки (±10px << CARD_WIDTH/2 = 55px)
+  const MAX_INNER_JITTER = 10;
+  const jitter = (Math.random() - 0.5) * 2 * MAX_INNER_JITTER;
+
+  return exactCenter + jitter;
 }
 
 // ── Компонент одной карточки ──────────────────────────────────────────────────
@@ -212,14 +244,13 @@ export default function CaseRoulette({ user, onUserUpdate }) {
         body:   JSON.stringify({ tier: tier.cost }),
       });
 
-      // Сохраняем выигрышный тег в ref — он будет использован при построении ленты
-      const winTag = result.prize.tag; // 'zero' | 'cashback' | 'break_even' | 'double' | 'jackpot'
-      winTagRef.current = winTag;
+      // Сохраняем выигрышный тег в ref (на случай отладки)
+      winTagRef.current = result.prize.tag;
 
-      // ── ШАГ 2: СТРОИМ ЛЕНТУ С ВЫИГРЫШЕМ НА WIN_INDEX ─────────────────────
-      // Лента строится ПОСЛЕ получения результата, выигрышная карточка
-      // гарантированно размещается на позиции WIN_INDEX.
-      const newTape = buildTape(tier.prizes, winTag);
+      // ── ШАГ 2: СТРОИМ ЛЕНТУ — ЖЁСТКАЯ ПЕРЕЗАПИСЬ WIN_INDEX ───────────────
+      // buildTape принимает ПОЛНЫЙ объект prize с бэкенда и жёстко
+      // перезаписывает items[WIN_INDEX] — никакой рассинхрон невозможен.
+      const newTape = buildTape(tier.prizes, result.prize);
 
       // Сначала сбрасываем x в 0 (без анимации), потом заменяем ленту,
       // чтобы пользователь не увидел скачка.
@@ -230,11 +261,10 @@ export default function CaseRoulette({ user, onUserUpdate }) {
       // Даём React время смонтировать новую ленту в DOM.
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-      // ── ШАГ 4: ВЫЧИСЛЯЕМ ТОЧНУЮ ПОЗИЦИЮ ОСТАНОВКИ ────────────────────────
-      // calcFinalX гарантирует, что стрелка попадает СТРОГО внутрь
-      // карточки WIN_INDEX (допуск ±18px — меньше половины карточки).
-      const containerW = tapeRef.current?.offsetWidth ?? 560;
-      const finalX = calcFinalX(containerW, WIN_INDEX);
+      // ── ШАГ 4: ТОЧНАЯ ПОЗИЦИЯ ОСТАНОВКИ (без containerW) ────────────────
+      // calcFinalX не зависит от containerW — px-[50%] уже компенсирует
+      // смещение. Формула: finalX = -(WIN_INDEX * STEP + CARD_WIDTH / 2).
+      const finalX = calcFinalX(WIN_INDEX);
 
       // ── ШАГ 5: АНИМАЦИЯ ПРОКРУТКИ ─────────────────────────────────────────
       // ease: быстрый разгон → плавное торможение до точной остановки
@@ -352,7 +382,6 @@ export default function CaseRoulette({ user, onUserUpdate }) {
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 pointer-events-none"
             style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: `8px solid ${pointerColor}` }}
           />
-
           <div
             ref={tapeRef}
             className="overflow-hidden w-full"

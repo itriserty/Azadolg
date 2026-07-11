@@ -1,1 +1,1 @@
-fix(roulette): align animation outcome with actual reward back-end data
+fix(roulette): fix math offset drift and force strict state sync in tape generation
