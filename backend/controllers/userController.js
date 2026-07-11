@@ -27,7 +27,7 @@ function getRankLabel(elo) {
 async function getLeaderboard(req, res) {
   try {
     const users = await User.find({ role: { $ne: 'admin' } })
-      .select('name username email eloRating coins karma avatar activeProfileSkin activeProfileFrame')
+      .select('name username email eloRating karma avatar activeProfileSkin activeProfileFrame')
       .sort({ eloRating: -1 }); // Сортируем по убыванию ELO
 
     const enrichedUsers = users.map(u => {

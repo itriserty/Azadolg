@@ -75,7 +75,7 @@ function notifyDebtCreated({ creditorName, debtorName, amount, description, dueD
 /**
  * Уведомление об оплате (закрытии) долга.
  */
-function notifyDebtPaid({ debtorName, creditorName, amount, eloChangeDebtor, coinsEarned, isOverdue, debtorTelegramId, creditorTelegramId, note }) {
+function notifyDebtPaid({ debtorName, creditorName, amount, eloChangeDebtor, karmaEarned, isOverdue, debtorTelegramId, creditorTelegramId, note }) {
   const icon = isOverdue ? '⚠️' : '✅';
   const eloEmoji = eloChangeDebtor >= 0 ? '📈' : '📉';
   let text = `${icon} <b>Долг закрыт${isOverdue ? ' (с просрочкой)' : ' вовремя'}!</b>\n\n` +
@@ -83,7 +83,7 @@ function notifyDebtPaid({ debtorName, creditorName, amount, eloChangeDebtor, coi
     `👤 Кредитор: <b>${creditorName}</b>\n` +
     `💰 Сумма: <b>${amount} ₸</b>\n\n` +
     `${eloEmoji} ELO Должника: <b>${eloChangeDebtor >= 0 ? '+' : ''}${eloChangeDebtor}</b>\n` +
-    `🪙 Карма получена: <b>+${coinsEarned}</b>`;
+    `🪙 Карма получена: <b>+${karmaEarned}</b>`;
 
   if (note) {
     text += `\n\n🛡️ <b>Инфо:</b> ${note}`;

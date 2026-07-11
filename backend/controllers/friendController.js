@@ -164,7 +164,7 @@ async function getFriends(req, res) {
   try {
     const user = await User.findById(req.user).populate({
       path: 'friends',
-      select: 'name username email eloRating coins telegramId'
+      select: 'name username email eloRating karma telegramId'
     });
 
     if (!user) {

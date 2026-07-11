@@ -151,7 +151,7 @@ async function openCase(req, res) {
     res.status(200).json({
       message: 'Кейс успешно открыт!',
       drop: { label: dropLabel, rarity: dropRarity, emoji: dropEmoji, description, detail },
-      user: { _id: user._id, name: user.name, coins: user.coins, karma: user.karma, eloRating: user.eloRating },
+      user: { _id: user._id, name: user.name, karma: user.karma, eloRating: user.eloRating },
       inventoryItem
     });
   } catch (error) {

@@ -200,9 +200,9 @@ async function seedDatabase() {
 
   const hashedPassword = await bcrypt.hash('password123', 10);
 
-  const alice   = new User({ name: 'Алиса',  username: 'alice',   password: hashedPassword, email: 'alice@example.com',   eloRating: 1050, coins: 250 });
-  const bob     = new User({ name: 'Боб',    username: 'bob',     password: hashedPassword, email: 'bob@example.com',     eloRating: 980,  coins: 80  });
-  const charlie = new User({ name: 'Чарли',  username: 'charlie', password: hashedPassword, email: 'charlie@example.com', eloRating: 1000, coins: 400 });
+  const alice   = new User({ name: 'Алиса',  username: 'alice',   password: hashedPassword, email: 'alice@example.com',   eloRating: 1050, karma: 250 });
+  const bob     = new User({ name: 'Боб',    username: 'bob',     password: hashedPassword, email: 'bob@example.com',     eloRating: 980,  karma: 80  });
+  const charlie = new User({ name: 'Чарли',  username: 'charlie', password: hashedPassword, email: 'charlie@example.com', eloRating: 1000, karma: 400 });
   await Promise.all([alice.save(), bob.save(), charlie.save()]);
 
   alice.friends   = [bob._id, charlie._id];

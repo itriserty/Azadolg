@@ -91,8 +91,7 @@ async function pullGacha(req, res) {
         _id: user._id,
         name: user.name,
         eloRating: user.eloRating,
-        karma: user.karma,
-        coins: user.coins
+        karma: user.karma
       },
       inventoryItem
     });

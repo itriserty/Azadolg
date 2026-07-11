@@ -340,62 +340,37 @@ async function deleteAchievement(req, res) {
   }
 }
 
-// ── Ручное начисление монет конкретному пользователю ─────────────────────────
-async function grantCoins(req, res) {
-  try {
-    const { id }     = req.params;
-    const { amount, reason } = req.body;
-    const adminId    = req.user;
-
-    const coinsAmount = Math.round(Number(amount));
-    if (isNaN(coinsAmount) || coinsAmount <= 0)
-      return res.status(400).json({ error: 'Укажите корректное количество монет' });
-
-    const user = await User.findById(id);
-    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
-
-    user.coins = (user.coins || 0) + coinsAmount;
-    await user.save();
-
-    await logAction(adminId, 'manual_coins_grant', id, 'User', reason, { amount: coinsAmount });
-    res.status(200).json({ message: `+${coinsAmount} монет начислено ${user.name}`, newCoins: user.coins });
-  } catch (err) {
-    console.error('[admin/grantCoins]', err);
-    res.status(500).json({ error: 'Ошибка начисления монет' });
-  }
-}
-
-// ── Массовая раздача монет всем пользователям ─────────────────────────────────
-async function distributeCoins(req, res) {
+// ── Массовая раздача Кармы всем пользователям ─────────────────────────────────
+async function distributeKarma(req, res) {
   try {
     const { amount, reason } = req.body;
     const adminId = req.user;
 
-    const coinsAmount = Math.round(Number(amount));
-    if (isNaN(coinsAmount) || coinsAmount <= 0)
-      return res.status(400).json({ error: 'Укажите корректное количество монет' });
+    const karmaAmount = Math.round(Number(amount));
+    if (isNaN(karmaAmount) || karmaAmount <= 0)
+      return res.status(400).json({ error: 'Укажите корректное количество Кармы' });
 
-    // Массово начисляем монеты всем активным (незаблокированным) пользователям
+    // Массово начисляем карму всем активным (незаблокированным) пользователям
     const result = await User.updateMany(
       { isBanned: { $ne: true } },
-      { $inc: { coins: coinsAmount } }
+      { $inc: { karma: karmaAmount, "stats.totalKarmaEarned": karmaAmount } }
     );
 
-    await logAction(adminId, 'distribute_coins', adminId, 'User', reason || 'Массовая раздача монет', { amount: coinsAmount, modifiedCount: result.modifiedCount });
+    await logAction(adminId, 'distribute_karma', adminId, 'User', reason || 'Массовая раздача кармы', { amount: karmaAmount, modifiedCount: result.modifiedCount });
 
     tg.sendMessage(
-      `🎁 <b>Массовая раздача монет!</b>\n\n` +
-      `💰 Всем пользователям начислено по <b>${coinsAmount} монет</b>.\n` +
+      `🎁 <b>Массовая раздача Кармы!</b>\n\n` +
+      `✧ Всем пользователям начислено по <b>${karmaAmount} Кармы</b>.\n` +
       `📝 Описание: ${reason || 'Подарок от администрации'}`
     );
 
     res.status(200).json({
-      message: `Успешно начислено по ${coinsAmount} монет для ${result.modifiedCount} пользователей.`,
+      message: `Успешно начислено по ${karmaAmount} Кармы для ${result.modifiedCount} пользователей.`,
       modifiedCount: result.modifiedCount
     });
   } catch (err) {
-    console.error('[admin/distributeCoins]', err);
-    res.status(500).json({ error: 'Ошибка раздачи монет' });
+    console.error('[admin/distributeKarma]', err);
+    res.status(500).json({ error: 'Ошибка раздачи кармы' });
   }
 }
 
@@ -404,5 +379,5 @@ module.exports = {
   getAllDebts, deleteDebt, cancelTransaction,
   resetUserPassword, getAdminLogs, grantKarma,
   getAchievements, createAchievement, updateAchievement, deleteAchievement,
-  grantCoins, distributeCoins
+  distributeKarma
 };

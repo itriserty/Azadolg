@@ -5,7 +5,7 @@ const {
   getAllDebts, deleteDebt, cancelTransaction,
   resetUserPassword, getAdminLogs, grantKarma,
   getAchievements, createAchievement, updateAchievement, deleteAchievement,
-  grantCoins, distributeCoins
+  distributeKarma
 } = require('../controllers/adminController');
 const authMiddleware  = require('../middlewares/authMiddleware');
 const adminMiddleware = require('../middlewares/adminMiddleware');
@@ -16,13 +16,12 @@ router.use(adminMiddleware);
 
 // ── Пользователи ─────────────────────────────────────────────────────────────
 router.get('/users',                       getUsers);
-router.post('/users/distribute-coins',     distributeCoins);
+router.post('/users/distribute-karma',     distributeKarma);
 router.post('/users/:id/ban',              banUser);
 router.post('/users/:id/unban',            unbanUser);
 router.delete('/users/:id',                deleteUser);
 router.post('/users/:id/reset-password',   resetUserPassword);
 router.post('/users/:id/grant-karma',      grantKarma);
-router.post('/users/:id/grant-coins',      grantCoins);
 
 // ── Долги ─────────────────────────────────────────────────────────────────────
 router.get('/debts',               getAllDebts);

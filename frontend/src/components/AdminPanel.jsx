@@ -18,8 +18,8 @@ export default function AdminPanel({ token }) {
   const [search,   setSearch]   = useState('');
   const [msg,      setMsg]      = useState({ text: '', type: 'ok' });
   
-  const [distCoinsAmt,    setDistCoinsAmt]    = useState('');
-  const [distCoinsReason, setDistCoinsReason] = useState('');
+  const [distKarmaAmt,    setDistKarmaAmt]    = useState('');
+  const [distKarmaReason, setDistKarmaReason] = useState('');
   
   // Модальные окна
   const [banModal, setBanModal] = useState(null);   // userId
@@ -27,11 +27,10 @@ export default function AdminPanel({ token }) {
   const [pwModal,  setPwModal]  = useState(null);   // userId
   const [newPw,    setNewPw]    = useState('');
   
-  // Выдача средств (коины / карма)
+  // Выдача средств (карма)
   const [grantModal,      setGrantModal]      = useState(null); // null | { userId, name }
   const [grantAmt,        setGrantAmt]        = useState('');
   const [grantReason,     setGrantReason]     = useState('');
-  const [grantType,       setGrantType]       = useState('coins'); // 'coins' | 'karma'
   
   // Достижения
   const [achModal, setAchModal] = useState(null);   // null | 'create' | achievementObject
@@ -135,22 +134,22 @@ export default function AdminPanel({ token }) {
     if (r.ok) { setPwModal(null); setNewPw(''); }
   };
 
-  const doDistributeCoins = async () => {
-    if (!distCoinsAmt || Number(distCoinsAmt) <= 0) {
-      return flash('Укажите корректную сумму монет', 'err');
+  const doDistributeKarma = async () => {
+    if (!distKarmaAmt || Number(distKarmaAmt) <= 0) {
+      return flash('Укажите корректную сумму Кармы', 'err');
     }
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/admin/users/distribute-coins`, {
+      const r = await fetch(`${API}/api/admin/users/distribute-karma`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ amount: distCoinsAmt, reason: distCoinsReason })
+        body: JSON.stringify({ amount: distKarmaAmt, reason: distKarmaReason })
       });
       const d = await r.json();
       if (!r.ok) return flash(d.error || 'Ошибка', 'err');
       flash(d.message);
-      setDistCoinsAmt('');
-      setDistCoinsReason('');
+      setDistKarmaAmt('');
+      setDistKarmaReason('');
       fetchUsers();
     } catch (err) {
       flash('Ошибка при массовой раздаче', 'err');
@@ -161,12 +160,11 @@ export default function AdminPanel({ token }) {
 
   const doGrantFunds = async () => {
     if (!grantAmt || Number(grantAmt) <= 0) {
-      return flash('Укажите корректную сумму', 'err');
+      return flash('Укажите корректное количество Кармы', 'err');
     }
     setLoading(true);
     try {
-      const endpoint = grantType === 'coins' ? 'grant-coins' : 'grant-karma';
-      const r = await fetch(`${API}/api/admin/users/${grantModal.userId}/${endpoint}`, {
+      const r = await fetch(`${API}/api/admin/users/${grantModal.userId}/grant-karma`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ amount: grantAmt, reason: grantReason })
@@ -179,7 +177,7 @@ export default function AdminPanel({ token }) {
       setGrantReason('');
       fetchUsers();
     } catch (err) {
-      flash('Ошибка при начислении средств', 'err');
+      flash('Ошибка при начислении Кармы', 'err');
     } finally {
       setLoading(false);
     }
@@ -293,32 +291,32 @@ export default function AdminPanel({ token }) {
       {/* ── ПОЛЬЗОВАТЕЛИ ── */}
       {tab === 'users' && (
         <div className="space-y-4">
-          {/* Блок массовой раздачи коинов */}
+          {/* Блок массовой раздачи Кармы */}
           <div className="bg-gradient-to-br from-[#111827] to-[#1f2937] border border-cyan-500/25 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h3 className="font-bold text-white flex items-center gap-1.5 text-sm">
-                <span>🎁 Массовая раздача коинов</span>
+                <span>🎁 Массовая раздача Кармы</span>
               </h3>
-              <p className="text-gray-400 text-[10px]">Начислить монеты всем незаблокированным пользователям одновременно</p>
+              <p className="text-gray-400 text-[10px]">Начислить Карму всем незаблокированным пользователям одновременно</p>
             </div>
             
             <div className="flex flex-wrap items-center gap-2">
               <input 
                 type="number" 
-                placeholder="Сумма коинов" 
-                value={distCoinsAmt}
-                onChange={e => setDistCoinsAmt(e.target.value)}
+                placeholder="Сумма Кармы" 
+                value={distKarmaAmt}
+                onChange={e => setDistKarmaAmt(e.target.value)}
                 className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 w-32" 
               />
               <input 
                 type="text" 
                 placeholder="Причина раздачи..." 
-                value={distCoinsReason}
-                onChange={e => setDistCoinsReason(e.target.value)}
+                value={distKarmaReason}
+                onChange={e => setDistKarmaReason(e.target.value)}
                 className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 w-48" 
               />
               <button 
-                onClick={doDistributeCoins}
+                onClick={doDistributeKarma}
                 className="bg-cyan-600 hover:bg-cyan-500 text-[#0b0f19] font-black px-4 py-2 rounded-xl transition text-xs"
               >
                 Раздать всем
@@ -353,7 +351,6 @@ export default function AdminPanel({ token }) {
                       <td className="px-4 py-3">
                         <div>🔥 {u.eloRating} ELO</div>
                         <div className="text-[10px] text-emerald-400">✧ {u.karma} Карма</div>
-                        <div className="text-[10px] text-cyan-400">🪙 {u.coins || 0} Коины</div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${u.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-gray-800 text-gray-400'}`}>
@@ -384,7 +381,7 @@ export default function AdminPanel({ token }) {
                                   <Ban className="w-3 h-3 inline" /> Бан
                                 </button>
                               )}
-                              <button onClick={() => { setGrantModal({ userId: u._id, name: u.name }); setGrantAmt(''); setGrantReason(''); setGrantType('coins'); }} className={`${btn} bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600/40`}>
+                              <button onClick={() => { setGrantModal({ userId: u._id, name: u.name }); setGrantAmt(''); setGrantReason(''); }} className={`${btn} bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600/40`}>
                                 🪙 Начислить
                               </button>
                               <button onClick={() => { setPwModal(u._id); setNewPw(''); }} className={`${btn} bg-amber-600/20 text-amber-400 border border-amber-500/30 hover:bg-amber-600/40`}>
@@ -615,27 +612,18 @@ export default function AdminPanel({ token }) {
         )}
       </AnimatePresence>
 
-      {/* ── Модал НАЧИСЛЕНИЯ СРЕДСТВ (КОИНЫ / КАРМА) ── */}
+      {/* ── Модал НАЧИСЛЕНИЯ КАРМЫ ── */}
       <AnimatePresence>
         {grantModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
               className="bg-[#151c2c] border border-cyan-500/30 rounded-2xl p-6 w-full max-w-sm">
-              <h3 className="font-black text-white mb-4 flex items-center gap-2">💰 Начислить средства</h3>
+              <h3 className="font-black text-white mb-4 flex items-center gap-2">💰 Начислить Карму</h3>
               <p className="text-gray-400 text-[10px] mb-3">Пользователь: <span className="text-white font-bold">{grantModal.name}</span></p>
-              
-              <div className="mb-4">
-                <label className="text-[10px] uppercase font-bold text-gray-500 block mb-1">Тип баланса</label>
-                <select value={grantType} onChange={e => setGrantType(e.target.value)}
-                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500">
-                  <option value="coins">🪙 Коины (монеты)</option>
-                  <option value="karma">✧ Карма (рейтинг)</option>
-                </select>
-              </div>
 
               <div className="mb-4">
-                <label className="text-[10px] uppercase font-bold text-gray-500 block mb-1">Количество</label>
+                <label className="text-[10px] uppercase font-bold text-gray-500 block mb-1">Количество Кармы</label>
                 <input type="number" value={grantAmt} onChange={e => setGrantAmt(e.target.value)}
                   placeholder="Сумма для начисления"
                   className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500" />

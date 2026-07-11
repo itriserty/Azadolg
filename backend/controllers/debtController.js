@@ -39,8 +39,8 @@ function calculateEloChange(transaction, now = new Date()) {
   const diffDays   = Math.floor((now - new Date(startDate)) / (1000 * 60 * 60 * 24));
   const eloBonus   = calcEloBonus(transaction.originalAmount);
   return diffDays <= 7
-    ? { debtorElo: eloBonus,     creditorElo: Math.round(eloBonus / 3), coinsReward: 50,  isOverdue: false }
-    : { debtorElo: -Math.min(20, eloBonus), creditorElo: Math.round(eloBonus / 5), coinsReward: 10, isOverdue: true };
+    ? { debtorElo: eloBonus,     creditorElo: Math.round(eloBonus / 3), karmaReward: 50,  isOverdue: false }
+    : { debtorElo: -Math.min(20, eloBonus), creditorElo: Math.round(eloBonus / 5), karmaReward: 10, isOverdue: true };
 }
 
 // Логарифмический ELO-бонус за прощение долга (до 150)
@@ -336,17 +336,17 @@ async function submitPaymentProof(req, res) {
         creditor = await User.findById(tx.creditor._id).session(session);
       }
 
-      // Обновление баланса Coins
+      // Обновление баланса Karma
       if (debtor) {
-        debtor.coins -= payAmt;
+        debtor.karma -= payAmt;
       }
       if (creditor && creditor !== debtor) {
-        creditor.coins += payAmt;
+        creditor.karma += payAmt;
       }
 
       let note = '';
       let applyRewards = true;
-      let debtorElo = 0, creditorElo = 0, coinsReward = 0, isOverdue = false;
+      let debtorElo = 0, creditorElo = 0, karmaReward = 0, isOverdue = false;
 
       if (isFullyPaid) {
         // ── Полное закрытие ────────────────────────────────────────────────────
@@ -359,7 +359,7 @@ async function submitPaymentProof(req, res) {
         const eloObj = calculateEloChange(tx, now);
         debtorElo = eloObj.debtorElo;
         creditorElo = eloObj.creditorElo;
-        coinsReward = eloObj.coinsReward;
+        karmaReward = eloObj.karmaReward;
         isOverdue = eloObj.isOverdue;
 
         // Лимит 1 транзакция/24ч между этими двумя пользователями
@@ -384,11 +384,11 @@ async function submitPaymentProof(req, res) {
         if (applyRewards) {
           if (debtor) {
             debtor.eloRating = Math.max(100, debtor.eloRating + debtorElo);
-            debtor.karma     += coinsReward;
+            debtor.karma     += karmaReward;
             if (!isOverdue) { debtor.winStreak++; debtor.stats.debtsPaidOnTime++; }
             else              debtor.winStreak = 0;
             debtor.stats.totalDebtsPaid++;
-            debtor.stats.totalKarmaEarned += coinsReward;
+            debtor.stats.totalKarmaEarned += karmaReward;
             const { addXP } = require('../utils/battlePassHelper');
             await addXP(debtor, isOverdue ? 10 : 25);
           }
@@ -450,7 +450,7 @@ async function submitPaymentProof(req, res) {
         payAmt,
         currentAmount,
         debtorElo,
-        coinsReward,
+        karmaReward,
         isOverdue,
         note,
         debtorName: debtor?.name,
@@ -466,7 +466,7 @@ async function submitPaymentProof(req, res) {
         creditorName: result.creditorName || 'Неизвестно',
         amount:       result.currentAmount,
         eloChangeDebtor: result.note.includes('не начислены') ? 0 : result.debtorElo,
-        coinsEarned:     result.note.includes('не начислены') ? 0 : result.coinsReward,
+        karmaEarned:     result.note.includes('не начислены') ? 0 : result.karmaReward,
         isOverdue:    result.isOverdue,
         debtorTelegramId: result.debtorTelegramId,
         creditorTelegramId: result.creditorTelegramId,

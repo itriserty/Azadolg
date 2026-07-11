@@ -45,8 +45,7 @@ async function seed() {
     password:  hashed,
     role:      'admin',
     eloRating: 9999,
-    karma:     99999,
-    coins:     99999
+    karma:     99999
   });
   await admin.save();
 

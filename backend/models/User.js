@@ -53,10 +53,6 @@ const UserSchema = new mongoose.Schema({
     type: Number,
     default: 1000
   },
-  coins: {
-    type: Number,
-    default: 200
-  },
   karma: {
     type: Number,
     default: 200
