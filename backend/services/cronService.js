@@ -403,6 +403,42 @@ function startCronScheduler() {
     await deductWeeklyKarma();
   });
 
+  // Еженедельные задания: каждый понедельник в 00:00
+  cron.schedule('0 0 * * 1', async () => {
+    try {
+      console.log('[CronService] Запуск генерации еженедельных заданий...');
+      const UserTask = require('../models/UserTask');
+      const Transaction = require('../models/Transaction');
+      
+      // Удаляем старые задания
+      const now = new Date();
+      await UserTask.deleteMany({ expires_at: { $lte: now } });
+
+      // Находим активных пользователей (логинились последние 30 дней или имеют активные долги)
+      const ACTIVITY_DAYS = 30;
+      const cutoff = new Date(Date.now() - ACTIVITY_DAYS * 24 * 60 * 60 * 1000);
+      const activeDebtorIds = await Transaction.distinct('debtor',   { status: 'active' });
+      const activeCreditorIds = await Transaction.distinct('creditor', { status: 'active' });
+      const activeDebtUsers = [...new Set([...activeDebtorIds.map(String), ...activeCreditorIds.map(String)])];
+
+      const activeUsers = await User.find({
+        isBanned: { $ne: true },
+        $or: [
+          { lastLoginAt: { $gte: cutoff } },
+          { _id: { $in: activeDebtUsers } }
+        ]
+      });
+
+      const questService = require('./questService');
+      for (const u of activeUsers) {
+        await questService.generateQuestsForUser(u._id);
+      }
+      console.log(`[CronService] Успешно сгенерировано еженедельных заданий для ${activeUsers.length} пользователей.`);
+    } catch (err) {
+      console.error('[CronService] Ошибка еженедельной генерации квестов:', err);
+    }
+  });
+
   // Ежедневный штраф за просрочку долгов (списание ELO): каждый день в 00:05
   cron.schedule('5 0 * * *', async () => {
     await applyDailyOverduePenalties();

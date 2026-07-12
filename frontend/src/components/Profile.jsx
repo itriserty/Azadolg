@@ -254,7 +254,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
     );
   }
 
-  const { user, canView, comments, debts, inventory } = profileData;
+  const { user, canView, comments, debts, inventory, allAchievements = [] } = profileData;
   const currentSkin = user.activeProfileSkin || 'default';
   const currentFrame = user.activeProfileFrame || 'none';
   const elo = user.eloRating || 1000;

@@ -419,7 +419,7 @@ export default function App() {
     }, 5500);
   }, []);
 
-  const checkAchievements = useCallback((res) => {
+  const checkAchievementsAndQuests = useCallback((res) => {
     if (res && res.newlyAwarded && res.newlyAwarded.length > 0) {
       res.newlyAwarded.forEach(ach => {
         addToast(
@@ -430,14 +430,24 @@ export default function App() {
         );
       });
     }
+    if (res && res.newlyCompletedQuests && res.newlyCompletedQuests.length > 0) {
+      res.newlyCompletedQuests.forEach(quest => {
+        addToast(
+          'Задание выполнено!',
+          `✨ ${quest.title} (+${quest.reward_karma} Кармы)`,
+          '🏆',
+          quest.reward_karma
+        );
+      });
+    }
   }, [addToast]);
 
   useEffect(() => {
     setSuccessCallback((data) => {
-      checkAchievements(data);
+      checkAchievementsAndQuests(data);
     });
     return () => setSuccessCallback(null);
-  }, [checkAchievements]);
+  }, [checkAchievementsAndQuests]);
 
   // Состояния для форм авторизации
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot' | 'reset'

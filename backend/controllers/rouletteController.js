@@ -161,6 +161,19 @@ async function spin(req, res) {
       }
     }
 
+    let newlyCompletedQuests = [];
+    try {
+      const questService = require('../services/questService');
+      const q1 = await questService.trackProgress(userId, 'spin_roulette_3');
+      let q2 = [];
+      if (tier.cost === 100) {
+        q2 = await questService.trackProgress(userId, 'spin_elite_roulette');
+      }
+      newlyCompletedQuests = [...q1, ...q2];
+    } catch (err) {
+      console.error('[Casino] Ошибка QuestService:', err);
+    }
+
     return res.status(200).json({
       message: 'Спин завершён!',
       tier: { cost: tier.cost, label: tier.label },
@@ -177,6 +190,7 @@ async function spin(req, res) {
         name:  user.name,
         karma: user.karma,
       },
+      newlyCompletedQuests
     });
   } catch (err) {
     await session.abortTransaction();

@@ -653,15 +653,41 @@ async function transferKarma(req, res) {
     }
 
     if (success) {
+      const questService = require('../services/questService');
+      const newlyCompletedQuests = await questService.trackProgress(fromUserId, 'send_karma');
+
       return res.status(200).json({
         message: 'Перевод успешно выполнен',
         senderKarma: senderUpdated.karma,
-        recipientKarma: recipientUpdated.karma
+        recipientKarma: recipientUpdated.karma,
+        newlyCompletedQuests
       });
     }
   } catch (error) {
     console.error('[transferKarma]', error);
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+}
+
+async function getWeeklyQuests(req, res) {
+  try {
+    const userId = req.user;
+    const UserTask = require('../models/UserTask');
+    const questService = require('../services/questService');
+
+    let tasks = await UserTask.find({
+      user_id: userId,
+      expires_at: { $gt: new Date() }
+    });
+
+    if (tasks.length === 0) {
+      tasks = await questService.generateQuestsForUser(userId);
+    }
+
+    res.status(200).json(tasks);
+  } catch (error) {
+    console.error('[getWeeklyQuests]', error);
+    res.status(500).json({ error: 'Ошибка получения еженедельных заданий' });
   }
 }
 
@@ -677,5 +703,6 @@ module.exports = {
   updateShowcase,
   addProfileComment,
   deleteProfileComment,
-  transferKarma
+  transferKarma,
+  getWeeklyQuests
 };

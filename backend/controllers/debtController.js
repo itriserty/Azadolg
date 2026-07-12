@@ -229,12 +229,20 @@ async function witnessDecision(req, res) {
     tg.sendMessage(notifyText);
 
     const newlyAwarded = [];
+    let newlyCompletedQuests = [];
     if (action === 'approve') {
       const triggerResult = await achievementService.trigger('witness_decision', { witnessId: userId });
       newlyAwarded.push(...triggerResult);
+
+      try {
+        const questService = require('../services/questService');
+        newlyCompletedQuests = await questService.trackProgress(userId, 'witness_approve');
+      } catch (err) {
+        console.error('[witnessDecision] QuestService tracking error:', err);
+      }
     }
 
-    res.status(200).json({ message: `Решение свидетеля: ${action}`, transaction: result, newlyAwarded });
+    res.status(200).json({ message: `Решение свидетеля: ${action}`, transaction: result, newlyAwarded, newlyCompletedQuests });
   } catch (error) {
     console.error('[witnessDecision]', error);
     res.status(500).json({ error: error.message || 'Ошибка при обработке решения свидетеля' });
@@ -491,9 +499,22 @@ async function submitPaymentProof(req, res) {
         note: result.note
       });
 
+      let newlyCompletedQuests = [];
+      try {
+        const questService = require('../services/questService');
+        const q1 = await questService.trackProgress(result.tx.debtor, 'repay_debt');
+        let q2 = [];
+        if (!result.isOverdue) {
+          q2 = await questService.trackProgress(result.tx.debtor, 'repay_on_time');
+        }
+        newlyCompletedQuests = [...q1, ...q2];
+      } catch (err) {
+        console.error('[submitPaymentProof] QuestService tracking error:', err);
+      }
+
       return res.status(200).json({
         message:   'Долг полностью оплачен! 🎉',
-        fullyPaid: true, note: result.note, transaction: result.tx, newlyAwarded
+        fullyPaid: true, note: result.note, transaction: result.tx, newlyAwarded, newlyCompletedQuests
       });
     } else {
       const remainingAfter = Math.max(0, result.currentAmount - result.tx.paidAmount);
@@ -567,9 +588,17 @@ async function forgiveDebt(req, res) {
     if (tx.creditor.telegramId) tg.sendMessage(notifyText, tx.creditor.telegramId);
     tg.sendMessage(notifyText);
 
+    let newlyCompletedQuests = [];
+    try {
+      const questService = require('../services/questService');
+      newlyCompletedQuests = await questService.trackProgress(userId, 'forgive_debt');
+    } catch (err) {
+      console.error('[forgiveDebt] QuestService tracking error:', err);
+    }
+
     res.status(200).json({
       message:   `Долг прощён! Вы получили +${eloBonus} ELO за благородство`,
-      eloBonus, transaction: tx, newlyAwarded
+      eloBonus, transaction: tx, newlyAwarded, newlyCompletedQuests
     });
   } catch (error) {
     console.error('[forgiveDebt]', error);
@@ -691,7 +720,28 @@ async function confirmDebt(req, res) {
     if (result.debtor.telegramId)   tg.sendMessage(text, result.debtor.telegramId);
     if (result.creditor.telegramId) tg.sendMessage(text, result.creditor.telegramId);
 
-    res.status(200).json({ message: 'Долг успешно подтверждён!', transaction: result, newlyAwarded });
+    let newlyCompletedQuests = [];
+    try {
+      const questService = require('../services/questService');
+      if (userId.toString() === result.creditor._id.toString()) {
+        if (result.originalAmount >= 2000) {
+          const q1 = await questService.trackProgress(result.creditor._id, 'lend_amount_2000');
+          newlyCompletedQuests = [...newlyCompletedQuests, ...q1];
+        }
+        const q2 = await questService.trackProgress(result.creditor._id, 'lend_to_specific_user', 1, { targetUserId: result.debtor._id });
+        newlyCompletedQuests = [...newlyCompletedQuests, ...q2];
+      }
+      if (userId.toString() === result.debtor._id.toString()) {
+        if (result.originalAmount >= 10000) {
+          const q3 = await questService.trackProgress(result.debtor._id, 'borrow_amount_10000');
+          newlyCompletedQuests = [...newlyCompletedQuests, ...q3];
+        }
+      }
+    } catch (err) {
+      console.error('[confirmDebt] QuestService tracking error:', err);
+    }
+
+    res.status(200).json({ message: 'Долг успешно подтверждён!', transaction: result, newlyAwarded, newlyCompletedQuests });
   } catch (error) {
     console.error('[confirmDebt]', error);
     res.status(500).json({ error: error.message || 'Ошибка подтверждения долга' });

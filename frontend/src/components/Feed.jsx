@@ -19,6 +19,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
   // Сборы (Котлы) и Квесты
   const [funds, setFunds] = useState([]);
   const [quests, setQuests] = useState([]);
+  const [weeklyQuests, setWeeklyQuests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [feedError, setFeedError] = useState('');
   const [feedSuccess, setFeedSuccess] = useState('');
@@ -35,14 +36,16 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
   const fetchFeedData = async () => {
     try {
       setLoading(true);
-      const [postsList, fundsList, questsList] = await Promise.all([
+      const [postsList, fundsList, questsList, weeklyList] = await Promise.all([
         api.request('/posts'),
         api.request('/fund'),
-        api.request('/quests')
+        api.request('/quests'),
+        api.getWeeklyQuests()
       ]);
       setPosts(postsList);
       setFunds(fundsList);
       setQuests(questsList);
+      setWeeklyQuests(weeklyList);
     } catch (err) {
       console.error(err);
       setFeedError('Не удалось загрузить данные сообщества');
@@ -707,6 +710,54 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
       {/* ── ПРАВАЯ КОЛОНКА: Лидерборд + Друзья (col-span-4) ── */}
       <div className="lg:col-span-4 space-y-6">
         
+        {/* Виджет Еженедельных заданий */}
+        <div className={activeMobileTab === 'leaderboard' ? 'block' : 'hidden lg:block'}>
+          <div className="bg-[#151c2c] border border-amber-500/20 rounded-2xl p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+              <h3 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <span>📅</span> Еженедельные задания
+              </h3>
+              <span className="text-[9px] text-gray-500 font-bold">Обновление каждый Пн</span>
+            </div>
+
+            <div className="space-y-3">
+              {weeklyQuests.map((quest) => {
+                const percent = Math.min(100, Math.round((quest.current_value / quest.target_value) * 100));
+                return (
+                  <div key={quest._id} className="p-3 bg-black/20 border border-gray-850 rounded-xl space-y-2">
+                    <div className="flex justify-between items-start gap-2">
+                      <div>
+                        <div className="font-bold text-gray-200 text-xs">{quest.meta_data?.title || quest.task_type}</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">{quest.meta_data?.description || ''}</div>
+                      </div>
+                      <span className="text-[10px] text-amber-400 font-extrabold shrink-0">
+                        +{quest.reward_karma} ✧
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-gradient-to-r from-amber-500 to-orange-400 h-full" style={{ width: `${percent}%` }} />
+                      </div>
+                      <div className="flex justify-between text-[9px] text-gray-500">
+                        <span>Прогресс: {quest.current_value} / {quest.target_value}</span>
+                        {quest.is_completed ? (
+                          <span className="text-emerald-400 font-bold">Выполнено</span>
+                        ) : (
+                          <span className="text-amber-500 font-bold">Активно</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {weeklyQuests.length === 0 && (
+                <p className="text-[10px] text-gray-500 text-center py-4">Нет активных заданий.</p>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Виджет Лидерборда */}
         <div className={activeMobileTab === 'leaderboard' ? 'block' : 'hidden lg:block'}>
           <Leaderboard 

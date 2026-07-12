@@ -54,6 +54,7 @@ export const api = {
   getUsers:       ()              => request('/users'),
   getLeaderboard: ()              => request('/leaderboard'),
   transferKarma:  (toUserId, amount) => request('/users/transfer', { method: 'POST', body: JSON.stringify({ toUserId, amount }) }),
+  getWeeklyQuests:()              => request('/users/me/weekly-quests'),
 
   // Администрирование
   adjustKarma:    (userId, amount, reason) => request(`/admin/users/${userId}/adjust-karma`, { method: 'POST', body: JSON.stringify({ amount, reason }) }),
