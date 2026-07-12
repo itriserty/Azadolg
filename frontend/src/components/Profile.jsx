@@ -55,6 +55,27 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
   const [transferLoading, setTransferLoading] = useState(false);
   const [transferError, setTransferError] = useState('');
 
+  // История баланса (Elo/Karma)
+  const [balanceHistory, setBalanceHistory] = useState([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const fetchBalanceHistory = async (page = 1) => {
+    try {
+      setHistoryLoading(true);
+      const data = await api.request(`/users/me/balance-history?page=${page}&limit=10`);
+      setBalanceHistory(data.logs || []);
+      setHistoryPage(data.pagination?.page || 1);
+      setHistoryTotalPages(data.pagination?.pages || 1);
+    } catch (err) {
+      console.error('Ошибка загрузки истории баланса:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+
   const getAchievementProgress = (ach) => {
     if (!profileData || !profileData.user) return 0;
     const user = profileData.user;
@@ -108,6 +129,13 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
       fetchProfile();
     }
   }, [targetUserId]);
+
+  useEffect(() => {
+    if (activeTab === 'balance_history' && isSelf) {
+      fetchBalanceHistory(1);
+    }
+  }, [activeTab, isSelf]);
+
 
   const isSelf = currentUser && currentUser._id === targetUserId;
 
@@ -462,11 +490,12 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
           <div className="flex flex-wrap gap-2 border-b border-gray-800/60 pb-3 mt-4">
             {[
               { id: 'debts', label: 'История долгов', icon: DollarSign },
+              isSelf && { id: 'balance_history', label: 'История рейтинга', icon: Coins },
               { id: 'inventory', label: 'Инвентарь', icon: Award },
               { id: 'achievements', label: 'Достижения', icon: Trophy },
               { id: 'friends', label: `Друзья (${user.friends?.length || 0})`, icon: Users },
               { id: 'comments', label: 'Стена', icon: MessageSquare }
-            ].map(tab => {
+            ].filter(Boolean).map(tab => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
               return (
@@ -485,6 +514,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
               );
             })}
           </div>
+
 
           {/* Контент активной вкладки */}
           <div className="mt-4">
@@ -802,7 +832,76 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
               </div>
             )}
 
+            {activeTab === 'balance_history' && isSelf && (
+              <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-5">
+                <h2 className="text-sm font-black flex items-center gap-1.5 uppercase tracking-wider text-cyan-400 mb-4">
+                  <Coins className="w-4 h-4 text-cyan-400" />
+                  История рейтинга и транзакций
+                </h2>
+
+                {historyLoading ? (
+                  <div className="text-center py-8 text-xs text-gray-500">Загрузка истории...</div>
+                ) : balanceHistory.length > 0 ? (
+                  <div className="space-y-3">
+                    {balanceHistory.map((log) => {
+                      const isPositive = log.amount >= 0;
+                      const badgeColor = isPositive ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10';
+                      const badgePrefix = isPositive ? '+' : '';
+                      const currencySymbol = log.currency === 'elo' ? 'ELO' : '✧ Кармы';
+                      
+                      return (
+                        <div key={log._id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-black/20 border border-gray-850 hover:border-gray-800 transition rounded-xl gap-2">
+                          <div className="flex items-start sm:items-center gap-3">
+                            <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${isPositive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                              {log.currency === 'elo' ? 'E' : 'K'}
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-gray-205">{log.description}</p>
+                              <p className="text-[10px] text-gray-500 mt-0.5">
+                                {new Date(log.created_at).toLocaleString('ru-RU')}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 self-end sm:self-center">
+                            <span className={`text-xs font-black px-2.5 py-1 rounded-lg uppercase tracking-wider ${badgeColor}`}>
+                              {badgePrefix}{log.amount} {currencySymbol}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Пагинация */}
+                    {historyTotalPages > 1 && (
+                      <div className="flex justify-center items-center gap-2 mt-4 pt-2">
+                        <button
+                          disabled={historyPage === 1}
+                          onClick={() => fetchBalanceHistory(historyPage - 1)}
+                          className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-gray-800 text-gray-300 rounded-lg text-[10px] font-bold uppercase transition"
+                        >
+                          Назад
+                        </button>
+                        <span className="text-[10px] text-gray-500 font-bold">
+                          {historyPage} / {historyTotalPages}
+                        </span>
+                        <button
+                          disabled={historyPage === historyTotalPages}
+                          onClick={() => fetchBalanceHistory(historyPage + 1)}
+                          className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-gray-800 text-gray-300 rounded-lg text-[10px] font-bold uppercase transition"
+                        >
+                          Вперед
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 text-center py-8">История начислений пока пуста.</p>
+                )}
+              </div>
+            )}
+
             {activeTab === 'comments' && (
+
               <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-5">
                 <h2 className="text-sm font-black flex items-center gap-1.5 uppercase tracking-wider text-cyan-400 mb-4">
                   <MessageSquare className="w-4 h-4 text-cyan-400" />

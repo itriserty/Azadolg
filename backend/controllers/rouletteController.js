@@ -126,6 +126,8 @@ async function spin(req, res) {
     user.karma -= tier.cost;
     // 2. Зачисляем выигрыш (даже если 0 — транзакция всё равно фиксируется)
     user.karma += prize.win;
+    user._karmaReason = 'roulette_spin';
+
 
     // ── Джекпот-пул: 30% от ставки уходит в пул (house edge = 30%) ──────────
     const jackpotContrib = Math.floor(tier.cost * 0.30);

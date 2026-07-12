@@ -163,15 +163,20 @@ async function createDebt(req, res) {
       });
     }
 
+    const newlyCompletedQuests = [];
     const newlyAwarded = await achievementService.emit('debt_created', {
       creditorId: transaction.creditor,
       debtorId: transaction.debtor,
       amount: Number(amount),
-      hasWitness: !!cleanWitnessId
+      hasWitness: !!cleanWitnessId,
+      debt: transaction,
+      newlyCompletedQuests
     });
     const txObj = transaction.toObject();
     txObj.newlyAwarded = newlyAwarded;
+    txObj.newlyCompletedQuests = newlyCompletedQuests;
     res.status(201).json(txObj);
+
   } catch (error) {
     console.error('[createDebt]', error);
     res.status(500).json({ error: error.message || 'Ошибка создания долга' });
@@ -411,6 +416,10 @@ async function submitPaymentProof(req, res) {
           if (debtor) {
             debtor.eloRating = Math.max(100, debtor.eloRating + debtorElo);
             debtor.karma     += karmaReward;
+            debtor._eloReason = 'debt_repaid';
+            debtor._eloRelatedEntityId = tx._id;
+            debtor._karmaReason = 'debt_repaid';
+            debtor._karmaRelatedEntityId = tx._id;
             if (!isOverdue) { debtor.winStreak++; debtor.stats.debtsPaidOnTime++; }
             else              debtor.winStreak = 0;
             debtor.stats.totalDebtsPaid++;
@@ -435,9 +444,13 @@ async function submitPaymentProof(req, res) {
               }
             } else {
               creditor.eloRating = Math.max(100, creditor.eloRating + finalCreditorElo);
+              creditor._eloReason = 'debt_repaid';
+              creditor._eloRelatedEntityId = tx._id;
               if (creditorKarma > 0) {
                 creditor.karma += creditorKarma;
                 creditor.stats.totalKarmaEarned += creditorKarma;
+                creditor._karmaReason = 'debt_repaid';
+                creditor._karmaRelatedEntityId = tx._id;
               }
             }
           }
@@ -572,8 +585,11 @@ async function forgiveDebt(req, res) {
       if (creditor) {
         creditor.eloRating += eloBonus;
         creditor.stats.totalDebtsForgivenByMe = (creditor.stats.totalDebtsForgivenByMe || 0) + 1;
+        creditor._eloReason = 'debt_repaid';
+        creditor._eloRelatedEntityId = tx._id;
         await creditor.save({ session });
       }
+
       return { tx, eloBonus };
     });
 
@@ -694,8 +710,11 @@ async function confirmDebt(req, res) {
       const creditor = await User.findById(tx.creditor._id).session(session);
       if (creditor) {
         creditor.eloRating += eloReward;
+        creditor._eloReason = 'debt_issued';
+        creditor._eloRelatedEntityId = tx._id;
         await creditor.save({ session });
       }
+
 
       await tx.save({ session });
 

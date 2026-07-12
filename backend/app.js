@@ -34,6 +34,9 @@ const achievementObserver = require('./services/AchievementObserver');
 // Инициализируем наблюдатель за достижениями
 achievementObserver.init();
 
+// Загружаем модель логирования баланса
+require('./models/BalanceLog');
+
 const { getLeaderboard } = require('./controllers/userController');
 const { openCase }       = require('./controllers/caseController');
 

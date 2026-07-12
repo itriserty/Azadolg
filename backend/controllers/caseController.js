@@ -137,7 +137,10 @@ async function openCase(req, res) {
       }
     }
 
+    user._karmaReason = 'case_open';
+    user._eloReason = 'case_open';
     await user.save();
+
 
     // 📣 Telegram: уведомление об открытии кейса
     tg.notifyCase({

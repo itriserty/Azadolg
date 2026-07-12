@@ -9,7 +9,7 @@ const { RARITY_KARMA } = require('../utils/achievementHelper');
 
 class AchievementObserver {
   init() {
-    achievementService.on('debt_created', async ({ creditorId, debtorId, amount, hasWitness, isConfirmed, resultsRef }) => {
+    achievementService.on('debt_created', async ({ creditorId, debtorId, amount, hasWitness, isConfirmed, debt, newlyCompletedQuests, resultsRef }) => {
       try {
         // 1. active_debts_count (for debtor)
         await this.processProgress(debtorId, 'active_debts_count', async () => {
@@ -25,6 +25,16 @@ class AchievementObserver {
         if (amount > 5000 && !hasWitness) {
           await this.processProgress(creditorId, 'blind_kitten', async () => 1, resultsRef);
         }
+
+        // 4. еженедельные задания для кредитора
+        if (creditorId) {
+          const questService = require('./questService');
+          const quests = await questService.trackProgress(creditorId, 'lend_to_specific_user', 1, { debt });
+          if (newlyCompletedQuests && quests && quests.length > 0) {
+            newlyCompletedQuests.push(...quests);
+          }
+        }
+
 
         // Создаем системный пост в ленту при подтверждении долга
         if (isConfirmed) {
@@ -195,8 +205,9 @@ class AchievementObserver {
           const karmaReward = RARITY_KARMA[rarityKey] || 0;
 
           if (karmaReward > 0) {
-            user.karma = (user.karma || 0) + karmaReward;
+            user.replenishBalance('karma', karmaReward, 'achievement_unlocked', ach._id);
           }
+
 
           // Выдаем ачивку
           user.achievements.push({ achievement: ach._id, earnedAt: new Date() });

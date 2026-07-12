@@ -201,11 +201,15 @@ async function trackProgress(userId, taskType, increment = 1, checkMeta = {}) {
 
     for (const task of tasks) {
       if (taskType === 'lend_to_specific_user') {
-        const targetUserId = checkMeta.targetUserId;
-        if (!targetUserId || task.meta_data.targetUserId?.toString() !== targetUserId.toString()) {
+        const targetUserId = task.meta_data?.targetUserId || task.target_value;
+        const debt = checkMeta.debt;
+        const debtorId = debt ? (debt.debtorId || debt.debtor) : checkMeta.targetUserId;
+        
+        if (!targetUserId || !debtorId || targetUserId.toString() !== debtorId.toString()) {
           continue;
         }
       }
+
 
       await runInTransaction(async (session) => {
         const activeTask = await UserTask.findById(task._id).session(session);
@@ -220,9 +224,10 @@ async function trackProgress(userId, taskType, increment = 1, checkMeta = {}) {
           // Award reward_karma
           const user = await User.findById(userId).session(session);
           if (user) {
-            user.karma = (user.karma || 0) + activeTask.reward_karma;
+            user.replenishBalance('karma', activeTask.reward_karma, 'quest_completed', activeTask._id);
             user.stats.totalKarmaEarned = (user.stats.totalKarmaEarned || 0) + activeTask.reward_karma;
             await user.save({ session });
+
 
             // Create system transaction
             const Transaction = require('../models/Transaction');

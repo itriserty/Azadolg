@@ -106,8 +106,14 @@ async function buyMarketItem(req, res) {
 
     // Переводим Карму
     buyer.karma -= marketItem.price;
+    buyer._karmaReason = 'item_purchase';
+    buyer._karmaRelatedEntityId = marketItem._id;
+    
     seller.karma += marketItem.price;
     seller.stats.totalKarmaEarned += marketItem.price;
+    seller._karmaReason = 'item_purchase';
+    seller._karmaRelatedEntityId = marketItem._id;
+
 
     // Переносим предмет покупателю в инвентарь
     let buyerInv = await Inventory.findOne({ userId: buyerId, itemId: marketItem.itemId });

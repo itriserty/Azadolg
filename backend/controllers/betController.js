@@ -47,7 +47,10 @@ async function placeBet(req, res) {
 
     // Списываем ставку
     user.karma -= wager;
+    user._karmaReason = 'roulette_spin';
+    user._karmaRelatedEntityId = debt._id;
     await user.save();
+
 
     const newBet = new Bet({
       debtId,
@@ -112,9 +115,15 @@ async function resolveBetsForDebt(debtId, isOverdue, session = null) {
         systemState.jackpotPool += commission;
 
         // Начисляем выигрыш
-        await User.findByIdAndUpdate(bet.better._id, {
-          $inc: { karma: netWin, 'stats.totalKarmaEarned': netWin - bet.wager }
-        }, { session });
+        const betterUser = await User.findById(bet.better._id).session(session);
+        if (betterUser) {
+          betterUser.karma = (betterUser.karma || 0) + netWin;
+          betterUser.stats.totalKarmaEarned = (betterUser.stats.totalKarmaEarned || 0) + (netWin - bet.wager);
+          betterUser._karmaReason = 'roulette_spin';
+          betterUser._karmaRelatedEntityId = bet.debtId;
+          await betterUser.save({ session });
+        }
+
 
         bet.status = 'won';
         await bet.save({ session });

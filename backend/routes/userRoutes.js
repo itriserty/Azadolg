@@ -3,7 +3,7 @@ const router = express.Router();
 const {
   getUsers, getLeaderboard, addFriend, updateTelegramId, updateAvatar,
   getUserProfile, toggleProfilePrivacy, updateShowcase, addProfileComment, deleteProfileComment,
-  transferKarma, getWeeklyQuests
+  transferKarma, getWeeklyQuests, getBalanceHistory
 } = require('../controllers/userController');
 const { register, login, getMe, forgotPassword, resetPassword } = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
@@ -15,8 +15,10 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.get('/me', authMiddleware, getMe);
 router.get('/me/weekly-quests', authMiddleware, getWeeklyQuests);
+router.get('/me/balance-history', authMiddleware, getBalanceHistory);
 router.put('/telegram', authMiddleware, updateTelegramId);
 router.put('/avatar', authMiddleware, uploadAvatarMiddleware, updateAvatar);
+
 
 router.get('/', authMiddleware, getUsers);
 router.get('/leaderboard', authMiddleware, getLeaderboard);

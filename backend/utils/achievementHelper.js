@@ -81,8 +81,9 @@ async function checkAndAward(userId, triggerType, currentValue = null) {
         const karmaReward = RARITY_KARMA[rarityKey] || 0;
 
         if (karmaReward > 0) {
-          user.karma = (user.karma || 0) + karmaReward;
+          user.replenishBalance('karma', karmaReward, 'achievement_unlocked', ach._id);
         }
+
 
         // Выдаем ачивку
         user.achievements.push({ achievement: ach._id, earnedAt: new Date() });

@@ -548,11 +548,17 @@ async function transferKarma(req, res) {
 
       // Обновляем балансы
       sender.karma -= amount;
+      sender._karmaReason = 'transfer_sent';
+      sender._karmaRelatedEntityId = recipient._id;
+      
       const receivedAmount = Math.floor(amount * 0.9);
       recipient.karma = (recipient.karma || 0) + receivedAmount;
+      recipient._karmaReason = 'transfer_received';
+      recipient._karmaRelatedEntityId = sender._id;
 
       await sender.save({ session });
       await recipient.save({ session });
+
 
       const Transaction = require('../models/Transaction');
       
@@ -699,6 +705,179 @@ async function getWeeklyQuests(req, res) {
   }
 }
 
+async function getBalanceHistory(req, res) {
+  try {
+    const userId = req.user;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+
+    const BalanceLog = require('../models/BalanceLog');
+    const Transaction = require('../models/Transaction');
+    const UserTask = require('../models/UserTask');
+    const Achievement = require('../models/Achievement');
+    const User = require('../models/User');
+
+    const total = await BalanceLog.countDocuments({ user_id: userId });
+    const logs = await BalanceLog.find({ user_id: userId })
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    // Bulk fetch related entities to build descriptions
+    const debtIds = [];
+    const taskIds = [];
+    const achievementIds = [];
+    const userIds = [];
+
+    logs.forEach(log => {
+      if (log.related_entity_id) {
+        const refId = log.related_entity_id;
+        if (['debt_issued', 'debt_repaid', 'debt_paid', 'overdue_penalty'].includes(log.reason)) {
+          debtIds.push(refId);
+        } else if (log.reason === 'quest_completed') {
+          taskIds.push(refId);
+        } else if (log.reason === 'achievement_unlocked') {
+          achievementIds.push(refId);
+        } else if (['transfer_sent', 'transfer_received'].includes(log.reason)) {
+          userIds.push(refId);
+        }
+      }
+    });
+
+    const [debts, tasks, achievements, users] = await Promise.all([
+      Transaction.find({ _id: { $in: debtIds } }).populate('creditor debtor', 'name username'),
+      UserTask.find({ _id: { $in: taskIds } }),
+      Achievement.find({ _id: { $in: achievementIds } }),
+      User.find({ _id: { $in: userIds } }, 'name username')
+    ]);
+
+    const debtMap = new Map(debts.map(d => [d._id.toString(), d]));
+    const taskMap = new Map(tasks.map(t => [t._id.toString(), t]));
+    const achievementMap = new Map(achievements.map(a => [a._id.toString(), a]));
+    const userMap = new Map(users.map(u => [u._id.toString(), u]));
+
+    const formattedLogs = logs.map(log => {
+      let description = 'Изменение баланса';
+      const refIdStr = log.related_entity_id ? log.related_entity_id.toString() : '';
+
+      switch (log.reason) {
+        case 'debt_issued': {
+          const debt = debtMap.get(refIdStr);
+          if (debt) {
+            const isCreditor = debt.creditor?._id?.toString() === userId.toString();
+            const otherUser = isCreditor ? debt.debtor : debt.creditor;
+            description = isCreditor 
+              ? `Выдача долга пользователю @${otherUser?.username || 'user'}`
+              : `Получение долга от пользователя @${otherUser?.username || 'user'}`;
+          } else {
+            description = 'Выдача/получение долга';
+          }
+          break;
+        }
+        case 'debt_repaid':
+        case 'debt_paid': {
+          const debt = debtMap.get(refIdStr);
+          if (debt) {
+            const isCreditor = debt.creditor?._id?.toString() === userId.toString();
+            const otherUser = isCreditor ? debt.debtor : debt.creditor;
+            description = isCreditor 
+              ? `Получена оплата долга от пользователя @${otherUser?.username || 'user'}`
+              : `Погашен долг перед пользователем @${otherUser?.username || 'user'}`;
+          } else {
+            description = 'Погашение долга';
+          }
+          break;
+        }
+        case 'quest_completed': {
+          const task = taskMap.get(refIdStr);
+          description = task 
+            ? `Выполнение еженедельного квеста: "${task.meta_data?.title || task.task_type}"`
+            : 'Выполнение еженедельного квеста';
+          break;
+        }
+        case 'achievement_unlocked': {
+          const ach = achievementMap.get(refIdStr);
+          description = ach 
+            ? `Получено достижение: ${ach.emoji || '🏆'} ${ach.title}`
+            : 'Получено достижение';
+          break;
+        }
+        case 'transfer_sent': {
+          const otherUser = userMap.get(refIdStr);
+          description = otherUser 
+            ? `Перевод кармы пользователю @${otherUser.username}`
+            : 'Перевод кармы';
+          break;
+        }
+        case 'transfer_received': {
+          const otherUser = userMap.get(refIdStr);
+          description = otherUser 
+            ? `Получен перевод кармы от пользователя @${otherUser.username}`
+            : 'Получен перевод кармы';
+          break;
+        }
+        case 'roulette_spin':
+          description = 'Игра в рулетку';
+          break;
+        case 'overdue_penalty': {
+          const debt = debtMap.get(refIdStr);
+          description = debt 
+            ? `Штраф за просрочку долга перед @${debt.creditor?.username || 'пользователем'}`
+            : 'Штраф за просрочку долга';
+          break;
+        }
+        case 'weekly_bonus':
+          description = 'Еженедельная Карма по ELO';
+          break;
+        case 'weekly_decay':
+          description = 'Списание Кармы за неактивность';
+          break;
+        case 'admin_adjustment':
+          description = 'Корректировка баланса администратором';
+          break;
+        case 'duel_result':
+          description = 'Результат дуэли';
+          break;
+        case 'jackpot_win':
+          description = 'Выигрыш в еженедельном джекпоте';
+          break;
+        case 'case_open':
+          description = 'Открытие кейса';
+          break;
+        case 'item_purchase':
+          description = 'Покупка товара в магазине';
+          break;
+        case 'battlepass_reward':
+          description = 'Награда Battle Pass';
+          break;
+      }
+
+      return {
+        _id: log._id,
+        currency: log.currency,
+        amount: log.amount,
+        reason: log.reason,
+        created_at: log.created_at,
+        description
+      };
+    });
+
+    res.status(200).json({
+      logs: formattedLogs,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('[getBalanceHistory] Ошибка:', error);
+    res.status(500).json({ error: 'Ошибка сервера при получении истории баланса' });
+  }
+}
+
 module.exports = {
   getUsers,
   getLeaderboard,
@@ -712,5 +891,7 @@ module.exports = {
   addProfileComment,
   deleteProfileComment,
   transferKarma,
-  getWeeklyQuests
+  getWeeklyQuests,
+  getBalanceHistory
 };
+

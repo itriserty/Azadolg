@@ -105,11 +105,87 @@ const UserSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// ── Middleware для автоматической проверки негативной кармы ────────────────────
+// ── Метод для унифицированного изменения баланса ──────────────────────────────
+UserSchema.methods.replenishBalance = function(currency, amount, reason, relatedEntityId = null) {
+  if (currency === 'elo') {
+    this.eloRating = (this.eloRating || 1000) + amount;
+    if (this.eloRating < 100) this.eloRating = 100;
+    this._eloReason = reason;
+    this._eloRelatedEntityId = relatedEntityId;
+    if (!this._balanceLogs) this._balanceLogs = [];
+    this._balanceLogs.push({
+      currency: 'elo',
+      amount,
+      reason,
+      related_entity_id: relatedEntityId
+    });
+  } else if (currency === 'karma') {
+    this.karma = (this.karma || 0) + amount;
+    this._karmaReason = reason;
+    this._karmaRelatedEntityId = relatedEntityId;
+    if (!this._balanceLogs) this._balanceLogs = [];
+    this._balanceLogs.push({
+      currency: 'karma',
+      amount,
+      reason,
+      related_entity_id: relatedEntityId
+    });
+  }
+};
+
+// Сохраняем исходные значения при инициализации документа из базы данных
+UserSchema.post('init', function(doc) {
+  doc._originalElo = doc.eloRating;
+  doc._originalKarma = doc.karma;
+});
+
+// ── Middleware для автоматической проверки негативной кармы и изменений баланса ────────────────────
 UserSchema.pre('save', function(next) {
   if (this.isModified('karma') && this.karma < 0) {
     this._karmaDroppedNegative = true;
   }
+
+  if (!this._balanceLogs) {
+    this._balanceLogs = [];
+  }
+
+  const originalElo = this._originalElo !== undefined ? this._originalElo : 1000;
+  const originalKarma = this._originalKarma !== undefined ? this._originalKarma : 200;
+
+  if (this.isModified('eloRating')) {
+    const diff = this.eloRating - originalElo;
+    if (diff !== 0) {
+      const alreadyLogged = this._balanceLogs.some(log => log.currency === 'elo' && log.amount === diff);
+      if (!alreadyLogged) {
+        this._balanceLogs.push({
+          currency: 'elo',
+          amount: diff,
+          reason: this._eloReason || 'other',
+          related_entity_id: this._eloRelatedEntityId || null
+        });
+      }
+    }
+  }
+
+  if (this.isModified('karma')) {
+    const diff = this.karma - originalKarma;
+    if (diff !== 0) {
+      const alreadyLogged = this._balanceLogs.some(log => log.currency === 'karma' && log.amount === diff);
+      if (!alreadyLogged) {
+        this._balanceLogs.push({
+          currency: 'karma',
+          amount: diff,
+          reason: this._karmaReason || 'other',
+          related_entity_id: this._karmaRelatedEntityId || null
+        });
+      }
+    }
+  }
+
+  // Обновляем оригинальные значения
+  this._originalElo = this.eloRating;
+  this._originalKarma = this.karma;
+
   next();
 });
 
@@ -121,6 +197,25 @@ UserSchema.post('save', function(doc) {
       console.error('[UserSchema post-save] Ошибка вызова AchievementService:', err);
     });
   }
+
+  if (doc._balanceLogs && doc._balanceLogs.length > 0) {
+    const BalanceLog = mongoose.model('BalanceLog');
+    const logs = doc._balanceLogs.map(log => ({
+      user_id: doc._id,
+      currency: log.currency,
+      amount: log.amount,
+      reason: log.reason,
+      related_entity_id: log.related_entity_id
+    }));
+
+    // Очищаем локальный список изменений
+    doc._balanceLogs = [];
+
+    BalanceLog.insertMany(logs).catch(err => {
+      console.error('[UserSchema post-save] Ошибка сохранения balance_logs:', err);
+    });
+  }
 });
 
 module.exports = mongoose.model('User', UserSchema);
+

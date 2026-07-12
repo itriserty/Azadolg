@@ -20,10 +20,6 @@ async function createQuest(req, res) {
         error: `Недостаточно Кармы. Нужно: ${bounty} ₸, у вас: ${creator.karma} ₸`
       });
 
-    // Эскроу: списываем bounty сразу
-    creator.karma -= bounty;
-    await creator.save();
-
     const max = Math.max(1, Math.min(20, Number(maxParticipants) || 1));
 
     const quest = new Quest({
@@ -36,7 +32,14 @@ async function createQuest(req, res) {
       dueDate:         dueDate ? new Date(dueDate) : null,
       status:          'available'
     });
+
+    // Эскроу: списываем bounty сразу
+    creator.karma -= bounty;
+    creator._karmaReason = 'quest_completed';
+    creator._karmaRelatedEntityId = quest._id;
+    await creator.save();
     await quest.save();
+
 
     tg.sendMessage(
       `🎯 <b>Новое задание на доске квестов!</b>\n\n` +
@@ -163,8 +166,10 @@ async function verifyQuest(req, res) {
         if (!participant) return;
         participant.karma                    += perPerson;
         participant.stats.totalKarmaEarned   += perPerson;
+        participant._karmaReason             = 'quest_completed';
+        participant._karmaRelatedEntityId    = quest._id;
         await addXP(participant, 20);
-        // await participant.save() уже внутри addXP
+
 
         if (participant.telegramId) {
           tg.sendMessage(
@@ -223,8 +228,11 @@ async function cancelQuest(req, res) {
     const creator = await User.findById(userId);
     if (creator) {
       creator.karma += quest.bounty;
+      creator._karmaReason = 'quest_completed';
+      creator._karmaRelatedEntityId = quest._id;
       await creator.save();
     }
+
 
     quest.status = 'cancelled';
     await quest.save();

@@ -232,7 +232,9 @@ async function grantKarma(req, res) {
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
 
     user.karma += Number(amount);
+    user._karmaReason = 'admin_adjustment';
     await user.save();
+
 
     await logAction(adminId, 'manual_karma_grant', id, 'User', reason, { amount });
     res.status(200).json({ message: `+${amount} Кармы начислено ${user.name}`, newKarma: user.karma });
@@ -390,6 +392,7 @@ async function adjustKarma(req, res) {
 
     user.karma = (user.karma || 0) + numAmount;
     if (user.karma < 0) user.karma = 0;
+    user._karmaReason = 'admin_adjustment';
     
     await user.save();
 
@@ -417,8 +420,10 @@ async function adjustElo(req, res) {
 
     user.eloRating = (user.eloRating || 1000) + numAmount;
     if (user.eloRating < 0) user.eloRating = 0;
+    user._eloReason = 'admin_adjustment';
     
     await user.save();
+
 
     await logAction(adminId, 'manual_elo_adjust', id, 'User', reason || 'Корректировка ELO', { amount: numAmount });
     res.status(200).json({ message: `Рейтинг ELO изменен на ${numAmount}. Текущий: ${user.eloRating}`, newElo: user.eloRating });

@@ -138,12 +138,18 @@ async function respondToDuel(req, res) {
       winner.karma += netWin;
       winner.stats.totalKarmaEarned += netWin;
 
+      winner._karmaReason = 'duel_result';
+      winner._karmaRelatedEntityId = duel._id;
+      loser._karmaReason = 'duel_result';
+      loser._karmaRelatedEntityId = duel._id;
+
       // Отправляем комиссию в Джекпот
       const systemState = await getOrCreateSystemState();
       systemState.jackpotPool += commission;
       await systemState.save();
 
       await Promise.all([winner.save(), loser.save()]);
+
       duelResult = `🪙 Победитель получил <b>+${netWin} ₸ Кармы</b> (с учетом комиссии 1% в Джекпот: ${commission} ₸)`;
     }
 

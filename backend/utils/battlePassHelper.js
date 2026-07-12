@@ -14,7 +14,7 @@ async function grantBattlePassReward(user, level) {
       );
       rewardText = 'Неоново-Голубая Рамка';
     } else if (level === 3) {
-      user.eloRating += 20;
+      user.replenishBalance('elo', 20, 'battlepass_reward');
       rewardText = '+20 ELO-рейтинга';
     } else if (level === 4) {
       await Inventory.findOneAndUpdate(
@@ -24,7 +24,7 @@ async function grantBattlePassReward(user, level) {
       );
       rewardText = 'Скин Vaporwave';
     } else if (level === 5) {
-      user.karma += 150;
+      user.replenishBalance('karma', 150, 'battlepass_reward');
       rewardText = '+150 ₸ Кармы';
     } else if (level === 6) {
       await Inventory.findOneAndUpdate(
@@ -34,7 +34,7 @@ async function grantBattlePassReward(user, level) {
       );
       rewardText = 'Неоново-Красная Рамка';
     } else if (level === 7) {
-      user.eloRating += 50;
+      user.replenishBalance('elo', 50, 'battlepass_reward');
       rewardText = '+50 ELO-рейтинга';
     } else if (level === 8) {
       await Inventory.findOneAndUpdate(
@@ -44,7 +44,7 @@ async function grantBattlePassReward(user, level) {
       );
       rewardText = 'Скин Матрица';
     } else if (level === 9) {
-      user.karma += 300;
+      user.replenishBalance('karma', 300, 'battlepass_reward');
       rewardText = '+300 ₸ Кармы';
     } else if (level === 10) {
       await Inventory.findOneAndUpdate(
@@ -53,6 +53,7 @@ async function grantBattlePassReward(user, level) {
         { upsert: true }
       );
       rewardText = 'Золотая Рамка';
+
     }
 
     if (rewardText) {

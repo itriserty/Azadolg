@@ -61,7 +61,9 @@ async function drawJackpot() {
       // Начисляем джекпот победителю
       winner.karma += jackpotAmount;
       winner.stats.totalKarmaEarned += jackpotAmount;
+      winner._karmaReason = 'jackpot_win';
       await winner.save({ session });
+
 
       // Находим admin-пользователя для записи лога транзакции
       const admin = await User.findOne({ role: 'admin' }).session(session);
@@ -236,7 +238,9 @@ async function distributeWeeklyKarma() {
           dbUser.karma = (dbUser.karma || 0) + karmaReward;
           dbUser.stats.totalKarmaEarned = (dbUser.stats.totalKarmaEarned || 0) + karmaReward;
           dbUser.stats.totalKarmaWeeklyReceived = (dbUser.stats.totalKarmaWeeklyReceived || 0) + karmaReward;
+          dbUser._karmaReason = 'weekly_bonus';
           await dbUser.save({ session });
+
           modifiedCount++;
           totalKarmaDistributed += karmaReward;
         }
@@ -271,27 +275,29 @@ async function deductWeeklyKarma() {
 
     // Находим неактивных пользователей (не заходили 30 дней и нет активных долгов)
     // Списываем у них карму (не уменьшая ниже 0)
-    const result = await User.updateMany(
-      {
-        isBanned: { $ne: true },
-        $or: [
-          { lastLoginAt: { $lt: cutoff } },
-          { lastLoginAt: null },
-          { lastLoginAt: { $exists: false } }
-        ],
-        _id: { $not: { $in: activeDebtUsers } },
-        karma: { $gt: 0 }
-      },
-      [
-        {
-          $set: {
-            karma: {
-              $max: [0, { $subtract: ["$karma", DECAY_KARMA] }]
-            }
-          }
+    const inactiveUsers = await User.find({
+      isBanned: { $ne: true },
+      $or: [
+        { lastLoginAt: { $lt: cutoff } },
+        { lastLoginAt: null },
+        { lastLoginAt: { $exists: false } }
+      ],
+      _id: { $not: { $in: activeDebtUsers } },
+      karma: { $gt: 0 }
+    });
+
+    let modifiedCount = 0;
+    await runInTransaction(async (session) => {
+      for (const u of inactiveUsers) {
+        const dbUser = await User.findById(u._id).session(session);
+        if (dbUser && dbUser.karma > 0) {
+          dbUser.karma = Math.max(0, dbUser.karma - DECAY_KARMA);
+          dbUser._karmaReason = 'weekly_decay';
+          await dbUser.save({ session });
+          modifiedCount++;
         }
-      ]
-    );
+      }
+    });
 
     // Также списываем карму у пользователей с просроченными долгами (dueDate < now)
     const now = new Date();
@@ -302,25 +308,25 @@ async function deductWeeklyKarma() {
 
     let overdueCount = 0;
     if (overdueDebts.length > 0) {
-      const overdueResult = await User.updateMany(
-        {
-          _id: { $in: overdueDebts },
-          karma: { $gt: 0 }
-        },
-        [
-          {
-            $set: {
-              karma: {
-                $max: [0, { $subtract: ["$karma", DECAY_KARMA] }]
-              }
-            }
+      const overdueUsers = await User.find({
+        _id: { $in: overdueDebts },
+        karma: { $gt: 0 }
+      });
+      await runInTransaction(async (session) => {
+        for (const u of overdueUsers) {
+          const dbUser = await User.findById(u._id).session(session);
+          if (dbUser && dbUser.karma > 0) {
+            dbUser.karma = Math.max(0, dbUser.karma - DECAY_KARMA);
+            dbUser._karmaReason = 'overdue_penalty';
+            await dbUser.save({ session });
+            overdueCount++;
           }
-        ]
-      );
-      overdueCount = overdueResult.modifiedCount;
+        }
+      });
     }
 
-    console.log(`[CronService] Еженедельное списание кармы: списано у ${result.modifiedCount} неактивных пользователей и ${overdueCount} должников с просрочкой.`);
+    console.log(`[CronService] Еженедельное списание кармы: списано у ${modifiedCount} неактивных пользователей и ${overdueCount} должников с просрочкой.`);
+
   } catch (error) {
     console.error('[CronService] Ошибка еженедельного списания Кармы:', error);
   }
@@ -368,7 +374,10 @@ async function applyDailyOverduePenalties() {
         const actualDeduction = oldElo - debtor.eloRating;
 
         if (actualDeduction > 0) {
+          debtor._eloReason = 'overdue_penalty';
+          debtor._eloRelatedEntityId = tx._id;
           await debtor.save({ session });
+
           penalisedCount++;
           totalEloPenalised += actualDeduction;
 
