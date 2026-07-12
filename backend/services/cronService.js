@@ -459,7 +459,121 @@ function startCronScheduler() {
     cleanExpiredCrowdfunds();
   });
 
-  console.log('[CronService] Планировщик cron запущен (Карма: Пн 09:00 | Джекпот: Вс 23:59 | Сезон: 1-е число месяца | Сборы: каждые 6ч | Ежедневные штрафы ELO: 00:05)');
+  // Умный шейминг должников каждый день в 00:10
+  cron.schedule('10 0 * * *', async () => {
+    await runSmartOverdueShaming();
+  });
+
+  // Агрегатор мемов: запускается дважды в день (в 08:00 и в 20:00)
+  cron.schedule('0 8,20 * * *', async () => {
+    await fetchExternalMemes();
+  });
+
+  console.log('[CronService] Планировщик cron запущен (Карма: Пн 09:00 | Джекпот: Вс 23:59 | Сезон: 1-е число месяца | Сборы: каждые 6ч | Штрафы ELO: 00:05 | Шейминг: 00:10 | Мемы: 08:00 и 20:00)');
+}
+
+async function runSmartOverdueShaming() {
+  console.log('[CronService] Запуск умного шейминга должников...');
+  try {
+    const Transaction = require('../models/Transaction');
+    const Post = require('../models/Post');
+    const User = require('../models/User');
+
+    // Ищем активные (или частично выплаченные) долги, срок выплаты которых уже прошел
+    const activeDebts = await Transaction.find({
+      status: { $in: ['active', 'partially_paid'] },
+      dueDate: { $lt: new Date() }
+    }).populate('creditor debtor');
+
+    const SHAMING_PHRASES = [
+      '3 раза посмотреть Игру Престолов',
+      'пешком дойти до Астаны',
+      'выучить основы JavaScript',
+      'построить египетскую пирамиду',
+      'дождаться выхода GTA 6',
+      'накопить на собственный остров'
+    ];
+
+    const roundDays = [7, 14, 30, 50, 100];
+    const now = new Date();
+    let publishedCount = 0;
+
+    for (const tx of activeDebts) {
+      if (!tx.debtor || !tx.creditor) continue;
+
+      // Вычисляем количество дней просрочки
+      const diffTime = now - new Date(tx.dueDate);
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      if (roundDays.includes(diffDays)) {
+        // Проверяем, не публиковался ли уже шейминг по этому долгу с таким же кол-вом дней просрочки
+        const existingShame = await Post.findOne({
+          type: 'system_shaming',
+          transactionId: tx._id,
+          content: new RegExp(`уже ${diffDays} дней`)
+        });
+
+        if (existingShame) continue;
+
+        const randomPhrase = SHAMING_PHRASES[Math.floor(Math.random() * SHAMING_PHRASES.length)];
+        const content = `Пользователь @${tx.debtor.username} не отдает долг пользователю @${tx.creditor.username} уже ${diffDays} дней. За это время можно было ${randomPhrase}.`;
+
+        const shamePost = new Post({
+          type: 'system_shaming',
+          author: tx.creditor._id,
+          targetUser: tx.debtor._id,
+          transactionId: tx._id,
+          content
+        });
+
+        await shamePost.save();
+        publishedCount++;
+      }
+    }
+
+    console.log(`[CronService] Опубликовано шейминг-постов: ${publishedCount}`);
+  } catch (error) {
+    console.error('[CronService] Ошибка умного шейминга должников:', error);
+  }
+}
+
+async function fetchExternalMemes() {
+  console.log('[CronService] Запуск агрегатора мемов...');
+  try {
+    const Post = require('../models/Post');
+    
+    // Запрос к открытому Meme API
+    const response = await fetch('https://meme-api.com/gimme/memes/3');
+    if (!response.ok) {
+      throw new Error(`Meme API returned status ${response.status}`);
+    }
+    const data = await response.json();
+    if (!data || !data.memes || !Array.isArray(data.memes)) {
+      throw new Error('Invalid response structure from Meme API');
+    }
+
+    let savedCount = 0;
+    for (const meme of data.memes) {
+      if (!meme.url || !meme.title) continue;
+
+      // Уникальность по ссылке
+      const existing = await Post.findOne({ image_url: meme.url });
+      if (existing) continue;
+
+      const newMemePost = new Post({
+        type: 'external_meme',
+        content: meme.title,
+        image_url: meme.url
+      });
+
+      await newMemePost.save();
+      savedCount++;
+    }
+
+    console.log(`[CronService] Успешно загружено и сохранено мемов: ${savedCount}`);
+  } catch (error) {
+    console.error('[CronService] Ошибка агрегатора мемов:', error.message || error);
+  }
 }
 
 async function cleanExpiredCrowdfunds() {
@@ -489,5 +603,7 @@ module.exports = {
   deductWeeklyKarma,
   applyDailyOverduePenalties,
   startCronScheduler,
-  cleanExpiredCrowdfunds
+  cleanExpiredCrowdfunds,
+  runSmartOverdueShaming,
+  fetchExternalMemes
 };

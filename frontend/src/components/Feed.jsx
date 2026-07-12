@@ -12,6 +12,11 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
   const [posts, setPosts] = useState([]);
   const [postContent, setPostContent] = useState('');
   
+  // Пагинация для ленты
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [fetchingMore, setFetchingMore] = useState(false);
+
   // Комментарии к постам
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(null);
   const [commentContent, setCommentContent] = useState({}); // { [postId]: 'text' }
@@ -36,13 +41,15 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
   const fetchFeedData = async () => {
     try {
       setLoading(true);
+      setPage(1);
       const [postsList, fundsList, questsList, weeklyList] = await Promise.all([
-        api.request('/posts'),
+        api.request('/feed?page=1&limit=10'),
         api.request('/fund'),
         api.request('/quests'),
         api.getWeeklyQuests()
       ]);
       setPosts(postsList);
+      setHasMore(postsList.length === 10);
       setFunds(fundsList);
       setQuests(questsList);
       setWeeklyQuests(weeklyList);
@@ -51,6 +58,26 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
       setFeedError('Не удалось загрузить данные сообщества');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMorePosts = async () => {
+    if (fetchingMore || !hasMore) return;
+    setFetchingMore(true);
+    try {
+      const nextPage = page + 1;
+      const postsList = await api.request(`/feed?page=${nextPage}&limit=10`);
+      if (postsList.length > 0) {
+        setPosts(prev => [...prev, ...postsList]);
+        setPage(nextPage);
+        setHasMore(postsList.length === 10);
+      } else {
+        setHasMore(false);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки дополнительных постов ленты:', err);
+    } finally {
+      setFetchingMore(false);
     }
   };
 
@@ -356,32 +383,73 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
             const isAdmin = user.role === 'admin';
             const frameStyle = post.author?.activeProfileFrame;
             
+            // Динамические стили постов
+            let cardClass = "bg-[#151c2c] border border-gray-850 rounded-2xl p-5 shadow-lg space-y-4 transition-all duration-300";
+            let badgeText = "";
+            let badgeClass = "";
+            let showHeaderDetails = true;
+
+            if (post.type === 'debt_created') {
+              cardClass = "bg-[#151c2c] border-l-4 border-cyan-500 rounded-2xl p-5 shadow-lg space-y-4 border-t border-r border-b border-gray-850 shadow-[0_0_15px_rgba(6,182,212,0.06)]";
+              badgeText = "🤝 Долг";
+              badgeClass = "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[9px] px-1.5 py-0.5 rounded font-black uppercase";
+            } else if (post.type === 'achievement_earned') {
+              cardClass = "bg-[#151c2c] border-l-4 border-amber-500 rounded-2xl p-5 shadow-lg space-y-4 border-t border-r border-b border-gray-850 shadow-[0_0_15px_rgba(245,158,11,0.06)]";
+              badgeText = "🏆 Достижение";
+              badgeClass = "bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] px-1.5 py-0.5 rounded font-black uppercase";
+            } else if (post.type === 'system_shaming') {
+              cardClass = "bg-[#1f1215] border border-red-600/40 rounded-2xl p-5 shadow-lg space-y-4 shadow-[0_0_20px_rgba(220,38,38,0.15)]";
+              badgeText = "💀 Шейминг";
+              badgeClass = "bg-red-500/20 text-red-400 border border-red-500/30 text-[9px] px-1.5 py-0.5 rounded font-black uppercase animate-pulse";
+            } else if (post.type === 'external_meme') {
+              cardClass = "bg-[#151c2c] border border-gray-850 rounded-2xl p-5 shadow-lg space-y-4 hover:border-purple-500/30 transition-all duration-300";
+              badgeText = "👾 Мем";
+              badgeClass = "bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[9px] px-1.5 py-0.5 rounded font-black uppercase";
+              showHeaderDetails = false;
+            }
+
             return (
-              <div key={post._id} className="bg-[#151c2c] border border-gray-850 rounded-2xl p-5 shadow-lg space-y-4">
+              <div key={post._id} className={cardClass}>
                 {/* Шапка поста */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 cursor-pointer" onClick={() => onViewProfile(post.author?._id)}>
-                    <div className="relative">
-                      <img
-                        src={post.author?.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${post.author?.username}`}
-                        alt={post.author?.name}
-                        className={`w-9 h-9 rounded-xl border object-cover ${
-                          frameStyle === 'gold_frame' ? 'border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)]' :
-                          frameStyle === 'diamond_frame' ? 'border-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.5)]' :
-                          'border-gray-800'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <div className="font-bold text-gray-100 flex items-center gap-1">
-                        {post.author?.name}
-                        {post.author?.role === 'admin' && (
-                          <Shield className="w-3.5 h-3.5 text-purple-400" />
-                        )}
+                  {showHeaderDetails ? (
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => post.author?._id && onViewProfile(post.author._id)}>
+                      <div className="relative">
+                        <img
+                          src={post.author?.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${post.author?.username}`}
+                          alt={post.author?.name || 'Пользователь'}
+                          className={`w-9 h-9 rounded-xl border object-cover ${
+                            frameStyle === 'gold_frame' ? 'border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)]' :
+                            frameStyle === 'diamond_frame' ? 'border-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.5)]' :
+                            'border-gray-800'
+                          }`}
+                        />
                       </div>
-                      <div className="text-[10px] text-gray-500">@{post.author?.username}</div>
+                      <div>
+                        <div className="font-bold text-gray-100 flex items-center gap-1.5">
+                          <span>{post.author?.name || 'Пользователь'}</span>
+                          {post.author?.role === 'admin' && (
+                            <Shield className="w-3.5 h-3.5 text-purple-400" />
+                          )}
+                          {badgeText && <span className={badgeClass}>{badgeText}</span>}
+                        </div>
+                        <div className="text-[10px] text-gray-500">@{post.author?.username || 'username'}</div>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-purple-950/20 text-purple-400 border border-purple-800/30 flex items-center justify-center font-black text-sm">
+                        🤖
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-100 flex items-center gap-1.5">
+                          <span>Reddit Агрегатор Мелькает</span>
+                          {badgeText && <span className={badgeClass}>{badgeText}</span>}
+                        </div>
+                        <div className="text-[10px] text-gray-500">reddit.com</div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-gray-500">
@@ -399,7 +467,25 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
                 </div>
 
                 {/* Содержимое */}
-                <p className="text-gray-250 leading-relaxed text-[12px] break-words whitespace-pre-line">{post.content}</p>
+                {post.type === 'system_shaming' ? (
+                  <p className="text-red-400 font-bold text-[12px] leading-relaxed break-words whitespace-pre-line bg-red-950/15 border border-red-900/30 p-3.5 rounded-xl italic flex items-start gap-2">
+                    <span className="text-sm">⚠️</span>
+                    <span>{post.content}</span>
+                  </p>
+                ) : (
+                  <p className="text-gray-250 leading-relaxed text-[12px] break-words whitespace-pre-line">{post.content}</p>
+                )}
+
+                {/* Мем картинка */}
+                {post.type === 'external_meme' && post.image_url && (
+                  <div className="rounded-xl overflow-hidden border border-gray-800 bg-black/40 mt-3 flex items-center justify-center">
+                    <img 
+                      src={post.image_url} 
+                      alt={post.content} 
+                      className="w-full max-h-96 object-contain"
+                    />
+                  </div>
+                )}
 
                 {/* Подвал: Лайки и Кнопка комментов */}
                 <div className="flex items-center gap-4 border-t border-gray-800/40 pt-3">
@@ -470,6 +556,24 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
               </div>
             );
           })}
+
+          {hasMore && (
+            <div className="pt-2 text-center">
+              <button
+                onClick={loadMorePosts}
+                disabled={fetchingMore}
+                className="px-6 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white rounded-xl text-xs font-black transition flex items-center justify-center gap-2 mx-auto disabled:opacity-50"
+              >
+                {fetchingMore ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Загрузка...
+                  </>
+                ) : (
+                  'Показать еще посты'
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 🏺 ОБЩИЕ КОТЛЫ (CROWDFUNDING) */}

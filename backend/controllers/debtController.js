@@ -714,7 +714,8 @@ async function confirmDebt(req, res) {
       creditorId: result.creditor._id,
       debtorId: result.debtor._id,
       amount: result.originalAmount,
-      hasWitness: !!result.witness
+      hasWitness: !!result.witness,
+      isConfirmed: true
     });
 
     const text = `✅ <b>Долг подтверждён!</b>\n\n` +

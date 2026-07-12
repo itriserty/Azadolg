@@ -3,12 +3,13 @@ const User = require('../models/User');
 const Achievement = require('../models/Achievement');
 const UserAchievementProgress = require('../models/UserAchievementProgress');
 const Transaction = require('../models/Transaction');
+const Post = require('../models/Post');
 const tg = require('./telegramService');
 const { RARITY_KARMA } = require('../utils/achievementHelper');
 
 class AchievementObserver {
   init() {
-    achievementService.on('debt_created', async ({ creditorId, debtorId, amount, hasWitness, resultsRef }) => {
+    achievementService.on('debt_created', async ({ creditorId, debtorId, amount, hasWitness, isConfirmed, resultsRef }) => {
       try {
         // 1. active_debts_count (for debtor)
         await this.processProgress(debtorId, 'active_debts_count', async () => {
@@ -23,6 +24,22 @@ class AchievementObserver {
         // 3. blind_kitten (for creditor)
         if (amount > 5000 && !hasWitness) {
           await this.processProgress(creditorId, 'blind_kitten', async () => 1, resultsRef);
+        }
+
+        // Создаем системный пост в ленту при подтверждении долга
+        if (isConfirmed) {
+          const debtorUser = await User.findById(debtorId);
+          const creditorUser = await User.findById(creditorId);
+          if (debtorUser && creditorUser) {
+            const content = `Пользователь @${debtorUser.username} занял ${amount} ₸ у @${creditorUser.username}`;
+            const newPost = new Post({
+              type: 'debt_created',
+              author: debtorId,
+              targetUser: creditorId,
+              content: content
+            });
+            await newPost.save();
+          }
         }
       } catch (err) {
         console.error('[AchievementObserver] Error on debt_created listener:', err);
@@ -188,6 +205,15 @@ class AchievementObserver {
             karmaReward
           });
           changed = true;
+
+          // Создаем пост о получении ачивки в ленте
+          const content = `Пользователь @${user.username} получил достижение [${ach.emoji} ${ach.title}]!`;
+          const newPost = new Post({
+            type: 'achievement_earned',
+            author: user._id,
+            content: content
+          });
+          await newPost.save();
 
           // Telegram-уведомление
           const karmaLine = karmaReward > 0 ? `\n💠 Награда: +${karmaReward} Кармы` : '';
