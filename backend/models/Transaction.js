@@ -65,7 +65,7 @@ const TransactionSchema = new mongoose.Schema({
   },
   witnessStatus: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
+    enum: ['pending', 'approved', 'rejected', 'none'],
     default: 'pending'
   },
   // ── Статус долга ─────────────────────────────────────────────────────────────
