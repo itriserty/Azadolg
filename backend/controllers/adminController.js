@@ -374,10 +374,113 @@ async function distributeKarma(req, res) {
   }
 }
 
+// ── Редактирование баланса Кармы (прибавить/убавить) ───────────────────────
+async function adjustKarma(req, res) {
+  try {
+    const { id } = req.params;
+    const { amount, reason } = req.body;
+    const adminId = req.user;
+
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount === 0)
+      return res.status(400).json({ error: 'Укажите корректную сумму изменения Кармы (ненулевое число)' });
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    user.karma = (user.karma || 0) + numAmount;
+    if (user.karma < 0) user.karma = 0;
+    
+    await user.save();
+
+    await logAction(adminId, 'manual_karma_grant', id, 'User', reason || 'Корректировка баланса', { amount: numAmount });
+    res.status(200).json({ message: `Баланс Кармы изменен на ${numAmount}. Текущий: ${user.karma}`, newKarma: user.karma });
+  } catch (err) {
+    console.error('[admin/adjustKarma]', err);
+    res.status(500).json({ error: 'Ошибка изменения баланса Кармы' });
+  }
+}
+
+// ── Редактирование ELO (прибавить/убавить) ──────────────────────────────────
+async function adjustElo(req, res) {
+  try {
+    const { id } = req.params;
+    const { amount, reason } = req.body;
+    const adminId = req.user;
+
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount === 0)
+      return res.status(400).json({ error: 'Укажите корректную сумму изменения ELO (ненулевое число)' });
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    user.eloRating = (user.eloRating || 1000) + numAmount;
+    if (user.eloRating < 0) user.eloRating = 0;
+    
+    await user.save();
+
+    await logAction(adminId, 'manual_elo_adjust', id, 'User', reason || 'Корректировка ELO', { amount: numAmount });
+    res.status(200).json({ message: `Рейтинг ELO изменен на ${numAmount}. Текущий: ${user.eloRating}`, newElo: user.eloRating });
+  } catch (err) {
+    console.error('[admin/adjustElo]', err);
+    res.status(500).json({ error: 'Ошибка изменения рейтинга ELO' });
+  }
+}
+
+// ── Обнуление Джекпота ────────────────────────────────────────────────────────
+async function resetJackpot(req, res) {
+  try {
+    const SystemState = require('../models/SystemState');
+    let state = await SystemState.findOne();
+    if (!state) {
+      state = new SystemState();
+    }
+    state.jackpotPool = 0;
+    await state.save();
+
+    const adminId = req.user;
+    await logAction(adminId, 'cancel_transaction', state._id, 'Transaction', 'Обнуление джекпота администратором');
+
+    res.status(200).json({ message: 'Джекпот успешно обнулен', jackpotPool: state.jackpotPool });
+  } catch (err) {
+    console.error('[admin/resetJackpot]', err);
+    res.status(500).json({ error: 'Ошибка обнуления джекпота' });
+  }
+}
+
+// ── Глобальная статистика ────────────────────────────────────────────────────
+async function getGlobalStats(req, res) {
+  try {
+    const SystemState = require('../models/SystemState');
+    
+    const karmaAggregation = await User.aggregate([
+      { $group: { _id: null, totalKarma: { $sum: '$karma' } } }
+    ]);
+    const totalKarma = karmaAggregation.length > 0 ? karmaAggregation[0].totalKarma : 0;
+
+    let state = await SystemState.findOne();
+    if (!state) {
+      state = new SystemState();
+      await state.save();
+    }
+    const jackpotPool = state.jackpotPool;
+
+    res.status(200).json({
+      totalKarma,
+      jackpotPool
+    });
+  } catch (err) {
+    console.error('[admin/getGlobalStats]', err);
+    res.status(500).json({ error: 'Ошибка получения глобальной статистики' });
+  }
+}
+
 module.exports = {
   getUsers, banUser, unbanUser, deleteUser,
   getAllDebts, deleteDebt, cancelTransaction,
   resetUserPassword, getAdminLogs, grantKarma,
   getAchievements, createAchievement, updateAchievement, deleteAchievement,
-  distributeKarma
+  distributeKarma,
+  adjustKarma, adjustElo, resetJackpot, getGlobalStats
 };

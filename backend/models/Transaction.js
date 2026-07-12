@@ -83,6 +83,11 @@ const TransactionSchema = new mongoose.Schema({
     ],
     default: 'pending_witness'
   },
+  type: {
+    type: String,
+    enum: ['debt', 'transfer_sent', 'transfer_received'],
+    default: 'debt'
+  },
   // ── Пруф оплаты (финальный, для полной оплаты) ───────────────────────────────
   proofImage: {
     type: String,

@@ -492,6 +492,179 @@ async function deleteProfileComment(req, res) {
   }
 }
 
+// ── Перевод Кармы между пользователями (P2P) ──────────────────────────────────
+async function transferKarma(req, res) {
+  try {
+    const fromUserId = req.user;
+    const { toUserId, amount } = req.body;
+
+    if (!fromUserId) {
+      return res.status(401).json({ error: 'Не авторизован' });
+    }
+
+    if (!toUserId) {
+      return res.status(400).json({ error: 'Не указан получатель' });
+    }
+
+    if (fromUserId.toString() === toUserId.toString()) {
+      return res.status(400).json({ error: 'Нельзя переводить Карму самому себе' });
+    }
+
+    if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'Сумма перевода должна быть целым положительным числом' });
+    }
+
+    const mongoose = require('mongoose');
+    const session = await mongoose.startSession();
+
+    let success = false;
+    let senderUpdated = null;
+    let recipientUpdated = null;
+
+    try {
+      session.startTransaction();
+
+      const sender = await User.findById(fromUserId).session(session);
+      if (!sender) {
+        throw new Error('Отправитель не найден');
+      }
+
+      if (sender.isBanned) {
+        throw new Error('Ваш аккаунт заблокирован. Вы не можете совершать переводы.');
+      }
+
+      const recipient = await User.findById(toUserId).session(session);
+      if (!recipient) {
+        throw new Error('Получатель не найден');
+      }
+
+      if (recipient.isBanned) {
+        throw new Error('Получатель заблокирован');
+      }
+
+      if ((sender.karma || 0) < amount) {
+        throw new Error(`Недостаточно Кармы. Требуется ${amount} ✧, у вас на балансе ${sender.karma || 0} ✧.`);
+      }
+
+      // Обновляем балансы
+      sender.karma -= amount;
+      const receivedAmount = Math.floor(amount * 0.9);
+      recipient.karma = (recipient.karma || 0) + receivedAmount;
+
+      await sender.save({ session });
+      await recipient.save({ session });
+
+      const Transaction = require('../models/Transaction');
+      
+      // Создаем записи истории
+      const transferSent = new Transaction({
+        creditor: toUserId,
+        debtor: fromUserId,
+        amount: amount,
+        originalAmount: amount,
+        description: `Перевод кармы пользователю @${recipient.username}`,
+        dueDate: new Date(),
+        status: 'paid',
+        type: 'transfer_sent',
+        createdBy: fromUserId
+      });
+      await transferSent.save({ session });
+
+      const transferReceived = new Transaction({
+        creditor: toUserId,
+        debtor: fromUserId,
+        amount: receivedAmount,
+        originalAmount: receivedAmount,
+        description: `Получен перевод кармы от @${sender.username}`,
+        dueDate: new Date(),
+        status: 'paid',
+        type: 'transfer_received',
+        createdBy: fromUserId
+      });
+      await transferReceived.save({ session });
+
+      await session.commitTransaction();
+      success = true;
+      senderUpdated = sender;
+      recipientUpdated = recipient;
+    } catch (txError) {
+      await session.abortTransaction();
+
+      // Проверка на отсутствие Replica Set (fallback для локальной разработки)
+      if (txError.message && txError.message.includes('Transaction numbers are only allowed')) {
+        console.warn('[transferKarma] Transactions not supported by MongoDB server. Falling back to non-transactional execution...');
+        
+        // Повторяем без транзакции
+        const sender = await User.findById(fromUserId);
+        if (!sender) return res.status(404).json({ error: 'Отправитель не найден' });
+        if (sender.isBanned) return res.status(403).json({ error: 'Ваш аккаунт заблокирован. Вы не можете совершать переводы.' });
+
+        const recipient = await User.findById(toUserId);
+        if (!recipient) return res.status(404).json({ error: 'Получатель не найден' });
+        if (recipient.isBanned) return res.status(400).json({ error: 'Получатель заблокирован' });
+
+        if ((sender.karma || 0) < amount) {
+          return res.status(400).json({ error: `Недостаточно Кармы. Требуется ${amount} ✧, у вас на балансе ${sender.karma || 0} ✧.` });
+        }
+
+        sender.karma -= amount;
+        const receivedAmount = Math.floor(amount * 0.9);
+        recipient.karma = (recipient.karma || 0) + receivedAmount;
+
+        await sender.save();
+        await recipient.save();
+
+        const Transaction = require('../models/Transaction');
+        
+        const transferSent = new Transaction({
+          creditor: toUserId,
+          debtor: fromUserId,
+          amount: amount,
+          originalAmount: amount,
+          description: `Перевод кармы пользователю @${recipient.username}`,
+          dueDate: new Date(),
+          status: 'paid',
+          type: 'transfer_sent',
+          createdBy: fromUserId
+        });
+        await transferSent.save();
+
+        const transferReceived = new Transaction({
+          creditor: toUserId,
+          debtor: fromUserId,
+          amount: receivedAmount,
+          originalAmount: receivedAmount,
+          description: `Получен перевод кармы от @${sender.username}`,
+          dueDate: new Date(),
+          status: 'paid',
+          type: 'transfer_received',
+          createdBy: fromUserId
+        });
+        await transferReceived.save();
+
+        success = true;
+        senderUpdated = sender;
+        recipientUpdated = recipient;
+      } else {
+        return res.status(400).json({ error: txError.message || 'Ошибка транзакции перевода' });
+      }
+    } finally {
+      session.endSession();
+    }
+
+    if (success) {
+      return res.status(200).json({
+        message: 'Перевод успешно выполнен',
+        senderKarma: senderUpdated.karma,
+        recipientKarma: recipientUpdated.karma
+      });
+    }
+  } catch (error) {
+    console.error('[transferKarma]', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+}
+
 module.exports = {
   getUsers,
   getLeaderboard,
@@ -503,5 +676,6 @@ module.exports = {
   toggleProfilePrivacy,
   updateShowcase,
   addProfileComment,
-  deleteProfileComment
+  deleteProfileComment,
+  transferKarma
 };

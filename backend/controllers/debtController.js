@@ -83,6 +83,11 @@ async function createDebt(req, res) {
       if (cleanWitnessId && !witnessUser)
         throw new Error('Свидетель не найден');
 
+      if (creditorUser.isBanned)
+        throw new Error(`Кредитор ${creditorUser.name} заблокирован`);
+      if (debtorUser.isBanned)
+        throw new Error(`Должник ${debtorUser.name} заблокирован`);
+
       // Дружба между участниками (если creditor !== debtor)
       if (creditor !== debtor) {
         if (!creditorUser.friends.map(f => f.toString()).includes(debtor) ||
@@ -640,6 +645,11 @@ async function confirmDebt(req, res) {
       const isParticipant = [tx.debtor._id.toString(), tx.creditor._id.toString()].includes(userId.toString());
       if (!isParticipant)
         throw new Error('Вы не являетесь участником этого долга');
+
+      if (tx.creditor.isBanned)
+        throw new Error('Кредитор заблокирован');
+      if (tx.debtor.isBanned)
+        throw new Error('Должник заблокирован');
 
       tx.status = 'active';
 

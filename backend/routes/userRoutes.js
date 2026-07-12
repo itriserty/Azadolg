@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const {
   getUsers, getLeaderboard, addFriend, updateTelegramId, updateAvatar,
-  getUserProfile, toggleProfilePrivacy, updateShowcase, addProfileComment, deleteProfileComment
+  getUserProfile, toggleProfilePrivacy, updateShowcase, addProfileComment, deleteProfileComment,
+  transferKarma
 } = require('../controllers/userController');
 const { register, login, getMe, forgotPassword, resetPassword } = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
@@ -19,6 +20,7 @@ router.put('/avatar', authMiddleware, uploadAvatarMiddleware, updateAvatar);
 router.get('/', authMiddleware, getUsers);
 router.get('/leaderboard', authMiddleware, getLeaderboard);
 router.post('/add-friend', authMiddleware, addFriend);
+router.post('/transfer', authMiddleware, transferKarma);
 
 // ── Профили, Приватность, Комментарии и Витрина ─────────────────────────────
 router.get('/:id/profile', authMiddleware, getUserProfile);

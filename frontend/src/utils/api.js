@@ -53,6 +53,13 @@ export const api = {
   // Пользователи
   getUsers:       ()              => request('/users'),
   getLeaderboard: ()              => request('/leaderboard'),
+  transferKarma:  (toUserId, amount) => request('/users/transfer', { method: 'POST', body: JSON.stringify({ toUserId, amount }) }),
+
+  // Администрирование
+  adjustKarma:    (userId, amount, reason) => request(`/admin/users/${userId}/adjust-karma`, { method: 'POST', body: JSON.stringify({ amount, reason }) }),
+  adjustElo:      (userId, amount, reason) => request(`/admin/users/${userId}/adjust-elo`, { method: 'POST', body: JSON.stringify({ amount, reason }) }),
+  resetJackpot:   () => request('/admin/system/jackpot/reset', { method: 'POST' }),
+  getGlobalStats: () => request('/admin/stats'),
 
   // Друзья
   getFriends:               () => request('/friends'),

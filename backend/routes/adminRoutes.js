@@ -5,7 +5,8 @@ const {
   getAllDebts, deleteDebt, cancelTransaction,
   resetUserPassword, getAdminLogs, grantKarma,
   getAchievements, createAchievement, updateAchievement, deleteAchievement,
-  distributeKarma
+  distributeKarma,
+  adjustKarma, adjustElo, resetJackpot, getGlobalStats
 } = require('../controllers/adminController');
 const authMiddleware  = require('../middlewares/authMiddleware');
 const adminMiddleware = require('../middlewares/adminMiddleware');
@@ -22,6 +23,12 @@ router.post('/users/:id/unban',            unbanUser);
 router.delete('/users/:id',                deleteUser);
 router.post('/users/:id/reset-password',   resetUserPassword);
 router.post('/users/:id/grant-karma',      grantKarma);
+router.post('/users/:id/adjust-karma',     adjustKarma);
+router.post('/users/:id/adjust-elo',       adjustElo);
+
+// ── Джекпот и Статистика ────────────────────────────────────────────────────
+router.post('/system/jackpot/reset',       resetJackpot);
+router.get('/stats',                       getGlobalStats);
 
 // ── Долги ─────────────────────────────────────────────────────────────────────
 router.get('/debts',               getAllDebts);

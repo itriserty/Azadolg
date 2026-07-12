@@ -103,6 +103,12 @@ async function spin(req, res) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
+    if (user.isBanned) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({ error: 'Ваш аккаунт заблокирован. Вы не можете крутить рулетку.' });
+    }
+
     // Проверка баланса
     if ((user.karma || 0) < tier.cost) {
       await session.abortTransaction();

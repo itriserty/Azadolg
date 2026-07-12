@@ -16,17 +16,56 @@ export default function DebtList({
   onTransfer,     // должник передаёт: (id, newDebtorId)
   friends = []
 }) {
-  const iOwe      = debts.filter(d => d.debtor?._id === currentUser?._id || d.debtor === currentUser?._id);
-  const owesMe    = debts.filter(d => d.creditor?._id === currentUser?._id || d.creditor === currentUser?._id);
+  const transfers = debts.filter(d => d.type === 'transfer_sent' || d.type === 'transfer_received');
+  const iOwe      = debts.filter(d => (d.debtor?._id === currentUser?._id || d.debtor === currentUser?._id) && (!d.type || d.type === 'debt'));
+  const owesMe    = debts.filter(d => (d.creditor?._id === currentUser?._id || d.creditor === currentUser?._id) && (!d.type || d.type === 'debt'));
   const witnessing = debts.filter(d => {
     const wId = d.witness?._id || d.witness;
-    return wId && wId.toString() === currentUser?._id;
+    return wId && wId.toString() === currentUser?._id && (!d.type || d.type === 'debt');
   });
 
   const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: '2-digit' });
 
   // ── Карточка долга ─────────────────────────────────────────────────────────
   const DebtCard = ({ debt, direction }) => {
+    if (debt.type === 'transfer_sent' || debt.type === 'transfer_received') {
+      const isSent = debt.type === 'transfer_sent';
+      const otherUser = isSent ? debt.creditor : debt.debtor;
+      const displayAmount = isSent ? `-${debt.amount}` : `+${debt.amount}`;
+      const amountColor = isSent ? 'text-red-400' : 'text-emerald-400';
+      const arrowIcon = isSent ? <ArrowUpRight className="w-5 h-5 text-red-400" /> : <ArrowDownLeft className="w-5 h-5 text-emerald-400" />;
+      const iconBg = isSent ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400';
+
+      return (
+        <div className="rounded-xl border border-gray-800 bg-[#0b0f19]/85 p-4 flex items-center justify-between gap-3 transition hover:border-gray-700">
+          <div className="flex items-start gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
+              {arrowIcon}
+            </div>
+            <div>
+              <div className="text-xs font-bold text-gray-200">
+                {isSent ? 'Перевод другу' : 'Получен перевод'}
+              </div>
+              <div className="text-[10px] text-gray-400 mt-0.5">
+                {isSent ? `Получатель: ${otherUser?.name || 'Пользователь'} (@${otherUser?.username || ''})` : `Отправитель: ${otherUser?.name || 'Пользователь'} (@${otherUser?.username || ''})`}
+              </div>
+              <div className="text-[9px] text-gray-500 mt-1 flex items-center gap-1">
+                <Calendar className="w-3 h-3" /> {formatDate(debt.createdAt)}
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className={`text-sm font-black ${amountColor}`}>
+              {displayAmount} ✧
+            </div>
+            <div className="text-[9px] text-gray-500 mt-0.5">
+              {isSent ? 'Комиссия учтена' : 'Зачислено на баланс'}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const [expanded,       setExpanded]       = useState(false);
     const [partialAmt,     setPartialAmt]     = useState('');
     const [proofFile,      setProofFile]      = useState(null);
@@ -338,6 +377,20 @@ export default function DebtList({
 
       <Section title="Я должен" items={iOwe} direction="i-owe" colorClass="from-red-400 to-purple-400" />
       <Section title="Мне должны" items={owesMe} direction="owes-me" colorClass="from-emerald-400 to-cyan-400" />
+
+      {transfers.length > 0 && (
+        <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40">
+          <h2 className="text-lg font-black flex items-center gap-2 mb-4 text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400">
+            <RefreshCw className="w-5 h-5 text-amber-400" />
+            История переводов ({transfers.length})
+          </h2>
+          <div className="space-y-3">
+            <AnimatePresence>
+              {transfers.map(d => <DebtCard key={d._id} debt={d} direction={d.type === 'transfer_sent' ? 'i-owe' : 'owes-me'} />)}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

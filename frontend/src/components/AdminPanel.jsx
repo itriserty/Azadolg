@@ -28,7 +28,8 @@ export default function AdminPanel({ token }) {
   const [newPw,    setNewPw]    = useState('');
   
   // Выдача средств (карма)
-  const [grantModal,      setGrantModal]      = useState(null); // null | { userId, name }
+  const [grantModal,      setGrantModal]      = useState(null); // null | { userId, name, type }
+  const [stats,           setStats]           = useState(null);
   const [grantAmt,        setGrantAmt]        = useState('');
   const [grantReason,     setGrantReason]     = useState('');
   
@@ -42,11 +43,43 @@ export default function AdminPanel({ token }) {
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
   const flash = (text, type = 'ok') => { setMsg({ text, type }); setTimeout(() => setMsg({ text: '', type: 'ok' }), 4000); };
 
+  const fetchStats = async () => {
+    try {
+      const r = await fetch(`${API}/api/admin/stats`, { headers });
+      const d = await r.json();
+      if (r.ok) {
+        setStats(d);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки статистики:', err);
+    }
+  };
+
+  const doResetJackpot = async () => {
+    if (!window.confirm('Вы действительно хотите обнулить глобальный джекпот?')) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/admin/system/jackpot/reset`, {
+        method: 'POST',
+        headers
+      });
+      const d = await r.json();
+      if (!r.ok) return flash(d.error || 'Ошибка', 'err');
+      flash(d.message);
+      fetchStats();
+    } catch (err) {
+      flash('Ошибка при обнулении джекпота', 'err');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchUsers = async () => {
     setLoading(true);
     try {
       const r = await fetch(`${API}/api/admin/users`, { headers });
       setUsers(await r.json());
+      fetchStats();
     } finally { setLoading(false); }
   };
 
@@ -55,6 +88,7 @@ export default function AdminPanel({ token }) {
     try {
       const r = await fetch(`${API}/api/admin/debts`, { headers });
       setDebts(await r.json());
+      fetchStats();
     } finally { setLoading(false); }
   };
 
@@ -75,6 +109,7 @@ export default function AdminPanel({ token }) {
   };
 
   useEffect(() => {
+    fetchStats();
     if (tab === 'users') fetchUsers();
     else if (tab === 'debts') fetchDebts();
     else if (tab === 'achievements') fetchAchievements();
@@ -159,15 +194,18 @@ export default function AdminPanel({ token }) {
   };
 
   const doGrantFunds = async () => {
-    if (!grantAmt || Number(grantAmt) <= 0) {
-      return flash('Укажите корректное количество Кармы', 'err');
+    const amount = Number(grantAmt);
+    if (!grantAmt || isNaN(amount) || amount === 0) {
+      return flash('Укажите корректное количество (ненулевое число)', 'err');
     }
     setLoading(true);
+    const modalType = grantModal.type || 'karma';
+    const endpoint = modalType === 'elo' ? 'adjust-elo' : 'adjust-karma';
     try {
-      const r = await fetch(`${API}/api/admin/users/${grantModal.userId}/grant-karma`, {
+      const r = await fetch(`${API}/api/admin/users/${grantModal.userId}/${endpoint}`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ amount: grantAmt, reason: grantReason })
+        body: JSON.stringify({ amount, reason: grantReason })
       });
       const d = await r.json();
       if (!r.ok) return flash(d.error || 'Ошибка', 'err');
@@ -177,7 +215,7 @@ export default function AdminPanel({ token }) {
       setGrantReason('');
       fetchUsers();
     } catch (err) {
-      flash('Ошибка при начислении Кармы', 'err');
+      flash(`Ошибка при изменении баланса ${modalType === 'elo' ? 'ELO' : 'Кармы'}`, 'err');
     } finally {
       setLoading(false);
     }
@@ -239,7 +277,8 @@ export default function AdminPanel({ token }) {
   const filteredUsers = users.filter(u =>
     !search || u.name.toLowerCase().includes(search.toLowerCase()) ||
     u.username.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
+    u.email.toLowerCase().includes(search.toLowerCase()) ||
+    u._id.toString().includes(search)
   );
 
   const btn = 'px-3 py-1.5 rounded-lg text-[10px] font-bold transition';
@@ -269,6 +308,42 @@ export default function AdminPanel({ token }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Виджеты глобальной статистики и управление Джекпотом */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Кармы на руках */}
+        <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-4 flex flex-col justify-between">
+          <div>
+            <div className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Всего Кармы у пользователей</div>
+            <div className="text-2xl font-black text-amber-400 mt-1">{stats ? stats.totalKarma.toLocaleString('ru') : '...'} ✧</div>
+          </div>
+          <p className="text-[10px] text-gray-500 mt-2">Суммарный объем экономики Azadolg</p>
+        </div>
+
+        {/* Джекпот пул */}
+        <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-4 flex flex-col justify-between">
+          <div>
+            <div className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Глобальный Джекпот</div>
+            <div className="text-2xl font-black text-cyan-400 mt-1">{stats ? stats.jackpotPool.toLocaleString('ru') : '...'} ✧</div>
+          </div>
+          <p className="text-[10px] text-gray-500 mt-2">Накапливаемый пул системы</p>
+        </div>
+
+        {/* Управление Джекпотом */}
+        <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-4 flex flex-col justify-between">
+          <div>
+            <div className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Действия системы</div>
+            <button
+              onClick={doResetJackpot}
+              disabled={loading}
+              className="mt-2 w-full bg-red-600 hover:bg-red-500 text-white font-black py-2 rounded-xl text-xs transition"
+            >
+              Обнулить Джекпот
+            </button>
+          </div>
+          <p className="text-[10px] text-gray-500 mt-2">Сбросить глобальный джекпот до 0 ✧</p>
+        </div>
+      </div>
 
       {/* Вкладки */}
       <div className="flex flex-wrap gap-2">
@@ -381,8 +456,11 @@ export default function AdminPanel({ token }) {
                                   <Ban className="w-3 h-3 inline" /> Бан
                                 </button>
                               )}
-                              <button onClick={() => { setGrantModal({ userId: u._id, name: u.name }); setGrantAmt(''); setGrantReason(''); }} className={`${btn} bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600/40`}>
-                                🪙 Начислить
+                              <button onClick={() => { setGrantModal({ userId: u._id, name: u.name, type: 'karma' }); setGrantAmt(''); setGrantReason(''); }} className={`${btn} bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600/40`}>
+                                ✧ Карма
+                              </button>
+                              <button onClick={() => { setGrantModal({ userId: u._id, name: u.name, type: 'elo' }); setGrantAmt(''); setGrantReason(''); }} className={`${btn} bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/30`}>
+                                🔥 ELO
                               </button>
                               <button onClick={() => { setPwModal(u._id); setNewPw(''); }} className={`${btn} bg-amber-600/20 text-amber-400 border border-amber-500/30 hover:bg-amber-600/40`}>
                                 <Key className="w-3 h-3 inline" /> Пароль
@@ -612,32 +690,38 @@ export default function AdminPanel({ token }) {
         )}
       </AnimatePresence>
 
-      {/* ── Модал НАЧИСЛЕНИЯ КАРМЫ ── */}
+      {/* ── Модал НАЧИСЛЕНИЯ КАРМЫ ИЛИ ELO ── */}
       <AnimatePresence>
         {grantModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
               className="bg-[#151c2c] border border-cyan-500/30 rounded-2xl p-6 w-full max-w-sm">
-              <h3 className="font-black text-white mb-4 flex items-center gap-2">💰 Начислить Карму</h3>
+              <h3 className="font-black text-white mb-4 flex items-center gap-2">
+                {grantModal.type === 'elo' ? '🔥 Редактировать ELO' : '💰 Редактировать Карму'}
+              </h3>
               <p className="text-gray-400 text-[10px] mb-3">Пользователь: <span className="text-white font-bold">{grantModal.name}</span></p>
 
               <div className="mb-4">
-                <label className="text-[10px] uppercase font-bold text-gray-500 block mb-1">Количество Кармы</label>
+                <label className="text-[10px] uppercase font-bold text-gray-500 block mb-1">
+                  {grantModal.type === 'elo' ? 'Изменение рейтинга ELO (число)' : 'Изменение Кармы (число)'}
+                </label>
                 <input type="number" value={grantAmt} onChange={e => setGrantAmt(e.target.value)}
-                  placeholder="Сумма для начисления"
+                  placeholder={grantModal.type === 'elo' ? 'Например, +50 или -100' : 'Например, +1000 или -500'}
                   className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500" />
               </div>
 
               <div className="mb-4">
                 <label className="text-[10px] uppercase font-bold text-gray-500 block mb-1">Причина</label>
                 <input type="text" value={grantReason} onChange={e => setGrantReason(e.target.value)}
-                  placeholder="Причина начисления..."
+                  placeholder="Причина изменения..."
                   className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500" />
               </div>
 
               <div className="flex gap-2">
-                <button onClick={doGrantFunds} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-[#0b0f19] font-black py-2.5 rounded-xl text-sm transition">Начислить</button>
+                <button onClick={doGrantFunds} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-[#0b0f19] font-black py-2.5 rounded-xl text-sm transition">
+                  {grantModal.type === 'elo' ? 'Изменить ELO' : 'Изменить Карму'}
+                </button>
                 <button onClick={() => setGrantModal(null)} className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2.5 rounded-xl text-sm transition">Отмена</button>
               </div>
             </motion.div>

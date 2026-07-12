@@ -20,7 +20,7 @@ const FRAME_STYLES = {
   diamond_frame: 'border-4 border-indigo-400 shadow-[0_0_25px_rgba(129,140,248,0.95)] ring-2 ring-sky-300 ring-offset-1 ring-offset-black border-double'
 };
 
-export default function Profile({ userId, currentUser, onBack, onViewProfile, onUpdateAvatar }) {
+export default function Profile({ userId, currentUser, onBack, onViewProfile, onUpdateAvatar, onUpdateUser }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const targetUserId = id || userId;
@@ -48,6 +48,12 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
   const [sellItem, setSellItem] = useState(null);
   const [sellPrice, setSellPrice] = useState('');
   const [sellingLoading, setSellingLoading] = useState(false);
+
+  // Перевод кармы
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferAmount, setTransferAmount] = useState('');
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [transferError, setTransferError] = useState('');
 
   const getAchievementProgress = (ach) => {
     if (!profileData || !profileData.user) return 0;
@@ -202,6 +208,31 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
       alert(err.message || 'Ошибка продажи предмета');
     } finally {
       setSellingLoading(false);
+    }
+  };
+
+  const handleTransferKarma = async (e) => {
+    e.preventDefault();
+    const amount = parseInt(transferAmount, 10);
+    if (!amount || amount <= 0) {
+      setTransferError('Сумма перевода должна быть целым положительным числом');
+      return;
+    }
+    setTransferLoading(true);
+    setTransferError('');
+    try {
+      await api.transferKarma(targetUserId, amount);
+      alert(`Вы успешно перевели ${amount} Кармы! С учетом комиссии 10% получателю зачислено ${Math.floor(amount * 0.9)} Кармы.`);
+      setTransferModalOpen(false);
+      setTransferAmount('');
+      fetchProfile();
+      if (onUpdateUser) {
+        onUpdateUser({ ...currentUser, karma: currentUser.karma - amount });
+      }
+    } catch (err) {
+      setTransferError(err.message || 'Ошибка при переводе Кармы');
+    } finally {
+      setTransferLoading(false);
     }
   };
 
@@ -370,6 +401,15 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                 className="text-[11px] font-bold py-1.5 px-3 rounded-xl border border-gray-800 bg-[#0b0f19]/80 hover:bg-gray-800 transition"
               >
                 Назад
+              </button>
+            )}
+            {!isSelf && (
+              <button
+                onClick={() => setTransferModalOpen(true)}
+                className="flex items-center gap-1.5 text-[11px] font-bold py-1.5 px-3 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 transition"
+              >
+                <Send className="w-3.5 h-3.5 animate-pulse" />
+                Отправить Карму
               </button>
             )}
           </div>
@@ -827,6 +867,78 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно перевода Кармы */}
+      {transferModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#151c2c] border border-amber-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative">
+            <h3 className="text-lg font-black text-amber-400 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
+              <Send className="w-5 h-5 text-amber-400" />
+              Перевод Кармы
+            </h3>
+            
+            <p className="text-xs text-gray-300 mb-4">
+              Вы переводите Карму пользователю <span className="font-bold text-white">@{user.username}</span>.
+            </p>
+            
+            <form onSubmit={handleTransferKarma} className="space-y-4">
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-1">
+                  Сумма перевода (целое число)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  step="1"
+                  placeholder="Введите сумму"
+                  value={transferAmount}
+                  onChange={(e) => setTransferAmount(e.target.value)}
+                  className="w-full bg-black/60 border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-500 transition"
+                />
+              </div>
+
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center">
+                <p className="text-[11px] text-amber-400 font-bold">
+                  ⚠️ Комиссия системы — 10%
+                </p>
+                {transferAmount && !isNaN(transferAmount) && parseInt(transferAmount, 10) > 0 && (
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Получатель получит: <span className="text-emerald-400 font-bold">{Math.floor(parseInt(transferAmount, 10) * 0.9)} ✧</span>
+                  </p>
+                )}
+              </div>
+
+              {transferError && (
+                <div className="text-[11px] font-bold text-red-400 text-center bg-red-950/20 border border-red-900/30 p-2 rounded-xl">
+                  {transferError}
+                </div>
+              )}
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTransferModalOpen(false);
+                    setTransferAmount('');
+                    setTransferError('');
+                  }}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-bold transition"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={transferLoading || !transferAmount}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-bold rounded-xl text-xs transition"
+                >
+                  {transferLoading ? 'Перевод...' : 'Отправить'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
