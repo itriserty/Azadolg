@@ -44,6 +44,9 @@ const AchievementSchema = new mongoose.Schema({
       'jackpot_winner',         // выиграл джекпот
       'self_borrow',            // занял у себя
       'negative_karma',         // карма опустилась ниже 0
+      'karma_transferred',      // перевел суммарно N Кармы
+      'blind_kitten',           // выдал долг без свидетеля на сумму больше X
+      'witness_decline',        // отказался быть свидетелем N раз
       'custom'                  // выдаётся вручную администратором
     ],
     default: 'custom'

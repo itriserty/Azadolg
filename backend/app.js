@@ -28,6 +28,10 @@ const postRoutes    = require('./routes/postRoutes');
 const rouletteRoutes = require('./routes/rouletteRoutes');
 const { startReminderScheduler } = require('./services/reminderService');
 const { startCronScheduler } = require('./services/cronService');
+const achievementObserver = require('./services/AchievementObserver');
+
+// Инициализируем наблюдатель за достижениями
+achievementObserver.init();
 
 const { getLeaderboard } = require('./controllers/userController');
 const { openCase }       = require('./controllers/caseController');

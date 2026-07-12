@@ -160,8 +160,8 @@ async function getUserProfile(req, res) {
     const viewerId = req.user;
 
     // Проверяем достижение "Еблан года" (просрочка > 365 дней) перед загрузкой профиля
-    const { checkAndAward } = require('../utils/achievementHelper');
-    await checkAndAward(id, 'overdue_365');
+    const achievementService = require('../services/AchievementService');
+    await achievementService.emit('overdue_check', { userId: id });
 
     const [targetUser, viewerUser] = await Promise.all([
       User.findById(id)
@@ -653,6 +653,13 @@ async function transferKarma(req, res) {
     }
 
     if (success) {
+      const achievementService = require('../services/AchievementService');
+      const newlyAwarded = await achievementService.emit('karma_transferred', {
+        fromUserId: fromUserId,
+        toUserId: toUserId,
+        amount: amount
+      });
+
       const questService = require('../services/questService');
       const newlyCompletedQuests = await questService.trackProgress(fromUserId, 'send_karma');
 
@@ -660,7 +667,8 @@ async function transferKarma(req, res) {
         message: 'Перевод успешно выполнен',
         senderKarma: senderUpdated.karma,
         recipientKarma: recipientUpdated.karma,
-        newlyCompletedQuests
+        newlyCompletedQuests,
+        newlyAwarded
       });
     }
   } catch (error) {

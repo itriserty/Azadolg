@@ -6,7 +6,8 @@ const {
   resetUserPassword, getAdminLogs, grantKarma,
   getAchievements, createAchievement, updateAchievement, deleteAchievement,
   distributeKarma,
-  adjustKarma, adjustElo, resetJackpot, getGlobalStats
+  adjustKarma, adjustElo, resetJackpot, getGlobalStats,
+  getUsersWithQuests
 } = require('../controllers/adminController');
 const authMiddleware  = require('../middlewares/authMiddleware');
 const adminMiddleware = require('../middlewares/adminMiddleware');
@@ -17,6 +18,7 @@ router.use(adminMiddleware);
 
 // ── Пользователи ─────────────────────────────────────────────────────────────
 router.get('/users',                       getUsers);
+router.get('/users/quests',                getUsersWithQuests);
 router.post('/users/distribute-karma',     distributeKarma);
 router.post('/users/:id/ban',              banUser);
 router.post('/users/:id/unban',            unbanUser);

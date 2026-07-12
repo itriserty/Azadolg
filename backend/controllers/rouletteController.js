@@ -174,6 +174,14 @@ async function spin(req, res) {
       console.error('[Casino] Ошибка QuestService:', err);
     }
 
+    const achievementService = require('../services/AchievementService');
+    const newlyAwarded = await achievementService.emit('roulette_spun', {
+      userId: user._id,
+      tierCost: tier.cost,
+      winAmount: prize.win,
+      isJackpot: prize.tag === 'jackpot'
+    });
+
     return res.status(200).json({
       message: 'Спин завершён!',
       tier: { cost: tier.cost, label: tier.label },
@@ -190,7 +198,8 @@ async function spin(req, res) {
         name:  user.name,
         karma: user.karma,
       },
-      newlyCompletedQuests
+      newlyCompletedQuests,
+      newlyAwarded
     });
   } catch (err) {
     await session.abortTransaction();

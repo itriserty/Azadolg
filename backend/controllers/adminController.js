@@ -476,11 +476,61 @@ async function getGlobalStats(req, res) {
   }
 }
 
+// ── Получение всех пользователей вместе с активными еженедельными квестами ──
+async function getUsersWithQuests(req, res) {
+  try {
+    const UserTask = require('../models/UserTask');
+    
+    // 1. Получаем всех пользователей без пароля
+    const users = await User.find()
+      .select('-password -resetCode -resetCodeExpires')
+      .sort({ createdAt: -1 });
+
+    // 2. Ищем все активные еженедельные задачи (срок действия которых в будущем)
+    const activeTasks = await UserTask.find({
+      expires_at: { $gt: new Date() }
+    });
+
+    // 3. Группируем задачи по user_id
+    const tasksByUser = {};
+    activeTasks.forEach(task => {
+      if (!task.user_id) return;
+      const uId = task.user_id.toString();
+      if (!tasksByUser[uId]) {
+        tasksByUser[uId] = [];
+      }
+      tasksByUser[uId].push({
+        _id: task._id,
+        task_type: task.task_type,
+        target_value: task.target_value,
+        current_value: task.current_value,
+        reward_karma: task.reward_karma,
+        is_completed: task.is_completed,
+        expires_at: task.expires_at,
+        meta_data: task.meta_data
+      });
+    });
+
+    // 4. Привязываем задачи к объектам пользователей
+    const usersWithQuests = users.map(user => {
+      const userObj = user.toObject();
+      userObj.tasks = tasksByUser[user._id.toString()] || [];
+      return userObj;
+    });
+
+    res.status(200).json(usersWithQuests);
+  } catch (err) {
+    console.error('[admin/getUsersWithQuests]', err);
+    res.status(500).json({ error: 'Ошибка получения игроков и их заданий' });
+  }
+}
+
 module.exports = {
   getUsers, banUser, unbanUser, deleteUser,
   getAllDebts, deleteDebt, cancelTransaction,
   resetUserPassword, getAdminLogs, grantKarma,
   getAchievements, createAchievement, updateAchievement, deleteAchievement,
   distributeKarma,
-  adjustKarma, adjustElo, resetJackpot, getGlobalStats
+  adjustKarma, adjustElo, resetJackpot, getGlobalStats,
+  getUsersWithQuests
 };

@@ -53,6 +53,45 @@ const defaultAchievements = [
     isRepeatable: false,
     isActive: true,
     createdByAdmin: false
+  },
+  {
+    slug: 'sugar_daddy',
+    emoji: '🤑',
+    title: 'Сахарный папик',
+    description: 'Перевел суммарно 1000 Кармы другим пользователям.',
+    rarity: 'epic',
+    trigger: 'karma_transferred',
+    threshold: 1000,
+    isSecret: false,
+    isRepeatable: false,
+    isActive: true,
+    createdByAdmin: false
+  },
+  {
+    slug: 'blind_kitten',
+    emoji: '🙈',
+    title: 'Слепой котёнок',
+    description: 'Выдал долг без свидетеля на сумму больше 5000.',
+    rarity: 'rare',
+    trigger: 'blind_kitten',
+    threshold: 1,
+    isSecret: false,
+    isRepeatable: false,
+    isActive: true,
+    createdByAdmin: false
+  },
+  {
+    slug: 'witness_declined_3',
+    emoji: '🤓',
+    title: 'Душнила',
+    description: 'Трижды отказался быть свидетелем.',
+    rarity: 'common',
+    trigger: 'witness_decline',
+    threshold: 3,
+    isSecret: false,
+    isRepeatable: false,
+    isActive: true,
+    createdByAdmin: false
   }
 ];
 

@@ -3,14 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Users, FileText, Trash2, Ban, RotateCcw,
   Key, Star, AlertTriangle, CheckCircle, X, RefreshCw,
-  Search, ChevronDown, ChevronUp, Activity, Plus, Edit2
+  Search, ChevronDown, ChevronUp, Activity, Plus, Edit2, ListTodo
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || '';
 
 export default function AdminPanel({ token }) {
-  const [tab,      setTab]      = useState('users');   // 'users' | 'debts' | 'achievements' | 'logs'
+  const [tab,      setTab]      = useState('users');   // 'users' | 'debts' | 'achievements' | 'logs' | 'quests'
   const [users,    setUsers]    = useState([]);
+  const [usersWithQuests, setUsersWithQuests] = useState([]);
   const [debts,    setDebts]    = useState([]);
   const [logs,     setLogs]     = useState([]);
   const [achievements, setAchievements] = useState([]);
@@ -83,6 +84,15 @@ export default function AdminPanel({ token }) {
     } finally { setLoading(false); }
   };
 
+  const fetchUsersWithQuests = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/admin/users/quests`, { headers });
+      setUsersWithQuests(await r.json());
+      fetchStats();
+    } finally { setLoading(false); }
+  };
+
   const fetchDebts = async () => {
     setLoading(true);
     try {
@@ -113,7 +123,8 @@ export default function AdminPanel({ token }) {
     if (tab === 'users') fetchUsers();
     else if (tab === 'debts') fetchDebts();
     else if (tab === 'achievements') fetchAchievements();
-    else fetchLogs();
+    else if (tab === 'logs') fetchLogs();
+    else if (tab === 'quests') fetchUsersWithQuests();
   }, [tab]);
 
   // ── Действия ─────────────────────────────────────────────────────────────────
@@ -350,11 +361,13 @@ export default function AdminPanel({ token }) {
         <button onClick={() => setTab('users')} className={tabBtn('users')}><Users className="w-3.5 h-3.5" />Пользователи</button>
         <button onClick={() => setTab('debts')} className={tabBtn('debts')}><FileText className="w-3.5 h-3.5" />Транзакции и Реверсы</button>
         <button onClick={() => setTab('achievements')} className={tabBtn('achievements')}><Star className="w-3.5 h-3.5 text-yellow-500" />Achievements CRUD</button>
+        <button onClick={() => setTab('quests')} className={tabBtn('quests')}><ListTodo className="w-3.5 h-3.5" />Квесты Игроков</button>
         <button onClick={() => setTab('logs')} className={tabBtn('logs')}><Activity className="w-3.5 h-3.5" />Лог действий</button>
         <button onClick={() => { 
             if (tab === 'users') fetchUsers(); 
             else if (tab === 'debts') fetchDebts(); 
             else if (tab === 'achievements') fetchAchievements();
+            else if (tab === 'quests') fetchUsersWithQuests();
             else fetchLogs(); 
           }}
           className={`${btn} bg-gray-800 text-gray-400 hover:bg-gray-700 ml-auto`}
@@ -611,6 +624,139 @@ export default function AdminPanel({ token }) {
             {achievements.length === 0 && !loading && (
               <div className="text-center py-8 text-gray-500">Достижения не созданы</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── КВЕСТЫ ИГРОКОВ ── */}
+      {tab === 'quests' && (
+        <div className="space-y-6">
+          {/* Поиск и статистика */}
+          <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2 bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus-within:border-cyan-500 w-full max-w-md">
+              <Search className="w-4 h-4 text-gray-500" />
+              <input 
+                type="text" 
+                placeholder="Поиск игрока по имени/юзернейму..." 
+                value={search} 
+                onChange={e => setSearch(e.target.value)}
+                className="bg-transparent border-none text-white focus:outline-none text-xs w-full" 
+              />
+            </div>
+            <div className="text-gray-400 text-xs">
+              Всего игроков с заданиями: <span className="font-bold text-cyan-400">{usersWithQuests.length}</span>
+            </div>
+          </div>
+
+          {/* Сетка игроков */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {usersWithQuests
+              .filter(u => 
+                u.name.toLowerCase().includes(search.toLowerCase()) || 
+                u.username.toLowerCase().includes(search.toLowerCase())
+              )
+              .map(u => (
+                <div 
+                  key={u._id} 
+                  className="bg-[#151c2c] border border-gray-800 hover:border-gray-700 rounded-2xl p-5 shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Информация об игроке */}
+                    <div className="flex items-center gap-3 border-b border-gray-800/50 pb-4 mb-4">
+                      {u.avatar_url ? (
+                        <img 
+                          src={u.avatar_url} 
+                          alt={u.name} 
+                          className="w-10 h-10 rounded-full border border-gray-700 object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-cyan-900/30 text-cyan-400 font-bold flex items-center justify-center text-sm border border-cyan-800/30">
+                          {u.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="font-bold text-gray-100 text-sm flex items-center gap-1.5">
+                          {u.name}
+                          {u.role === 'admin' && (
+                            <span className="bg-purple-600/10 text-purple-400 border border-purple-500/20 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">
+                              Admin
+                            </span>
+                          )}
+                        </h4>
+                        <p className="text-gray-500 text-[10px]">@{u.username}</p>
+                      </div>
+                    </div>
+
+                    {/* Раздел квестов */}
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                        <span>Активные задания</span>
+                        <span className="text-gray-500">{u.tasks.length} / 3</span>
+                      </div>
+
+                      {u.tasks.length === 0 ? (
+                        <p className="text-gray-600 text-xs italic py-2">Нет активных заданий на этой неделе</p>
+                      ) : (
+                        u.tasks.map(task => {
+                          const percent = Math.min(100, Math.round((task.current_value / task.target_value) * 100));
+                          const isCompleted = task.is_completed || task.current_value >= task.target_value;
+
+                          return (
+                            <div 
+                              key={task._id} 
+                              className={`p-3 rounded-xl border transition-colors ${
+                                isCompleted 
+                                  ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-100' 
+                                  : 'bg-[#0b0f19]/40 border-gray-800 text-gray-300'
+                              }`}
+                            >
+                              <div className="flex justify-between items-start gap-2 mb-1.5">
+                                <div>
+                                  <h5 className="font-bold text-xs flex items-center gap-1">
+                                    {task.meta_data?.title || 'Задание'}
+                                    {isCompleted && <span className="text-emerald-400 text-xs">✓</span>}
+                                  </h5>
+                                  <p className="text-gray-400 text-[10px] leading-relaxed mt-0.5">
+                                    {task.meta_data?.description || 'Описание отсутствует'}
+                                  </p>
+                                </div>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                                  isCompleted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                }`}>
+                                  +{task.reward_karma} ✧
+                                </span>
+                              </div>
+
+                              {/* Прогресс-бар */}
+                              <div className="mt-2.5">
+                                <div className="flex justify-between text-[9px] font-medium text-gray-400 mb-1">
+                                  <span>Прогресс</span>
+                                  <span>{task.current_value} / {task.target_value}</span>
+                                </div>
+                                <div className="w-full bg-[#0b0f19] h-1.5 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full rounded-full transition-all duration-500 ${
+                                      isCompleted 
+                                        ? 'bg-emerald-500' 
+                                        : 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                                    }`}
+                                    style={{ width: `${percent}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-gray-800/40 flex justify-between items-center text-[10px] text-gray-500">
+                    <span>🔥 ELO: {u.eloRating}</span>
+                    <span>✧ Карма: {u.karma}</span>
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       )}

@@ -163,7 +163,12 @@ async function createDebt(req, res) {
       });
     }
 
-    const newlyAwarded = await achievementService.trigger('debt_created', { creditorId: transaction.creditor, debtorId: transaction.debtor });
+    const newlyAwarded = await achievementService.emit('debt_created', {
+      creditorId: transaction.creditor,
+      debtorId: transaction.debtor,
+      amount: Number(amount),
+      hasWitness: !!cleanWitnessId
+    });
     const txObj = transaction.toObject();
     txObj.newlyAwarded = newlyAwarded;
     res.status(201).json(txObj);
@@ -228,12 +233,13 @@ async function witnessDecision(req, res) {
     if (result.witness?.telegramId)  tg.sendMessage(notifyText, result.witness.telegramId);
     tg.sendMessage(notifyText);
 
-    const newlyAwarded = [];
+    const newlyAwarded = await achievementService.emit('witness_decision', {
+      witnessId: userId,
+      action: action
+    });
+
     let newlyCompletedQuests = [];
     if (action === 'approve') {
-      const triggerResult = await achievementService.trigger('witness_decision', { witnessId: userId });
-      newlyAwarded.push(...triggerResult);
-
       try {
         const questService = require('../services/questService');
         newlyCompletedQuests = await questService.trackProgress(userId, 'witness_approve');
@@ -444,11 +450,6 @@ async function submitPaymentProof(req, res) {
         if (debtor) await debtor.save({ session });
         if (creditor && creditor !== debtor) await creditor.save({ session });
 
-        if (debtor) {
-          const { checkAndAward } = require('../utils/achievementHelper');
-          await checkAndAward(debtor._id, 'debts_paid_count');
-        }
-
         // Расчёт ставок тотализатора
         try {
           const { resolveBetsForDebt } = require('./betController');
@@ -480,9 +481,10 @@ async function submitPaymentProof(req, res) {
       };
     });
 
-    const newlyAwarded = await achievementService.trigger('debt_paid', {
+    const newlyAwarded = await achievementService.emit('debt_paid', {
       debtorId: result.tx.debtor,
       creditorId: result.tx.creditor,
+      amount: result.tx.originalAmount,
       isOverdue: result.isOverdue
     });
 
@@ -577,7 +579,10 @@ async function forgiveDebt(req, res) {
 
     const { tx, eloBonus } = result;
 
-    const newlyAwarded = await achievementService.trigger('debt_forgiven', { creditorId: tx.creditor._id });
+    const newlyAwarded = await achievementService.emit('debt_forgiven', {
+      creditorId: tx.creditor._id,
+      amount: tx.originalAmount
+    });
 
     const notifyText = `💝 <b>Долг прощён!</b>\n\n` +
       `👤 Кредитор <b>${tx.creditor.name}</b> простил долг <b>${tx.debtor.name}</b>!\n` +
@@ -705,9 +710,11 @@ async function confirmDebt(req, res) {
       return tx;
     });
 
-    const newlyAwarded = await achievementService.trigger('debt_created', {
+    const newlyAwarded = await achievementService.emit('debt_created', {
       creditorId: result.creditor._id,
-      debtorId: result.debtor._id
+      debtorId: result.debtor._id,
+      amount: result.originalAmount,
+      hasWitness: !!result.witness
     });
 
     const text = `✅ <b>Долг подтверждён!</b>\n\n` +
@@ -778,7 +785,7 @@ async function declineDebt(req, res) {
       return tx;
     });
 
-    const newlyAwarded = await achievementService.trigger('declined_loan', { debtorId: userId });
+    const newlyAwarded = await achievementService.emit('debt_declined', { debtorId: userId });
 
     const text = `❌ <b>Долг отклонён!</b>\n\n` +
       `👤 Кредитор: <b>${result.creditor.name}</b>\n` +
