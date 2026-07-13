@@ -825,7 +825,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
             </div>
 
             <div className="space-y-3">
-              {weeklyQuests.map((quest) => {
+              {(weeklyQuests || []).map((quest) => {
                 const percent = Math.min(100, Math.round((quest.current_value / quest.target_value) * 100));
                 return (
                   <div key={quest._id} className="p-3 bg-black/20 border border-gray-850 rounded-xl space-y-2">

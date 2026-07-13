@@ -721,13 +721,13 @@ export default function AdminPanel({ token }) {
                     <div className="space-y-4">
                       <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold uppercase tracking-wider">
                         <span>Активные задания</span>
-                        <span className="text-gray-500">{u.tasks.length} / 3</span>
+                        <span className="text-gray-500">{(u.tasks || []).length} / 3</span>
                       </div>
 
-                      {u.tasks.length === 0 ? (
+                      {(u.tasks || []).length === 0 ? (
                         <p className="text-gray-600 text-xs italic py-2">Нет активных заданий на этой неделе</p>
                       ) : (
-                        u.tasks.map(task => {
+                        (u.tasks || []).map(task => {
                           const percent = Math.min(100, Math.round((task.current_value / task.target_value) * 100));
                           const isCompleted = task.is_completed || task.current_value >= task.target_value;
 

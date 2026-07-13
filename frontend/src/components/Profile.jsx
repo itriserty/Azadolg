@@ -282,10 +282,10 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
     );
   }
 
-  const { user, canView, comments, debts, inventory, allAchievements = [] } = profileData;
-  const currentSkin = user.activeProfileSkin || 'default';
-  const currentFrame = user.activeProfileFrame || 'none';
-  const elo = user.eloRating || 1000;
+  const { user, canView, comments, debts, inventory, allAchievements = [] } = profileData || {};
+  const currentSkin = user?.activeProfileSkin || 'default';
+  const currentFrame = user?.activeProfileFrame || 'none';
+  const elo = user?.eloRating || 1000;
 
   const getRankLabel = (eloRating) => {
     if (eloRating < 1000) return 'Железо';
@@ -369,7 +369,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
             <p className="text-sm opacity-60">@{user.username}</p>
             
             {/* Значки/Ачивки рядом с аватаркой */}
-            {user.badges && user.badges.length > 0 && (
+            {user?.badges && user.badges.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2 justify-center md:justify-start">
                 {user.badges.map((badge, idx) => {
                   let badgeLabel = 'Участник';
@@ -493,7 +493,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
               isSelf && { id: 'balance_history', label: 'История рейтинга', icon: Coins },
               { id: 'inventory', label: 'Инвентарь', icon: Award },
               { id: 'achievements', label: 'Достижения', icon: Trophy },
-              { id: 'friends', label: `Друзья (${user.friends?.length || 0})`, icon: Users },
+              {id: 'friends', label: `Друзья (${user?.friends?.length || 0})`, icon: Users },
               { id: 'comments', label: 'Стена', icon: MessageSquare }
             ].filter(Boolean).map(tab => {
               const Icon = tab.icon;
@@ -632,7 +632,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                     <div className="mb-5 p-4 bg-[#0b0f19]/90 border border-cyan-500/20 rounded-xl space-y-4">
                       <p className="text-[11px] text-gray-300">Выберите до 4-х достижений для вашей витрины:</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
-                        {user.achievements && user.achievements.length > 0 ? (
+                        {user?.achievements && user.achievements.length > 0 ? (
                           user.achievements.map((ach, idx) => {
                             const item = ach.achievement;
                             const selected = selectedShowcase.includes(item._id);
@@ -664,7 +664,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                   )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    {user.achievementShowcase && user.achievementShowcase.length > 0 ? (
+                    {user?.achievementShowcase && user.achievementShowcase.length > 0 ? (
                       user.achievementShowcase.map((ach) => (
                         <div key={ach._id} className="relative p-3 bg-black/30 border border-gray-800/30 rounded-xl flex flex-col items-center text-center group">
                           <div className="text-3xl mb-1.5">{ach.emoji}</div>
@@ -693,9 +693,9 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                   <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-5">
                     <h2 className="text-sm font-black uppercase tracking-wider text-cyan-400 mb-4 flex items-center gap-1.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      Разблокированные достижения ({user.achievements?.length || 0})
+                      Разблокированные достижения ({user?.achievements?.length || 0})
                     </h2>
-                    {user.achievements && user.achievements.length > 0 ? (
+                    {user?.achievements && user.achievements.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                         {user.achievements.map((userAch, idx) => {
                           const ach = userAch.achievement;
@@ -732,7 +732,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                       Неполученные достижения ({allAchievements.length - (user.achievements?.length || 0)})
                     </h2>
                     {(() => {
-                      const earnedIds = (user.achievements || []).map(a => (a.achievement?._id || a.achievement || '').toString());
+                      const earnedIds = (user?.achievements || []).map(a => (a.achievement?._id || a.achievement || '').toString());
                       const unearned = allAchievements.filter(ach => !earnedIds.includes(ach._id.toString()));
 
                       if (unearned.length > 0) {
@@ -796,9 +796,9 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
               <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-5">
                 <h2 className="text-sm font-black flex items-center gap-1.5 uppercase tracking-wider text-cyan-400 mb-4">
                   <Users className="w-4 h-4 text-purple-400" />
-                  Список друзей ({user.friends?.length || 0})
+                  Список друзей ({user?.friends?.length || 0})
                 </h2>
-                {user.friends && user.friends.length > 0 ? (
+                {user?.friends && user.friends.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {user.friends.map(friend => (
                       <div
@@ -841,9 +841,9 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
 
                 {historyLoading ? (
                   <div className="text-center py-8 text-xs text-gray-500">Загрузка истории...</div>
-                ) : balanceHistory.length > 0 ? (
+                ) : (balanceHistory || []).length > 0 ? (
                   <div className="space-y-3">
-                    {balanceHistory.map((log) => {
+                    {(balanceHistory || []).map((log) => {
                       const isPositive = log.amount >= 0;
                       const badgeColor = isPositive ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10';
                       const badgePrefix = isPositive ? '+' : '';
@@ -928,7 +928,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
 
                 <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                   {comments && comments.length > 0 ? (
-                    comments.map((c) => {
+                    (comments || []).map((c) => {
                       const isCommentAuthor = currentUser && c.authorId?._id === currentUser._id;
                       const canDelete = isSelf || isCommentAuthor || (currentUser && currentUser.role === 'admin');
                       return (

@@ -25,7 +25,7 @@ async function sendMessage(text, chatId = CHAT_ID) {
   try {
     await bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
   } catch (err) {
-    console.error('[Telegram] Ошибка отправки:', err.message);
+    console.error('Telegram Bot Error:', err);
   }
 }
 

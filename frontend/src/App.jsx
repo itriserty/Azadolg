@@ -624,7 +624,7 @@ export default function App() {
 
   const handleUpdateTelegramId = async (telegramId) => {
     const updated = await api.updateTelegramId(telegramId);
-    setCurrentUser(updated);
+    setCurrentUser(updated.user);
   };
 
   const handleUpdateAvatar = (updatedUser) => {

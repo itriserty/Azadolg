@@ -97,9 +97,17 @@ async function updateTelegramId(req, res) {
     const { telegramId } = req.body;
     const userId = req.user;
 
+    let cleanTelegramId = null;
+    if (telegramId !== undefined && telegramId !== null) {
+      const trimmed = String(telegramId).trim();
+      if (trimmed && trimmed !== '0' && trimmed !== 'null' && trimmed !== 'undefined') {
+        cleanTelegramId = trimmed;
+      }
+    }
+
     const user = await User.findByIdAndUpdate(
       userId,
-      { telegramId: telegramId ? telegramId.trim() : null },
+      { telegramId: cleanTelegramId },
       { new: true }
     ).select('-password');
 
@@ -841,6 +849,9 @@ async function getBalanceHistory(req, res) {
           break;
         case 'jackpot_win':
           description = 'Выигрыш в еженедельном джекпоте';
+          break;
+        case 'jackpot_split':
+          description = 'Начисление за распределение джекпота';
           break;
         case 'case_open':
           description = 'Открытие кейса';
