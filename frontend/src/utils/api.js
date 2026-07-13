@@ -60,6 +60,7 @@ export const api = {
   adjustKarma:    (userId, amount, reason) => request(`/admin/users/${userId}/adjust-karma`, { method: 'POST', body: JSON.stringify({ amount, reason }) }),
   adjustElo:      (userId, amount, reason) => request(`/admin/users/${userId}/adjust-elo`, { method: 'POST', body: JSON.stringify({ amount, reason }) }),
   resetJackpot:   () => request('/admin/system/jackpot/reset', { method: 'POST' }),
+  distributeJackpot: () => request('/admin/jackpot/distribute', { method: 'POST' }),
   getGlobalStats: () => request('/admin/stats'),
 
   // Друзья

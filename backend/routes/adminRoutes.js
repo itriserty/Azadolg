@@ -7,7 +7,8 @@ const {
   getAchievements, createAchievement, updateAchievement, deleteAchievement,
   distributeKarma,
   adjustKarma, adjustElo, resetJackpot, getGlobalStats,
-  getUsersWithQuests
+  getUsersWithQuests,
+  distributeJackpot
 } = require('../controllers/adminController');
 const authMiddleware  = require('../middlewares/authMiddleware');
 const adminMiddleware = require('../middlewares/adminMiddleware');
@@ -30,6 +31,7 @@ router.post('/users/:id/adjust-elo',       adjustElo);
 
 // ── Джекпот и Статистика ────────────────────────────────────────────────────
 router.post('/system/jackpot/reset',       resetJackpot);
+router.post('/jackpot/distribute',         distributeJackpot);
 router.get('/stats',                       getGlobalStats);
 
 // ── Долги ─────────────────────────────────────────────────────────────────────

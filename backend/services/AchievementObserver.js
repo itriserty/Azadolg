@@ -28,6 +28,7 @@ class AchievementObserver {
 
         // 4. еженедельные задания для кредитора
         if (creditorId) {
+          console.log('[AchievementObserver] Handling debt_created for quest. creditorId:', creditorId, 'debtorId:', debtorId);
           const questService = require('./questService');
           const quests = await questService.trackProgress(creditorId, 'lend_to_specific_user', 1, { debt });
           if (newlyCompletedQuests && quests && quests.length > 0) {

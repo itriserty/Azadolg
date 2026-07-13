@@ -75,6 +75,27 @@ export default function AdminPanel({ token }) {
     }
   };
 
+  const doDistributeJackpot = async () => {
+    if (!window.confirm('Вы действительно хотите принудительно разыграть джекпот?')) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/admin/jackpot/distribute`, {
+        method: 'POST',
+        headers
+      });
+      const d = await r.json();
+      if (!r.ok) return flash(d.error || d.message || 'Ошибка при розыгрыше джекпота', 'err');
+      
+      const winnerName = d.winner ? `${d.winner.name} (@${d.winner.username})` : 'кто-то';
+      flash(`🎉 Джекпот разыгран! Победитель: ${winnerName}, Сумма: ${d.jackpotAmount} ✧`);
+      fetchStats();
+    } catch (err) {
+      flash('Ошибка при принудительном розыгрыше джекпота', 'err');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -344,15 +365,24 @@ export default function AdminPanel({ token }) {
         <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-4 flex flex-col justify-between">
           <div>
             <div className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Действия системы</div>
-            <button
-              onClick={doResetJackpot}
-              disabled={loading}
-              className="mt-2 w-full bg-red-600 hover:bg-red-500 text-white font-black py-2 rounded-xl text-xs transition"
-            >
-              Обнулить Джекпот
-            </button>
+            <div className="flex flex-col gap-2 mt-2">
+              <button
+                onClick={doDistributeJackpot}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white font-black py-2.5 px-3 rounded-xl text-xs transition duration-200 uppercase tracking-wider shadow-lg shadow-amber-500/20 active:scale-98"
+              >
+                Разыграть джекпот принудительно
+              </button>
+              <button
+                onClick={doResetJackpot}
+                disabled={loading}
+                className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-2 rounded-xl text-xs transition"
+              >
+                Обнулить Джекпот
+              </button>
+            </div>
           </div>
-          <p className="text-[10px] text-gray-500 mt-2">Сбросить глобальный джекпот до 0 ✧</p>
+          <p className="text-[10px] text-gray-500 mt-2">Управление еженедельным пулом розыгрыша</p>
         </div>
       </div>
 

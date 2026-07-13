@@ -28,93 +28,10 @@ async function runInTransaction(callback) {
 // Розыгрыш еженедельного джекпота
 async function drawJackpot() {
   try {
-    console.log('[CronService] Запуск розыгрыша еженедельного Джекпота...');
-    
-    const result = await runInTransaction(async (session) => {
-      let state = await SystemState.findOne().session(session);
-      if (!state) {
-        state = new SystemState();
-        await state.save({ session });
-      }
-
-      const jackpotAmount = state.jackpotPool;
-      if (jackpotAmount <= 0) {
-        console.log('[CronService] Джекпот пуст. Розыгрыш отменен.');
-        return null;
-      }
-
-      // Считаем количество подходящих пользователей
-      const count = await User.countDocuments({ username: { $exists: true, $ne: null } }).session(session);
-      if (count === 0) {
-        console.log('[CronService] Нет пользователей для розыгрыша.');
-        return null;
-      }
-
-      // Выбираем случайного победителя с помощью skip()
-      const randomIndex = Math.floor(Math.random() * count);
-      const winner = await User.findOne({ username: { $exists: true, $ne: null } })
-        .skip(randomIndex)
-        .session(session);
-
-      if (!winner) throw new Error('Не удалось выбрать победителя джекпота');
-
-      // Начисляем джекпот победителю
-      winner.karma += jackpotAmount;
-      winner.stats.totalKarmaEarned += jackpotAmount;
-      winner._karmaReason = 'jackpot_win';
-      await winner.save({ session });
-
-
-      // Находим admin-пользователя для записи лога транзакции
-      const admin = await User.findOne({ role: 'admin' }).session(session);
-      const adminId = admin ? admin._id : winner._id;
-
-      // Создаём запись в истории транзакций (Transaction)
-      const Transaction = require('../models/Transaction');
-      const tx = new Transaction({
-        creditor: adminId,
-        debtor: winner._id,
-        amount: jackpotAmount,
-        originalAmount: jackpotAmount,
-        description: '🎰 Выигрыш в еженедельном джекпоте Azadolg!',
-        dueDate: new Date(),
-        status: 'paid',
-        resolvedAt: new Date(),
-        createdBy: adminId
-      });
-      await tx.save({ session });
-
-      // Сбрасываем джекпот
-      state.jackpotPool = 0;
-      await state.save({ session });
-
-      return { winner, jackpotAmount };
-    });
-
-    if (!result) return;
-
-    const { winner, jackpotAmount } = result;
-    console.log(`[CronService] Победитель джекпота: ${winner.name} (@${winner.username}), выигрыш: ${jackpotAmount} ₸ Кармы.`);
-
-    try {
-      const achievementService = require('./AchievementService');
-      await achievementService.trigger('jackpot_won', { winnerId: winner._id });
-    } catch (err) {
-      console.error('[CronService] Ошибка вызова AchievementService для джекпота:', err);
-    }
-
-    // Уведомление в Телеграм
-    const text = `🎉 <b>ЕЖЕНЕДЕЛЬНЫЙ ДЖЕКПОТ АZADOLG!</b> 🎉\n\n` +
-      `👑 Счастливчик недели: <b>${winner.name}</b> (@${winner.username || 'нет'})\n` +
-      `💰 Выигрыш: <b>${jackpotAmount} ₸ Кармы</b>\n\n` +
-      `Копите карму, делайте ставки на долги, участвуйте в дуэлях Coinflip и выигрывайте джекпот каждую неделю! 🚀`;
-
-    tg.sendMessage(text);
-    if (winner.telegramId) {
-      tg.sendMessage(`🎉 Поздравляем! Вы выиграли еженедельный джекпот в размере <b>${jackpotAmount} ₸ Кармы</b>! 💰`, winner.telegramId);
-    }
+    const jackpotService = require('./jackpotService');
+    return await jackpotService.distributeJackpot();
   } catch (error) {
-    console.error('[CronService] Ошибка розыгрыша джекпота:', error);
+    console.error('[CronService] Ошибка в drawJackpot wrapper:', error);
   }
 }
 
@@ -453,8 +370,8 @@ function startCronScheduler() {
     await applyDailyOverduePenalties();
   });
 
-  // Розыгрыш джекпота каждое воскресенье в 23:59
-  cron.schedule('59 23 * * 0', () => {
+  // Розыгрыш джекпота каждый понедельник в 00:00
+  cron.schedule('0 0 * * 1', () => {
     drawJackpot();
   });
 

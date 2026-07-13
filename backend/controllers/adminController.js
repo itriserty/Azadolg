@@ -530,6 +530,53 @@ async function getUsersWithQuests(req, res) {
   }
 }
 
+// ── Ручной розыгрыш Джекпота ──────────────────────────────────────────────────
+async function distributeJackpot(req, res) {
+  try {
+    const jackpotService = require('../services/jackpotService');
+    const result = await jackpotService.distributeJackpot();
+
+    if (result && result.success) {
+      const adminId = req.user;
+      
+      // Логируем действие администратора в системе
+      await logAction(
+        adminId, 
+        'manual_karma_grant', 
+        result.winner._id, 
+        'User', 
+        `Принудительный розыгрыш джекпота. Победитель: ${result.winner.name} (@${result.winner.username}). Выигрыш: ${result.jackpotAmount} Кармы`
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: 'Джекпот успешно разыгран!',
+        winner: {
+          id: result.winner._id,
+          name: result.winner.name,
+          username: result.winner.username
+        },
+        jackpotAmount: result.jackpotAmount
+      });
+    } else {
+      const reason = result ? result.reason : 'unknown';
+      let message = 'Не удалось разыграть джекпот';
+      if (reason === 'jackpot_empty') {
+        message = 'Розыгрыш отменен: пул джекпота пуст или равен 0.';
+      } else if (reason === 'no_users') {
+        message = 'Розыгрыш отменен: в системе нет пользователей.';
+      }
+      return res.status(400).json({
+        success: false,
+        message
+      });
+    }
+  } catch (err) {
+    console.error('[admin/distributeJackpot]', err);
+    res.status(500).json({ error: 'Ошибка при принудительном розыгрыше джекпота' });
+  }
+}
+
 module.exports = {
   getUsers, banUser, unbanUser, deleteUser,
   getAllDebts, deleteDebt, cancelTransaction,
@@ -537,5 +584,6 @@ module.exports = {
   getAchievements, createAchievement, updateAchievement, deleteAchievement,
   distributeKarma,
   adjustKarma, adjustElo, resetJackpot, getGlobalStats,
-  getUsersWithQuests
+  getUsersWithQuests,
+  distributeJackpot
 };

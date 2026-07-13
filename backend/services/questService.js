@@ -201,13 +201,22 @@ async function trackProgress(userId, taskType, increment = 1, checkMeta = {}) {
 
     for (const task of tasks) {
       if (taskType === 'lend_to_specific_user') {
-        const targetUserId = task.meta_data?.targetUserId || task.target_value;
+        const targetUserId = task.meta_data?.targetUserId;
         const debt = checkMeta.debt;
         const debtorId = debt ? (debt.debtorId || debt.debtor) : checkMeta.targetUserId;
-        
-        if (!targetUserId || !debtorId || targetUserId.toString() !== debtorId.toString()) {
+
+        const rawDebtorId = debtorId && debtorId._id ? debtorId._id : debtorId;
+        const rawTargetUserId = targetUserId && targetUserId._id ? targetUserId._id : targetUserId;
+
+        console.log('[QuestService] Checking quest lend_to_specific_user:');
+        console.log(`- debtorId from event/meta: ${rawDebtorId} (${typeof rawDebtorId})`);
+        console.log(`- targetUserId from task meta_data: ${rawTargetUserId} (${typeof rawTargetUserId})`);
+
+        if (!rawTargetUserId || !rawDebtorId || String(rawDebtorId) !== String(rawTargetUserId)) {
+          console.log('[QuestService] Quest match failed.');
           continue;
         }
+        console.log('[QuestService] Quest match succeeded!');
       }
 
 
