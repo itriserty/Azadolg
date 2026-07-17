@@ -179,12 +179,13 @@ async function spin(req, res) {
     const eloGained = Math.round(baseElo * rate);
     const expGained = Math.round(baseExp * rate);
 
-    // ── Атомарное обновление баланса ─────────────────────────────────────────
+    // ── Атомарное обновление баланса через метод модели ───────────────────────
     // 1. Вычитаем ставку
-    user.karma -= tier.cost;
-    // 2. Зачисляем выигрыш (даже если 0 — транзакция всё равно фиксируется)
-    user.karma += prize.win;
-    user._karmaReason = 'roulette_spin';
+    user.replenishBalance('karma', -tier.cost, 'roulette_spin');
+    // 2. Зачисляем выигрыш (если он больше нуля)
+    if (prize.win > 0) {
+      user.replenishBalance('karma', prize.win, 'roulette_spin');
+    }
 
     // 3. Зачисляем ELO через replenishBalance (для автоматического логирования)
     if (eloGained > 0) {

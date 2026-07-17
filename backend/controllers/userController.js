@@ -216,6 +216,9 @@ async function getUserProfile(req, res) {
           level: targetUser.level || 1,
           exp: targetUser.exp || 0,
           friends: [],
+          achievements: [],
+          achievementShowcase: [],
+          badges: [],
           email: '',
           balance: 0
         },
@@ -639,8 +642,13 @@ async function transferKarma(req, res) {
         }
 
         sender.karma -= amount;
+        sender._karmaReason = 'transfer_sent';
+        sender._karmaRelatedEntityId = recipient._id;
+
         const receivedAmount = Math.floor(amount * 0.9);
         recipient.karma = (recipient.karma || 0) + receivedAmount;
+        recipient._karmaReason = 'transfer_received';
+        recipient._karmaRelatedEntityId = sender._id;
 
         await sender.save();
         await recipient.save();
