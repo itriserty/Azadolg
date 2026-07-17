@@ -100,6 +100,15 @@ const UserSchema = new mongoose.Schema({
   lastLoginAt: {
     type: Date,
     default: null
+  },
+  // ── Уровень и EXP игрока ──────────────────────────────────────────────────────
+  level: {
+    type: Number,
+    default: 1
+  },
+  exp: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true

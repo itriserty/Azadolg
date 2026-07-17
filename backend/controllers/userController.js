@@ -166,6 +166,12 @@ async function getUserProfile(req, res) {
   try {
     const { id } = req.params;
     const viewerId = req.user;
+    const mongoose = require('mongoose');
+
+    // Валидация ID пользователя во избежание CastError
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Неверный формат ID пользователя' });
+    }
 
     // Проверяем достижение "Еблан года" (просрочка > 365 дней) перед загрузкой профиля
     const achievementService = require('../services/AchievementService');
@@ -185,12 +191,18 @@ async function getUserProfile(req, res) {
     }
 
     const isSelf = id.toString() === viewerId.toString();
-    const isFriend = targetUser.friends.map(f => f._id.toString()).includes(viewerId.toString());
+    
+    // Безопасное сопоставление списка друзей (исключая возможные null значения при populate)
+    const isFriend = targetUser.friends && targetUser.friends
+      .filter(Boolean)
+      .map(f => f._id.toString())
+      .includes(viewerId.toString());
+
     const isAdmin = viewerUser && viewerUser.role === 'admin';
     const canView = isSelf || isAdmin || isFriend;
 
     if (!canView) {
-      // Если не друзья — возвращаем ограниченные данные (заблокированный профиль)
+      // Если не друзья — возвращаем ограниченные данные (заблокированный профиль) с дефолтными значениями для фронтенда
       return res.status(200).json({
         user: {
           _id: targetUser._id,
@@ -200,7 +212,12 @@ async function getUserProfile(req, res) {
           eloRating: targetUser.eloRating,
           activeProfileSkin: targetUser.activeProfileSkin,
           activeProfileFrame: targetUser.activeProfileFrame,
-          isPrivateProfile: true
+          isPrivateProfile: true,
+          level: targetUser.level || 1,
+          exp: targetUser.exp || 0,
+          friends: [],
+          email: '',
+          balance: 0
         },
         isFriend,
         canView: false,
