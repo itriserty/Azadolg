@@ -240,7 +240,7 @@ class AchievementObserver {
             try {
               const personalMsg = `🎉 Вы получили достижение: <b>${ach.emoji} ${ach.title}</b>!` +
                 (karmaReward > 0 ? `\n💠 +${karmaReward} Кармы зачислено!` : '');
-              await tg.sendMessage(personalMsg, user.telegramId);
+              tg.sendMessage(personalMsg, user.telegramId);
             } catch (e) {
               console.error('Ошибка отправки уведомления в Telegram:', e.message);
             }

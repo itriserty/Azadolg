@@ -244,7 +244,8 @@ async function seedDatabase() {
     creditor: alice._id, debtor: bob._id,
     amount: 500, originalAmount: 500,
     description: 'Скинулись на пиццу 🍕',
-    dueDate: futureDue, penaltyRate: 0.01, status: 'active'
+    dueDate: futureDue, penaltyRate: 0.01, status: 'active',
+    createdBy: alice._id
   }).save();
 
   // Просроченный долг — создан 8 дней назад → штраф 5% виден сразу
@@ -253,7 +254,8 @@ async function seedDatabase() {
     creditor: bob._id, debtor: charlie._id,
     amount: 800, originalAmount: 800,
     description: 'Такси из клуба 🚖',
-    dueDate: oldDate, penaltyRate: 0.02, status: 'active'
+    dueDate: oldDate, penaltyRate: 0.02, status: 'active',
+    createdBy: bob._id
   });
   overdueTx.createdAt = oldDate;
   await overdueTx.save();

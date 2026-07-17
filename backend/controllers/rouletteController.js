@@ -223,7 +223,7 @@ async function spin(req, res) {
       tg.sendMessage(msg);
       if (user.telegramId) {
         try {
-          await tg.sendMessage(
+          tg.sendMessage(
             `🎉 Поздравляем! Вы сорвали джекпот рулетки: +${prize.win} Кармы! 🏆`,
             user.telegramId
           );
