@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const tg = require('../services/telegramService');
 
@@ -166,7 +167,6 @@ async function getUserProfile(req, res) {
   try {
     const { id } = req.params;
     const viewerId = req.user;
-    const mongoose = require('mongoose');
 
     // Валидация ID пользователя во избежание CastError
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -253,7 +253,6 @@ async function getUserProfile(req, res) {
     const myFriendIds = viewerUser ? viewerUser.friends : [];
     
     // Агрегация долгов с фильтрацией
-    const mongoose = require('mongoose');
     const targetUserId = new mongoose.Types.ObjectId(id);
     const viewerObjectId = new mongoose.Types.ObjectId(viewerId);
     const myFriendObjectIds = myFriendIds.map(fid => new mongoose.Types.ObjectId(fid));
@@ -542,7 +541,6 @@ async function transferKarma(req, res) {
       return res.status(400).json({ error: 'Сумма перевода должна быть целым положительным числом' });
     }
 
-    const mongoose = require('mongoose');
     const session = await mongoose.startSession();
 
     let success = false;
