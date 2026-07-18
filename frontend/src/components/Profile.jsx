@@ -367,6 +367,22 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
           <div className="text-center md:text-left">
             <h1 className="text-2xl font-black tracking-tight">{user.name}</h1>
             <p className="text-sm opacity-60">@{user.username}</p>
+
+            {/* Уровень и полоска опыта */}
+            <div className="mt-2.5 flex flex-col sm:flex-row items-center gap-2 justify-center md:justify-start">
+              <span className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[10px] px-2 py-0.5 rounded-md font-black uppercase tracking-wider">
+                LVL {user.level || 1}
+              </span>
+              <div className="w-28 bg-slate-800/80 rounded-full h-2 overflow-hidden border border-slate-700/50 relative" title={`${user.exp || 0} / ${(user.level || 1) * 100} EXP`}>
+                <div 
+                  className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${Math.min(100, ((user.exp || 0) / ((user.level || 1) * 100)) * 100)}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-gray-400 font-bold">
+                {user.exp || 0} / {(user.level || 1) * 100} EXP
+              </span>
+            </div>
             
             {/* Значки/Ачивки рядом с аватаркой */}
             {user?.badges && user.badges.length > 0 && (

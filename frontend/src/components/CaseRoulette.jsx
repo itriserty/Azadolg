@@ -6,6 +6,22 @@ import { api } from '../utils/api';
 // ── Тиры (идентичны бэкенду rouletteController.js) ──────────────────────────
 const TIERS_META = [
   {
+    cost:     500,
+    label:    'Супертир',
+    sublabel: 'Легенда',
+    color:    'from-purple-500 to-indigo-650',
+    border:   'border-purple-500/40',
+    glow:     'shadow-purple-500/20',
+    textColor:'text-purple-400',
+    prizes:   [
+      { win: 0,    label: '0 Кармы',    emoji: '💀', rarity: 'Пусто',     weight: 25, tag: 'zero'       },
+      { win: 250,  label: '+250 Кармы', emoji: '🪙', rarity: 'Кэшбек',    weight: 36, tag: 'cashback'   },
+      { win: 500,  label: '+500 Кармы', emoji: '✅', rarity: 'Выход в 0', weight: 32, tag: 'break_even' },
+      { win: 1000, label: '+1000 Кармы',emoji: '💎', rarity: 'Удвоение',  weight:  5, tag: 'double'      },
+      { win: 2500, label: '+2500 Кармы',emoji: '🏆', rarity: 'ДЖЕКПОТ',   weight:  2, tag: 'jackpot'    },
+    ],
+  },
+  {
     cost:     100,
     label:    'Тир I',
     sublabel: 'Хайроллер',
