@@ -92,6 +92,19 @@ const defaultAchievements = [
     isRepeatable: false,
     isActive: true,
     createdByAdmin: false
+  },
+  {
+    slug: 'set_avatar',
+    emoji: '👤',
+    title: 'Своё лицо',
+    description: 'Установил аватарку в профиле.',
+    rarity: 'common',
+    trigger: 'avatar_set',
+    threshold: 1,
+    isSecret: false,
+    isRepeatable: false,
+    isActive: true,
+    createdByAdmin: false
   }
 ];
 
@@ -113,6 +126,49 @@ async function seedAchievements() {
         await existing.save();
       }
     }
+
+    // Проверка ачивок за аватарку для существующих пользователей
+    const User = require('../models/User');
+    const BalanceLog = require('../models/BalanceLog');
+    const avatarAch = await Achievement.findOne({ slug: 'set_avatar' });
+    if (avatarAch) {
+      const usersWithAvatar = await User.find({
+        avatar: { $ne: null, $exists: true, $ne: '' }
+      });
+      for (const u of usersWithAvatar) {
+        const hasAch = u.achievements.some(a => a.achievement && a.achievement.toString() === avatarAch._id.toString());
+        if (!hasAch) {
+          // Начисляем 25 кармы
+          u.replenishBalance('karma', 25, 'achievement_unlocked', avatarAch._id);
+          u.achievements.push({ achievement: avatarAch._id, earnedAt: new Date() });
+          await u.save();
+
+          // Создаем прогресс
+          const UserAchievementProgress = require('../models/UserAchievementProgress');
+          let progress = await UserAchievementProgress.findOne({ userId: u._id, achievementId: avatarAch._id });
+          if (!progress) {
+            progress = new UserAchievementProgress({ userId: u._id, achievementId: avatarAch._id, currentValue: 1, isEarned: true });
+            await progress.save();
+          } else if (!progress.isEarned) {
+            progress.isEarned = true;
+            progress.currentValue = 1;
+            await progress.save();
+          }
+
+          // Создаем пост в ленту
+          const Post = require('../models/Post');
+          const newPost = new Post({
+            type: 'achievement_earned',
+            author: u._id,
+            content: `Пользователь @${u.username} получил достижение [${avatarAch.emoji} ${avatarAch.title}]!`
+          });
+          await newPost.save();
+
+          console.log(`[SEED] Выдано достижение "set_avatar" пользователю ${u.username}`);
+        }
+      }
+    }
+
     console.log('[SEED] Сидирование базовых достижений завершено.');
   } catch (err) {
     console.error('[SEED] Ошибка при сидировании достижений:', err);

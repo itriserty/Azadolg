@@ -19,6 +19,19 @@ module.exports = function (req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded.id; // Прикрепляем ID пользователя к объекту запроса
+
+    // Обновляем время активности в фоне (с ограничением частоты в 2 минуты)
+    const User = require('../models/User');
+    User.findById(req.user).select('lastLoginAt').then(user => {
+      if (user) {
+        const now = new Date();
+        if (!user.lastLoginAt || (now - user.lastLoginAt) > 2 * 60 * 1000) {
+          user.lastLoginAt = now;
+          user.save().catch(err => console.error('[authMiddleware] Ошибка сохранения времени активности:', err));
+        }
+      }
+    }).catch(err => console.error('[authMiddleware] Ошибка обновления активности пользователя:', err));
+
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Недействительный или истекший токен.' });

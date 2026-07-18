@@ -149,13 +149,20 @@ async function updateAvatar(req, res) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
+    // Триггерим ачивку за аватарку
+    const achievementService = require('../services/AchievementService');
+    await achievementService.emit('avatar_set', { userId: user._id });
+
+    // Запрашиваем обновленного пользователя из базы, чтобы вернуть актуальный список ачивок/баланс
+    const finalUser = await User.findById(userId).select('-password');
+
     // Telegram-уведомление
-    tg.sendMessage(`🖼️ <b>Новое фото профиля!</b>\n\nПользователь <b>${user.name}</b> (@${user.username}) загрузил новый аватар.`);
-    if (user.telegramId) {
-      tg.sendMessage(`🖼️ Вы успешно обновили свой аватар в Avarice!`, user.telegramId);
+    tg.sendMessage(`🖼️ <b>Новое фото профиля!</b>\n\nПользователь <b>${finalUser.name}</b> (@${finalUser.username}) загрузил новый аватар.`);
+    if (finalUser.telegramId) {
+      tg.sendMessage(`🖼️ Вы успешно обновили свой аватар в Avarice!`, finalUser.telegramId);
     }
 
-    res.status(200).json({ message: 'Аватар профиля успешно обновлен!', user });
+    res.status(200).json({ message: 'Аватар профиля успешно обновлен!', user: finalUser });
   } catch (error) {
     console.error('Ошибка обновления аватара:', error);
     res.status(500).json({ error: 'Ошибка сервера при обновлении аватара' });
@@ -182,7 +189,7 @@ async function getUserProfile(req, res) {
         .select('-password -resetCode -resetCodeExpires')
         .populate('achievements.achievement')
         .populate('achievementShowcase')
-        .populate('friends', 'name username avatar avatar_url eloRating karma activeProfileFrame activeProfileSkin'),
+        .populate('friends', 'name username avatar avatar_url eloRating karma activeProfileFrame activeProfileSkin battlePassLevel level'),
       User.findById(viewerId)
     ]);
 
@@ -200,6 +207,8 @@ async function getUserProfile(req, res) {
 
     const isAdmin = viewerUser && viewerUser.role === 'admin';
     const canView = isSelf || isAdmin || isFriend;
+
+    const isOnline = isSelf || (targetUser.lastLoginAt && (new Date() - targetUser.lastLoginAt) < 5 * 60 * 1000);
 
     if (!canView) {
       // Если не друзья — возвращаем ограниченные данные (заблокированный профиль) с дефолтными значениями для фронтенда
@@ -220,7 +229,8 @@ async function getUserProfile(req, res) {
           achievementShowcase: [],
           badges: [],
           email: '',
-          balance: 0
+          balance: 0,
+          isOnline: !!isOnline
         },
         isFriend,
         canView: false,
@@ -416,8 +426,11 @@ async function getUserProfile(req, res) {
       return achObj;
     });
 
+    const userObj = targetUser.toObject();
+    userObj.isOnline = !!isOnline;
+
     res.status(200).json({
-      user: targetUser,
+      user: userObj,
       isFriend,
       canView: true,
       comments,

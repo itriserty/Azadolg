@@ -78,7 +78,10 @@ async function checkAndAward(userId, triggerType, currentValue = null) {
       if (val >= ach.threshold) {
         // Начисляем Карму за достижение
         const rarityKey = (ach.rarity || '').toUpperCase();
-        const karmaReward = RARITY_KARMA[rarityKey] || 0;
+        let karmaReward = RARITY_KARMA[rarityKey] || 0;
+        if (ach.slug === 'set_avatar') {
+          karmaReward = 25;
+        }
 
         if (karmaReward > 0) {
           user.replenishBalance('karma', karmaReward, 'achievement_unlocked', ach._id);

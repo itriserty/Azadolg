@@ -162,6 +162,14 @@ class AchievementObserver {
         console.error('[AchievementObserver] Error on overdue_check listener:', err);
       }
     });
+
+    achievementService.on('avatar_set', async ({ userId, resultsRef }) => {
+      try {
+        await this.processProgress(userId, 'avatar_set', async () => 1, resultsRef);
+      } catch (err) {
+        console.error('[AchievementObserver] Error on avatar_set listener:', err);
+      }
+    });
   }
 
   async processProgress(userId, triggerType, valCalculator, resultsRef, isIncremental = false) {
@@ -203,7 +211,11 @@ class AchievementObserver {
 
           // Начисляем Карму
           const rarityKey = (ach.rarity || '').toUpperCase();
-          const karmaReward = RARITY_KARMA[rarityKey] || 0;
+          let karmaReward = RARITY_KARMA[rarityKey] || 0;
+
+          if (ach.slug === 'set_avatar') {
+            karmaReward = 25;
+          }
 
           if (karmaReward > 0) {
             user.replenishBalance('karma', karmaReward, 'achievement_unlocked', ach._id);

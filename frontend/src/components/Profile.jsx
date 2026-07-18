@@ -280,8 +280,10 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
               
               {/* Статус в стиле Steam */}
               <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs text-gray-400 mt-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="font-semibold text-emerald-400">В сети</span>
+                <span className={`w-2.5 h-2.5 rounded-full ${user?.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-500'}`} />
+                <span className={`font-semibold ${user?.isOnline ? 'text-emerald-400' : 'text-gray-400'}`}>
+                  {user?.isOnline ? 'В сети' : 'Не в сети'}
+                </span>
               </div>
             </div>
           </div>
@@ -457,7 +459,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                     </div>
                     <div className="text-right shrink-0 flex items-center gap-1.5">
                       <div className="text-[8px] font-black bg-cyan-500/10 border border-cyan-500/35 text-cyan-400 rounded px-1">
-                        LVL {friend.level || 1}
+                        LVL {friend.battlePassLevel || friend.level || 1}
                       </div>
                       <span className="text-[9px] text-amber-500 font-bold">{friend.eloRating || 1000} ELO</span>
                     </div>

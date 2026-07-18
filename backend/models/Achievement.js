@@ -47,6 +47,7 @@ const AchievementSchema = new mongoose.Schema({
       'karma_transferred',      // перевел суммарно N Кармы
       'blind_kitten',           // выдал долг без свидетеля на сумму больше X
       'witness_decline',        // отказался быть свидетелем N раз
+      'avatar_set',             // установил аватарку
       'custom'                  // выдаётся вручную администратором
     ],
     default: 'custom'
