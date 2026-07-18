@@ -201,7 +201,8 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
     );
   }
 
-  const { user, friends = [], allAchievements = [] } = profileData;
+  const { user, allAchievements = [] } = profileData;
+  const friends = user?.friends || [];
   const currentSkin = user?.activeProfileSkin || 'default';
   const currentFrame = user?.activeProfileFrame || 'none';
   const elo = user?.eloRating || 1000;
