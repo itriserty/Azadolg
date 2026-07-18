@@ -12,8 +12,7 @@ const NAV_ITEMS = [
   { path: '/debts',      label: 'Долги',     icon: CreditCard,   color: 'hover:text-purple-400' },
   { path: '/casino',     label: 'Казино',    icon: Sparkles,     color: 'hover:text-amber-400' },
   { path: '/battlepass', label: 'BP Pass',   icon: Trophy,       color: 'hover:text-yellow-400' },
-  { path: '/shop',       label: 'Магазин',   icon: ShoppingBag,  color: 'hover:text-emerald-400' },
-  { path: '/profile',    label: 'Профиль',   icon: User,         color: 'hover:text-indigo-400' }
+  { path: '/shop',       label: 'Магазин',   icon: ShoppingBag,  color: 'hover:text-emerald-400' }
 ];
 
 export default function Layout({ user, onLogout }) {

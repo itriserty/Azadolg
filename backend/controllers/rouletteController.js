@@ -199,6 +199,23 @@ async function spin(req, res) {
     }
     const leveledUp = (user.level || 1) > initialLevel;
 
+    // 4.1 Зачисляем EXP на Battle Pass
+    const initialBPLevel = user.battlePassLevel || 1;
+    if (expGained > 0) {
+      user.battlePassXP = (user.battlePassXP || 0) + expGained;
+      while (user.battlePassXP >= 100) {
+        user.battlePassXP -= 100;
+        user.battlePassLevel = (user.battlePassLevel || 1) + 1;
+      }
+    }
+    const bpLeveledUp = (user.battlePassLevel || 1) > initialBPLevel;
+    if (bpLeveledUp) {
+      const { grantBattlePassReward } = require('../utils/battlePassHelper');
+      for (let lvl = initialBPLevel + 1; lvl <= user.battlePassLevel; lvl++) {
+        await grantBattlePassReward(user, lvl);
+      }
+    }
+
     // ── Джекпот-пул: 30% от ставки уходит в пул (house edge = 30%) ──────────
     const jackpotContrib = Math.floor(tier.cost * 0.30);
     let systemState = await SystemState.findOne().session(session);
@@ -268,16 +285,14 @@ async function spin(req, res) {
       spinDetails: {
         eloGained,
         expGained,
-        leveledUp,
-        levelDiff: (user.level || 1) - initialLevel
+        leveledUp: bpLeveledUp || leveledUp,
+        levelDiff: bpLeveledUp ? (user.battlePassLevel - initialBPLevel) : ((user.level || 1) - initialLevel)
       },
       user: {
-        _id:   user._id,
-        name:  user.name,
-        karma: user.karma,
-        level: user.level || 1,
-        exp:   user.exp || 0,
-        eloRating: user.eloRating
+        ...user.toObject(),
+        password: undefined,
+        resetCode: undefined,
+        resetCodeExpires: undefined
       },
       newlyCompletedQuests,
       newlyAwarded
