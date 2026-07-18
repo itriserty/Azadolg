@@ -815,11 +815,11 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
               <div className="bg-[#0b0f19]/40 backdrop-blur border border-gray-800/30 rounded-2xl p-5">
                 <h2 className="text-sm font-black flex items-center gap-1.5 uppercase tracking-wider text-cyan-400 mb-4">
                   <Users className="w-4 h-4 text-purple-400" />
-                  Список друзей ({user?.friends?.length || 0})
+                  Список друзей ({user?.friends?.filter(Boolean)?.length || 0})
                 </h2>
-                {user?.friends && user.friends.length > 0 ? (
+                {user?.friends && user.friends.filter(Boolean).length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {user.friends.map(friend => (
+                    {user.friends.filter(Boolean).map(friend => (
                       <div
                         key={friend._id}
                         onClick={() => {
