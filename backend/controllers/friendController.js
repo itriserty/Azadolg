@@ -193,10 +193,34 @@ async function getPendingRequests(req, res) {
   }
 }
 
+// Синхронизация связей дружбы в локальной сети: все не-админы друзья друг другу
+async function syncAllFriendships() {
+  try {
+    const nonAdmins = await User.find({ role: { $ne: 'admin' } });
+    const nonAdminIds = nonAdmins.map(u => u._id);
+
+    for (const user of nonAdmins) {
+      // Исключаем ID самого пользователя из его списка друзей
+      const otherIds = nonAdminIds.filter(id => id.toString() !== user._id.toString());
+      
+      await User.findByIdAndUpdate(user._id, {
+        $set: { friends: otherIds }
+      });
+    }
+    // Очищаем список друзей для администраторов
+    await User.updateMany({ role: 'admin' }, { $set: { friends: [] } });
+    
+    console.log(`[FriendSync] Связи дружбы успешно синхронизированы для ${nonAdmins.length} пользователей.`);
+  } catch (err) {
+    console.error('[FriendSync] Ошибка автоматического связывания:', err);
+  }
+}
+
 module.exports = {
   addFriend,
   acceptFriendRequest,
   rejectFriendRequest,
   getFriends,
-  getPendingRequests
+  getPendingRequests,
+  syncAllFriendships
 };

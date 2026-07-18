@@ -277,6 +277,12 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
     console.log('✅ MongoDB Atlas: подключено.');
     await seedDatabase();
     try {
+      const { syncAllFriendships } = require('./controllers/friendController');
+      await syncAllFriendships();
+    } catch (err) {
+      console.error('[app.js] Ошибка запуска синхронизации связей дружбы:', err);
+    }
+    try {
       const seedAchievements = require('./scripts/seedAchievements');
       await seedAchievements();
     } catch (err) {

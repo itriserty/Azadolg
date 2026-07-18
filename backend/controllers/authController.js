@@ -42,6 +42,14 @@ async function register(req, res) {
 
     await newUser.save();
 
+    // Синхронизация дружбы в локальной сети
+    try {
+      const { syncAllFriendships } = require('./friendController');
+      await syncAllFriendships();
+    } catch (err) {
+      console.error('[authController.register] Ошибка синхронизации дружбы:', err);
+    }
+
     // 📣 Telegram-уведомление
     const text = `🎉 <b>Новый пользователь зарегистрирован!</b>\n\n` +
       `👤 Игрок: <b>${newUser.name}</b>\n` +
