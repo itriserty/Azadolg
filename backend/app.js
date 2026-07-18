@@ -115,7 +115,7 @@ app.use(express.static(FRONTEND_DIST));
 // Все несовпадающие маршруты → index.html (SPA-режим)
 app.get('*', (req, res) => {
   res.sendFile(path.join(FRONTEND_DIST, 'index.html'), err => {
-    if (err) res.status(200).send('Azadolg API is running ✅');
+    if (err) res.status(200).send('Avarice API is running ✅');
   });
 });
 
@@ -132,7 +132,7 @@ async function seedDatabase() {
   // Семена достижений
   const achCount = await Achievement.countDocuments();
   if (achCount === 0) {
-    console.log('[SEED] Создаём стандартные достижения Azadolg...');
+    console.log('[SEED] Создаём стандартные достижения Avarice...');
     await Achievement.insertMany([
       {
         slug: 'declined_loan_streak',
@@ -287,6 +287,12 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
       await seedAchievements();
     } catch (err) {
       console.error('[app.js] Ошибка запуска сидирования ачивок:', err);
+    }
+    try {
+      const grantLuckyBastard = require('./scripts/grantLuckyBastard');
+      await grantLuckyBastard();
+    } catch (err) {
+      console.error('[app.js] Ошибка запуска выдачи достижений Везучий ублюдок:', err);
     }
     startReminderScheduler();
     startCronScheduler();

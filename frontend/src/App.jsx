@@ -84,9 +84,9 @@ function AppRoutes({
           {/* Логотип */}
           <div className="flex flex-col items-center mb-8">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-650 to-cyan-500 flex items-center justify-center font-black text-white text-3xl shadow-xl shadow-purple-500/20 mb-3 animate-pulse-slow">
-              AD
+              AV
             </div>
-            <h2 className="text-xl font-black text-white tracking-tight">Вход в Azadolg</h2>
+            <h2 className="text-xl font-black text-white tracking-tight">Вход в Avarice</h2>
             <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Закрытая финансовая ELO-система</p>
           </div>
 

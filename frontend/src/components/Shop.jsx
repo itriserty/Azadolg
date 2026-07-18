@@ -159,7 +159,7 @@ export default function Shop({ user, onUpdateUser, onViewProfile }) {
           {/* Официальная витрина */}
           <div className="bg-[#151c2c] border border-gray-800 rounded-3xl p-5 shadow-xl shadow-black/40 space-y-4">
             <h3 className="text-xs font-black uppercase tracking-wider text-purple-400">
-              Официальная Витрина Azadolg
+              Официальная Витрина Avarice
             </h3>
 
             {loading && items.length === 0 ? (

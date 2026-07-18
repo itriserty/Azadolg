@@ -65,10 +65,10 @@ export default function Layout({ user, onLogout }) {
           {/* Логотип */}
           <div className="flex items-center gap-2 px-2 cursor-pointer" onClick={() => navigate('/feed')}>
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-650 to-cyan-500 flex items-center justify-center font-black text-white text-lg shadow-lg shadow-purple-500/25">
-              AD
+              AV
             </div>
             <div>
-              <h1 className="font-black text-sm tracking-tight text-white leading-none">AZADOLG</h1>
+              <h1 className="font-black text-sm tracking-tight text-white leading-none">AVARICE</h1>
               <span className="text-[9px] text-cyan-400 font-extrabold uppercase tracking-widest leading-none">
                 Season {seasonInfo?.currentSeason || 1}
               </span>
@@ -167,9 +167,9 @@ export default function Layout({ user, onLogout }) {
       <header className="md:hidden flex items-center justify-between p-4 bg-[#0b0f19]/80 backdrop-blur-xl border-b border-gray-800/50">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-650 to-cyan-500 flex items-center justify-center font-black text-white text-sm">
-            AD
+            AV
           </div>
-          <span className="font-black text-xs text-white">AZADOLG</span>
+          <span className="font-black text-xs text-white">AVARICE</span>
         </div>
         <div className="flex items-center gap-2.5 text-[10px] sm:text-xs font-mono">
           <div className="flex items-center gap-1 px-1.5 py-0.5 bg-cyan-950/40 border border-cyan-500/20 rounded-lg text-[9px] text-cyan-400 font-bold shrink-0">

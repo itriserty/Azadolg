@@ -32,7 +32,7 @@ export default function Casino({ user, onUpdateUser }) {
         <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 
         <div className="text-amber-400 font-extrabold text-[10px] uppercase tracking-widest flex items-center justify-center gap-1 mb-2">
-          <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Накопительный Джекпот Azadolg <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+          <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Накопительный Джекпот Avarice <Sparkles className="w-3.5 h-3.5 animate-pulse" />
         </div>
 
         <h1 className="text-4xl font-black text-white tracking-tight drop-shadow-[0_2px_10px_rgba(250,204,21,0.3)] animate-pulse">

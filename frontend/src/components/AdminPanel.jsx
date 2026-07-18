@@ -389,7 +389,7 @@ export default function AdminPanel({ token }) {
         </div>
         <div>
           <h1 className="font-black text-white text-lg tracking-tight">Панель администратора</h1>
-          <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5 font-bold">Система центрального управления Azadolg</p>
+          <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5 font-bold">Система центрального управления Avarice</p>
         </div>
       </div>
 
@@ -423,7 +423,7 @@ export default function AdminPanel({ token }) {
               {stats ? stats.totalKarma.toLocaleString('ru') : '...'} <span className="text-lg font-normal">✧</span>
             </div>
           </div>
-          <p className="text-[10px] text-gray-500 mt-3 border-t border-gray-800/30 pt-2">Суммарный объем экономики Azadolg</p>
+          <p className="text-[10px] text-gray-500 mt-3 border-t border-gray-800/30 pt-2">Суммарный объем экономики Avarice</p>
         </div>
 
         {/* Global Jackpot card */}

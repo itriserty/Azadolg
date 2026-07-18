@@ -118,7 +118,7 @@ async function updateTelegramId(req, res) {
 
     // 📣 Telegram-уведомление
     if (user.telegramId) {
-      tg.sendMessage(`🔔 <b>Уведомления привязаны!</b>\n\nВы успешно привязали свой Telegram аккаунт к системе Azadolg ELO. Теперь вы будете получать отчеты о долгах и активности сюда!`, user.telegramId);
+      tg.sendMessage(`🔔 <b>Уведомления привязаны!</b>\n\nВы успешно привязали свой Telegram аккаунт к системе Avarice ELO. Теперь вы будете получать отчеты о долгах и активности сюда!`, user.telegramId);
     }
     tg.sendMessage(`🔔 <b>Telegram привязан!</b>\n\nПользователь <b>${user.name}</b> (@${user.username}) привязал свой Telegram ID.`);
 
@@ -152,7 +152,7 @@ async function updateAvatar(req, res) {
     // Telegram-уведомление
     tg.sendMessage(`🖼️ <b>Новое фото профиля!</b>\n\nПользователь <b>${user.name}</b> (@${user.username}) загрузил новый аватар.`);
     if (user.telegramId) {
-      tg.sendMessage(`🖼️ Вы успешно обновили свой аватар в Azadolg!`, user.telegramId);
+      tg.sendMessage(`🖼️ Вы успешно обновили свой аватар в Avarice!`, user.telegramId);
     }
 
     res.status(200).json({ message: 'Аватар профиля успешно обновлен!', user });

@@ -7,11 +7,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        darkBg: '#0b0f19',      // Глубокий космический черный
-        darkCard: '#151c2c',    // Темная карточка
-        neonPurple: '#a855f7',  // Неоновый фиолетовый
+        darkBg: '#060b0b',      // Глубокий изумрудно-черный
+        darkCard: '#0d1715',    // Темная изумрудная карточка
+        neonPurple: '#10b981',  // Изумрудный акцент
         neonGreen: '#22c55e',   // Неоновый зеленый
-        neonCyan: '#06b6d4',    // Неоновый голубой
+        neonCyan: '#fbbf24',    // Золотой акцент (Avarice)
         neonRed: '#ef4444',     // Неоновый красный
         gold: '#fbbf24',        // Золотой для редких дропов
       },
@@ -19,9 +19,9 @@ export default {
         sans: ['Inter', 'sans-serif'],
       },
       boxShadow: {
-        neonPurple: '0 0 15px rgba(168, 85, 247, 0.4)',
+        neonPurple: '0 0 15px rgba(16, 185, 129, 0.4)',
         neonGreen: '0 0 15px rgba(34, 197, 94, 0.4)',
-        neonCyan: '0 0 15px rgba(6, 182, 212, 0.4)',
+        neonCyan: '0 0 15px rgba(251, 191, 36, 0.4)',
       }
     },
   },

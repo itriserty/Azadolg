@@ -43,7 +43,7 @@ function notifyWitnessRequest({ creditorName, debtorName, amount, promisedReturn
     `${promisedReturnAmount ? `🤝 Обещано вернуть: <b>${promisedReturnAmount} ₸</b>\n` : ''}` +
     `📝 Описание: ${description}\n` +
     `📅 Срок: <b>${date}</b>\n\n` +
-    `⚖️ Вы назначены свидетелем. Подтвердите или отклоните этот долг в приложении Azadolg!`;
+    `⚖️ Вы назначены свидетелем. Подтвердите или отклоните этот долг в приложении Avarice!`;
 
   if (witnessTelegramId) sendMessage(text, witnessTelegramId);
   if (debtorTelegramId) sendMessage(text, debtorTelegramId);
@@ -62,7 +62,7 @@ function notifyDebtCreated({ creditorName, debtorName, amount, description, dueD
     `💰 Сумма: <b>${amount} ₸</b>\n` +
     `📝 Описание: ${description}\n` +
     `📅 Вернуть до: <b>${date}</b>\n\n` +
-    `⚡ Открыто в <a href="https://azadolg.onrender.com">Azadolg</a>`;
+    `⚡ Открыто в <a href="https://avarice.onrender.com">Avarice</a>`;
 
   if (debtorTelegramId) {
     sendMessage(text, debtorTelegramId);
@@ -126,7 +126,7 @@ function notifyPenaltyApplied({ debtorName, creditorName, originalAmount, newAmo
     `👤 Кредитор: <b>${creditorName}</b>\n` +
     `💸 Штраф +5%: <b>+${penalty} ₸</b>\n` +
     `💰 Новая сумма: <b>${newAmount} ₸</b>\n\n` +
-    `❗ Закройте долг скорее в <a href="https://azadolg.onrender.com">Azadolg</a>!`;
+    `❗ Закройте долг скорее в <a href="https://avarice.onrender.com">Avarice</a>!`;
 
   if (debtorTelegramId) {
     sendMessage(text, debtorTelegramId);
