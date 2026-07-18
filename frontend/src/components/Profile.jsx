@@ -680,8 +680,8 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                   )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    {user?.achievementShowcase && user.achievementShowcase.length > 0 ? (
-                      user.achievementShowcase.map((ach) => (
+                    {user?.achievementShowcase && user.achievementShowcase.filter(Boolean).length > 0 ? (
+                      user.achievementShowcase.filter(Boolean).map((ach) => (
                         <div key={ach._id} className="relative p-3 bg-black/30 border border-gray-800/30 rounded-xl flex flex-col items-center text-center group">
                           <div className="text-3xl mb-1.5">{ach.emoji}</div>
                           <div className="text-xs font-bold text-gray-200">{ach.title}</div>
@@ -729,7 +729,10 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                                 <div className="text-xs font-black text-gray-250 truncate">{ach.title}</div>
                                 <div className="text-[9px] text-gray-400 mt-0.5 line-clamp-2">{ach.description}</div>
                                 <div className="text-[8px] text-gray-500 mt-1 uppercase tracking-wider">
-                                  Получено: {new Date(userAch.earnedAt || userAch.earnedAt || userAch.awardedAt).toLocaleDateString('ru-RU')}
+                                  Получено: {(() => {
+                                    const d = new Date(userAch.earnedAt || userAch.awardedAt);
+                                    return isNaN(d.getTime()) ? 'Неизвестно' : d.toLocaleDateString('ru-RU');
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -874,7 +877,10 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                             <div>
                               <p className="text-xs font-bold text-gray-205">{log.description}</p>
                               <p className="text-[10px] text-gray-500 mt-0.5">
-                                {new Date(log.created_at).toLocaleString('ru-RU')}
+                                {(() => {
+                                  const d = new Date(log.created_at);
+                                  return isNaN(d.getTime()) ? 'Неизвестно' : d.toLocaleString('ru-RU');
+                                })()}
                               </p>
                             </div>
                           </div>
@@ -960,7 +966,10 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                                 {c.authorId?.name || 'Пользователь'}
                               </span>
                               <span className="text-[9px] text-gray-500">
-                                {new Date(c.createdAt).toLocaleDateString('ru-RU')}
+                                {(() => {
+                                  const d = new Date(c.createdAt);
+                                  return isNaN(d.getTime()) ? 'Неизвестно' : d.toLocaleDateString('ru-RU');
+                                })()}
                               </span>
                             </div>
                             <p className="text-xs text-gray-300 mt-1 break-words">{c.text}</p>
