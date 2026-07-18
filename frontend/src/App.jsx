@@ -292,7 +292,7 @@ function AppRoutes({
             <Feed
               user={currentUser}
               onUpdateUser={handleUserUpdate}
-              onViewProfile={null}
+              onViewProfile={(id) => navigate(`/profile/${id}`)}
               leaderboardUsers={users}
               friends={friends}
               pendingRequests={pendingRequests}
@@ -353,19 +353,37 @@ function AppRoutes({
             <Shop 
               user={currentUser} 
               onUpdateUser={handleUserUpdate} 
-              onViewProfile={null}
+              onViewProfile={(id) => navigate(`/profile/${id}`)}
             />
           }
         />
 
         <Route 
           path="profile" 
-          element={<Navigate to="/feed" replace />}
+          element={
+            <Profile 
+              userId={currentUser._id} 
+              currentUser={currentUser} 
+              onBack={null} 
+              onViewProfile={(id) => navigate(`/profile/${id}`)}
+              onUpdateAvatar={handleUpdateAvatar}
+              onUpdateUser={handleUserUpdate}
+            />
+          }
         />
 
         <Route 
           path="profile/:id" 
-          element={<Navigate to="/feed" replace />}
+          element={
+            <Profile 
+              userId={null} 
+              currentUser={currentUser} 
+              onBack={() => navigate(-1)} 
+              onViewProfile={(id) => navigate(`/profile/${id}`)}
+              onUpdateAvatar={handleUpdateAvatar}
+              onUpdateUser={handleUserUpdate}
+            />
+          }
         />
 
         <Route 
