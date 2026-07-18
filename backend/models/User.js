@@ -100,6 +100,15 @@ const UserSchema = new mongoose.Schema({
   lastLoginAt: {
     type: Date,
     default: null
+  },
+  // ── Уровень и EXP игрока ──────────────────────────────────────────────────────
+  level: {
+    type: Number,
+    default: 1
+  },
+  exp: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true
@@ -155,11 +164,13 @@ UserSchema.pre('save', function(next) {
   if (this.isModified('eloRating')) {
     const diff = this.eloRating - originalElo;
     if (diff !== 0) {
-      const alreadyLogged = this._balanceLogs.some(log => log.currency === 'elo' && log.amount === diff);
-      if (!alreadyLogged) {
+      const sumLogged = this._balanceLogs
+        .filter(log => log.currency === 'elo')
+        .reduce((sum, log) => sum + log.amount, 0);
+      if (sumLogged !== diff) {
         this._balanceLogs.push({
           currency: 'elo',
-          amount: diff,
+          amount: diff - sumLogged,
           reason: this._eloReason || 'other',
           related_entity_id: this._eloRelatedEntityId || null
         });
@@ -170,11 +181,13 @@ UserSchema.pre('save', function(next) {
   if (this.isModified('karma')) {
     const diff = this.karma - originalKarma;
     if (diff !== 0) {
-      const alreadyLogged = this._balanceLogs.some(log => log.currency === 'karma' && log.amount === diff);
-      if (!alreadyLogged) {
+      const sumLogged = this._balanceLogs
+        .filter(log => log.currency === 'karma')
+        .reduce((sum, log) => sum + log.amount, 0);
+      if (sumLogged !== diff) {
         this._balanceLogs.push({
           currency: 'karma',
-          amount: diff,
+          amount: diff - sumLogged,
           reason: this._karmaReason || 'other',
           related_entity_id: this._karmaRelatedEntityId || null
         });

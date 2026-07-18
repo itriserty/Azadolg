@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const tg = require('../services/telegramService');
 
@@ -167,6 +168,11 @@ async function getUserProfile(req, res) {
     const { id } = req.params;
     const viewerId = req.user;
 
+    // Валидация ID пользователя во избежание CastError
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Неверный формат ID пользователя' });
+    }
+
     // Проверяем достижение "Еблан года" (просрочка > 365 дней) перед загрузкой профиля
     const achievementService = require('../services/AchievementService');
     await achievementService.emit('overdue_check', { userId: id });
@@ -185,12 +191,18 @@ async function getUserProfile(req, res) {
     }
 
     const isSelf = id.toString() === viewerId.toString();
-    const isFriend = targetUser.friends.map(f => f._id.toString()).includes(viewerId.toString());
+    
+    // Безопасное сопоставление списка друзей (исключая возможные null значения при populate)
+    const isFriend = targetUser.friends && targetUser.friends
+      .filter(Boolean)
+      .map(f => f._id.toString())
+      .includes(viewerId.toString());
+
     const isAdmin = viewerUser && viewerUser.role === 'admin';
     const canView = isSelf || isAdmin || isFriend;
 
     if (!canView) {
-      // Если не друзья — возвращаем ограниченные данные (заблокированный профиль)
+      // Если не друзья — возвращаем ограниченные данные (заблокированный профиль) с дефолтными значениями для фронтенда
       return res.status(200).json({
         user: {
           _id: targetUser._id,
@@ -200,7 +212,15 @@ async function getUserProfile(req, res) {
           eloRating: targetUser.eloRating,
           activeProfileSkin: targetUser.activeProfileSkin,
           activeProfileFrame: targetUser.activeProfileFrame,
-          isPrivateProfile: true
+          isPrivateProfile: true,
+          level: targetUser.level || 1,
+          exp: targetUser.exp || 0,
+          friends: [],
+          achievements: [],
+          achievementShowcase: [],
+          badges: [],
+          email: '',
+          balance: 0
         },
         isFriend,
         canView: false,
@@ -233,7 +253,6 @@ async function getUserProfile(req, res) {
     const myFriendIds = viewerUser ? viewerUser.friends : [];
     
     // Агрегация долгов с фильтрацией
-    const mongoose = require('mongoose');
     const targetUserId = new mongoose.Types.ObjectId(id);
     const viewerObjectId = new mongoose.Types.ObjectId(viewerId);
     const myFriendObjectIds = myFriendIds.map(fid => new mongoose.Types.ObjectId(fid));
@@ -522,7 +541,6 @@ async function transferKarma(req, res) {
       return res.status(400).json({ error: 'Сумма перевода должна быть целым положительным числом' });
     }
 
-    const mongoose = require('mongoose');
     const session = await mongoose.startSession();
 
     let success = false;
@@ -622,8 +640,13 @@ async function transferKarma(req, res) {
         }
 
         sender.karma -= amount;
+        sender._karmaReason = 'transfer_sent';
+        sender._karmaRelatedEntityId = recipient._id;
+
         const receivedAmount = Math.floor(amount * 0.9);
         recipient.karma = (recipient.karma || 0) + receivedAmount;
+        recipient._karmaReason = 'transfer_received';
+        recipient._karmaRelatedEntityId = sender._id;
 
         await sender.save();
         await recipient.save();

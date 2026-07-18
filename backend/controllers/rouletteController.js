@@ -17,8 +17,34 @@ const SystemState = require('../models/SystemState');
 const tg          = require('../services/telegramService');
 const mongoose    = require('mongoose');
 
+/**
+ * Начисляет опыт и повышает уровни игрока
+ * @param {Object} user 
+ * @param {number} expGained 
+ */
+function addExperience(user, expGained) {
+  if (expGained <= 0) return;
+  user.exp = (user.exp || 0) + expGained;
+  user.level = user.level || 1;
+  while (user.exp >= user.level * 100) {
+    user.exp -= user.level * 100;
+    user.level += 1;
+  }
+}
+
 // ─── Таблицы призов (сумма весов = 100) ─────────────────────────────────────
 const TIERS = {
+  500: {
+    cost: 500,
+    label: 'Суперрулетка',
+    prizes: [
+      { win: 0,    weight: 25, label: '0 Кармы',    emoji: '💀', rarity: 'Пусто',     tag: 'zero'     },
+      { win: 250,  weight: 36, label: '+250 Кармы', emoji: '🪙', rarity: 'Кэшбек',    tag: 'cashback' },
+      { win: 500,  weight: 32, label: '+500 Кармы', emoji: '✅', rarity: 'Выход в 0', tag: 'break_even' },
+      { win: 1000, weight: 5,  label: '+1000 Кармы',emoji: '💎', rarity: 'Удвоение',  tag: 'double'   },
+      { win: 2500, weight: 2,  label: '+2500 Кармы',emoji: '🏆', rarity: 'ДЖЕКПОТ',   tag: 'jackpot'  },
+    ],
+  },
   100: {
     cost: 100,
     label: 'Тир 1',
@@ -70,7 +96,7 @@ function selectPrize(prizes) {
 
 /**
  * POST /api/roulette/spin
- * body: { tier: 100 | 50 | 25 }
+ * body: { tier: 500 | 100 | 50 | 25 }
  */
 async function spin(req, res) {
   // Открываем MongoDB-сессию для ACID-транзакции
@@ -91,7 +117,7 @@ async function spin(req, res) {
     if (!tier) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ error: 'Недопустимый тир. Доступны: 100, 50, 25.' });
+      return res.status(400).json({ error: 'Недопустимый тир. Доступны: 500, 100, 50, 25.' });
     }
 
     // Загружаем пользователя ВНУТРИ транзакции
@@ -121,13 +147,57 @@ async function spin(req, res) {
     // ── Выбираем приз (рандом только на сервере!) ───────────────────────────
     const prize = selectPrize(tier.prizes);
 
-    // ── Атомарное обновление баланса ─────────────────────────────────────────
-    // 1. Вычитаем ставку
-    user.karma -= tier.cost;
-    // 2. Зачисляем выигрыш (даже если 0 — транзакция всё равно фиксируется)
-    user.karma += prize.win;
-    user._karmaReason = 'roulette_spin';
+    // Вычисляем ELO и EXP на основе тира и тега приза
+    const rate = tier.cost / 100;
+    let baseElo = 0;
+    let baseExp = 0;
 
+    switch (prize.tag) {
+      case 'cashback':
+        baseElo = 2;
+        baseExp = 5;
+        break;
+      case 'break_even':
+        baseElo = 5;
+        baseExp = 10;
+        break;
+      case 'double':
+        baseElo = 10;
+        baseExp = 20;
+        break;
+      case 'jackpot':
+        baseElo = 25;
+        baseExp = 50;
+        break;
+      case 'zero':
+      default:
+        baseElo = 0;
+        baseExp = 0;
+        break;
+    }
+
+    const eloGained = Math.round(baseElo * rate);
+    const expGained = Math.round(baseExp * rate);
+
+    // ── Атомарное обновление баланса через метод модели ───────────────────────
+    // 1. Вычитаем ставку
+    user.replenishBalance('karma', -tier.cost, 'roulette_spin');
+    // 2. Зачисляем выигрыш (если он больше нуля)
+    if (prize.win > 0) {
+      user.replenishBalance('karma', prize.win, 'roulette_spin');
+    }
+
+    // 3. Зачисляем ELO через replenishBalance (для автоматического логирования)
+    if (eloGained > 0) {
+      user.replenishBalance('elo', eloGained, 'roulette_spin');
+    }
+
+    // 4. Зачисляем EXP
+    const initialLevel = user.level || 1;
+    if (expGained > 0) {
+      addExperience(user, expGained);
+    }
+    const leveledUp = (user.level || 1) > initialLevel;
 
     // ── Джекпот-пул: 30% от ставки уходит в пул (house edge = 30%) ──────────
     const jackpotContrib = Math.floor(tier.cost * 0.30);
@@ -153,7 +223,7 @@ async function spin(req, res) {
       tg.sendMessage(msg);
       if (user.telegramId) {
         try {
-          await tg.sendMessage(
+          tg.sendMessage(
             `🎉 Поздравляем! Вы сорвали джекпот рулетки: +${prize.win} Кармы! 🏆`,
             user.telegramId
           );
@@ -195,10 +265,19 @@ async function spin(req, res) {
         tag:    prize.tag,
       },
       karmaChange: prize.win - tier.cost,  // < 0 если потеря, >= 0 если прибыль/ноль
+      spinDetails: {
+        eloGained,
+        expGained,
+        leveledUp,
+        levelDiff: (user.level || 1) - initialLevel
+      },
       user: {
         _id:   user._id,
         name:  user.name,
         karma: user.karma,
+        level: user.level || 1,
+        exp:   user.exp || 0,
+        eloRating: user.eloRating
       },
       newlyCompletedQuests,
       newlyAwarded
