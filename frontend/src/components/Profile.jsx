@@ -114,7 +114,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
       setLoading(true);
       const data = await api.request(`/users/${targetUserId}/profile`);
       setProfileData(data);
-      setSelectedShowcase((data.user?.achievementShowcase || []).map(a => a._id || a));
+      setSelectedShowcase((data.user?.achievementShowcase || []).filter(Boolean).map(a => a?._id || a));
       setError('');
     } catch (err) {
       console.error(err);
@@ -306,8 +306,8 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
           {/* Аватар в рамке */}
           <div className="relative shrink-0 group">
             <img
-              src={user.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.username}`}
-              alt={user.name}
+              src={user?.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${user?.username}`}
+              alt={user?.name}
               className={`w-24 h-24 rounded-2xl object-cover ${FRAME_STYLES[currentFrame] || FRAME_STYLES.none}`}
             />
             {isSelf && (
@@ -365,8 +365,8 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
           )}
 
           <div className="text-center md:text-left">
-            <h1 className="text-2xl font-black tracking-tight">{user.name}</h1>
-            <p className="text-sm opacity-60">@{user.username}</p>
+            <h1 className="text-2xl font-black tracking-tight">{user?.name}</h1>
+            <p className="text-sm opacity-60">@{user?.username}</p>
 
             {/* Уровень и полоска опыта */}
             <div className="mt-2.5 flex flex-col sm:flex-row items-center gap-2 justify-center md:justify-start">
@@ -426,7 +426,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                 onClick={handleTogglePrivacy}
                 className="flex items-center gap-1 text-[11px] font-bold py-1.5 px-3 rounded-xl border border-gray-800 bg-[#0b0f19]/80 hover:bg-[#151c2c] transition"
               >
-                {user.isPrivateProfile ? (
+                {user?.isPrivateProfile ? (
                   <>
                     <EyeOff className="w-3.5 h-3.5 text-amber-400" />
                     Только для друзей
@@ -1005,7 +1005,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
             </h3>
             
             <p className="text-xs text-gray-300 mb-4">
-              Вы переводите Карму пользователю <span className="font-bold text-white">@{user.username}</span>.
+              Вы переводите Карму пользователю <span className="font-bold text-white">@{user?.username}</span>.
             </p>
             
             <form onSubmit={handleTransferKarma} className="space-y-4">

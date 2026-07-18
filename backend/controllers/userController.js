@@ -255,7 +255,9 @@ async function getUserProfile(req, res) {
     // Агрегация долгов с фильтрацией
     const targetUserId = new mongoose.Types.ObjectId(id);
     const viewerObjectId = new mongoose.Types.ObjectId(viewerId);
-    const myFriendObjectIds = myFriendIds.map(fid => new mongoose.Types.ObjectId(fid));
+    const myFriendObjectIds = (myFriendIds || [])
+      .filter(Boolean)
+      .map(fid => new mongoose.Types.ObjectId(fid));
 
     const rawDebts = await Transaction.aggregate([
       {

@@ -18,10 +18,11 @@ function getCalculatedAmount(transaction, now = new Date()) {
 
   const baseAmount = transaction.promisedReturnAmount || transaction.originalAmount;
 
-  // Если прошло более 7 дней
-  if (diffDays > 7) {
-    const penalty = baseAmount * 0.05;
-    return Number((baseAmount + penalty).toFixed(2));
+  // Количество полных недель (каждые 7 дней) просрочки
+  const weeks = Math.floor(diffDays / 7);
+  if (weeks > 0) {
+    const compounded = baseAmount * Math.pow(1.05, weeks);
+    return Number(compounded.toFixed(2));
   }
 
   return baseAmount;

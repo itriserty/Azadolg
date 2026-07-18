@@ -204,6 +204,38 @@ const TapeCard = React.memo(function TapeCard({ item }) {
   );
 });
 
+// ── Вспомогательная функция для расчета ELO и EXP по тегу и стоимости тира ──
+function getPrizeEloAndExp(tag, cost) {
+  const rate = cost / 100;
+  let baseElo = 0;
+  let baseExp = 0;
+  switch (tag) {
+    case 'cashback':
+      baseElo = 2;
+      baseExp = 5;
+      break;
+    case 'break_even':
+      baseElo = 5;
+      baseExp = 10;
+      break;
+    case 'double':
+      baseElo = 10;
+      baseExp = 20;
+      break;
+    case 'jackpot':
+      baseElo = 25;
+      baseExp = 50;
+      break;
+    default:
+      baseElo = 0;
+      baseExp = 0;
+  }
+  return {
+    elo: Math.round(baseElo * rate),
+    exp: Math.round(baseExp * rate)
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CaseRoulette({ user, onUserUpdate }) {
   const [tierIdx, setTierIdx]       = useState(0);
@@ -212,6 +244,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
   // во время анимации
   const [tape, setTape]             = useState(() => buildTape(TIERS_META[0].prizes));
   const [wonPrize, setWonPrize]     = useState(null);   // приз из бэкенда
+  const [spinDetails, setSpinDetails] = useState(null); // детали спина (ELO, EXP)
   const [showResult, setShowResult] = useState(false);
   const [error, setError]           = useState('');
 
@@ -229,6 +262,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
     setTierIdx(idx);
     winTagRef.current = null;
     setWonPrize(null);
+    setSpinDetails(null);
     setShowResult(false);
     setError('');
     controls.set({ x: 0 });
@@ -249,6 +283,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
     setError('');
     setSpinning(true);
     setWonPrize(null);
+    setSpinDetails(null);
     setShowResult(false);
 
     try {
@@ -268,7 +303,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
       // перезаписывает items[WIN_INDEX] — никакой рассинхрон невозможен.
       const newTape = buildTape(tier.prizes, result.prize);
 
-      // Сначала сбрасываем x в 0 (без анимации), потом заменяем ленту,
+      // Сначала сбрасываем x in 0 (без анимации), потом заменяем ленту,
       // чтобы пользователь не увидел скачка.
       controls.set({ x: 0 });
       setTape(newTape);
@@ -296,6 +331,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
       // ── ШАГ 6: ПОКАЗЫВАЕМ РЕЗУЛЬТАТ ──────────────────────────────────────
       // wonPrize — данные из бэкенда, та же карточка что и на ленте
       setWonPrize(result.prize);
+      setSpinDetails(result.spinDetails);
       setShowResult(true);
 
       // Обновляем баланс пользователя в родительском компоненте
@@ -325,7 +361,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
         <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-3 text-center">
           Выберите ставку
         </p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {TIERS_META.map((t, i) => (
             <button
               key={t.cost}
@@ -351,14 +387,30 @@ export default function CaseRoulette({ user, onUserUpdate }) {
         </div>
 
         {/* Таблица шансов */}
-        <div className="mt-3 grid grid-cols-5 gap-1">
-          {tier.prizes.map(p => (
-            <div key={p.tag} className="text-center">
-              <div className="text-base">{p.emoji}</div>
-              <div className={`text-[8px] font-black ${tier.textColor}`}>{p.weight}%</div>
-              <div className="text-[7px] text-gray-600 leading-tight">{p.rarity}</div>
-            </div>
-          ))}
+        <div className="mt-3.5 grid grid-cols-5 gap-1">
+          {tier.prizes.map(p => {
+            const rewards = getPrizeEloAndExp(p.tag, tier.cost);
+            return (
+              <div key={p.tag} className="text-center p-1 bg-[#0b0f19]/30 border border-gray-800/20 rounded-lg flex flex-col justify-between">
+                <div>
+                  <div className="text-base">{p.emoji}</div>
+                  <div className={`text-[8px] font-black ${tier.textColor}`}>{p.weight}%</div>
+                  <div className="text-[7px] text-gray-400 font-bold leading-tight truncate px-0.5">{p.label}</div>
+                </div>
+                <div className="mt-1 border-t border-gray-800/20 pt-1 space-y-0.5">
+                  {rewards.elo > 0 ? (
+                    <div className="text-[7px] text-cyan-400 font-black leading-none">+{rewards.elo} ELO</div>
+                  ) : null}
+                  {rewards.exp > 0 ? (
+                    <div className="text-[7px] text-indigo-400 font-black leading-none">+{rewards.exp} XP</div>
+                  ) : null}
+                  {rewards.elo === 0 && rewards.exp === 0 ? (
+                    <div className="text-[7px] text-gray-600 leading-none">—</div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -489,6 +541,24 @@ export default function CaseRoulette({ user, onUserUpdate }) {
                     +{wonPrize.win} ✧
                   </span>
                 </div>
+                {spinDetails && spinDetails.eloGained > 0 && (
+                  <div className="flex justify-between text-cyan-400 font-bold">
+                    <span>Получено ELO</span>
+                    <span>+{spinDetails.eloGained} 🔥</span>
+                  </div>
+                )}
+                {spinDetails && spinDetails.expGained > 0 && (
+                  <div className="flex justify-between text-indigo-400 font-bold">
+                    <span>Получено EXP</span>
+                    <span>+{spinDetails.expGained} XP</span>
+                  </div>
+                )}
+                {spinDetails && spinDetails.leveledUp && (
+                  <div className="flex justify-between border-t border-white/5 pt-1 text-yellow-400 font-extrabold text-[9px] uppercase tracking-wider">
+                    <span>🚀 Новый уровень!</span>
+                    <span>LVL +{spinDetails.levelDiff || 1}</span>
+                  </div>
+                )}
                 <div className="flex justify-between border-t border-white/10 pt-1">
                   <span className="font-bold">Итог</span>
                   <span className={`font-black ${wonPrize.win - tier.cost >= 0 ? 'text-green-400' : 'text-red-400'}`}>
