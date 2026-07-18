@@ -75,7 +75,7 @@ export default function Marketplace({ user, onUpdateUser, onViewProfile }) {
     <div className="space-y-6 animate-fadeIn text-sm">
       
       {/* Шапка рынка */}
-      <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[#0d1715] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-500 to-cyan-400 flex items-center justify-center font-black text-white text-xl">
             🛒
@@ -111,7 +111,7 @@ export default function Marketplace({ user, onUpdateUser, onViewProfile }) {
 
       {/* Мои лоты */}
       {myActiveListings.length > 0 && (
-        <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40">
+        <div className="bg-[#0d1715] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40">
           <h3 className="text-xs font-black uppercase tracking-wider text-purple-400 mb-4">
             Мои выставленные лоты ({myActiveListings.length})
           </h3>
@@ -139,7 +139,7 @@ export default function Marketplace({ user, onUpdateUser, onViewProfile }) {
       )}
 
       {/* Общий список лотов */}
-      <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40">
+      <div className="bg-[#0d1715] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40">
         <h3 className="text-xs font-black uppercase tracking-wider text-cyan-400 mb-4">
           Лоты игроков на продаже ({otherListings.length})
         </h3>
@@ -189,7 +189,7 @@ export default function Marketplace({ user, onUpdateUser, onViewProfile }) {
                     <button
                       onClick={() => handleBuy(item)}
                       disabled={buyingId === item._id || (user && user.karma < item.price)}
-                      className="bg-cyan-600 hover:bg-cyan-500 text-[#0b0f19] font-black text-xs py-1.5 px-3.5 rounded-lg transition disabled:opacity-40 flex items-center gap-1"
+                      className="bg-cyan-600 hover:bg-cyan-500 text-[#060b0b] font-black text-xs py-1.5 px-3.5 rounded-lg transition disabled:opacity-40 flex items-center gap-1"
                     >
                       <span>Купить</span>
                       <ArrowRight className="w-3 h-3" />

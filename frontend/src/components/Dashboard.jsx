@@ -91,7 +91,7 @@ export default function Dashboard({
       className="space-y-6"
     >
       {/* 1. КАРТОЧКА ПРОФИЛЯ */}
-      <div className={`relative overflow-hidden rounded-2xl p-6 transition-all duration-300 border-2 ${isVIP ? 'border-amber-400 bg-gradient-to-br from-[#241a0d] to-[#151c2c] shadow-[0_0_25px_rgba(245,158,11,0.25)] shadow-amber-500/20' : 'bg-[#151c2c] border-gray-800 shadow-xl shadow-black/40'}`}>
+      <div className={`relative overflow-hidden rounded-2xl p-6 transition-all duration-300 border-2 ${isVIP ? 'border-amber-400 bg-gradient-to-br from-[#241a0d] to-[#0d1715] shadow-[0_0_25px_rgba(245,158,11,0.25)] shadow-amber-500/20' : 'bg-[#0d1715] border-gray-800 shadow-xl shadow-black/40'}`}>
         {/* Декоративный неоновый фон */}
         <div className="absolute -right-20 -top-20 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-16 -bottom-12 w-32 h-32 bg-cyan-500/8 rounded-full blur-3xl pointer-events-none" />
@@ -171,7 +171,7 @@ export default function Dashboard({
                 placeholder="Ваш ID"
                 value={tgInput}
                 onChange={(e) => setTgInput(e.target.value)}
-                className="bg-[#151c2c] border border-gray-700 rounded px-2 py-1 text-xs text-gray-100 w-24 focus:outline-none focus:border-cyan-500"
+                className="bg-[#0d1715] border border-gray-700 rounded px-2 py-1 text-xs text-gray-100 w-24 focus:outline-none focus:border-cyan-500"
               />
               <button type="submit" className="p-1.5 bg-green-600/30 hover:bg-green-600/50 text-green-400 rounded transition">
                 <Check className="w-3.5 h-3.5" />
@@ -194,7 +194,7 @@ export default function Dashboard({
         </div>
 
         {/* Баланс долгов — основной блок */}
-        <div className="border border-gray-850/60 rounded-xl p-4 mb-4 bg-[#0b0f19]/60">
+        <div className="border border-gray-850/60 rounded-xl p-4 mb-4 bg-[#060b0b]/60">
           <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-2">
             Ваш баланс долгов
           </div>
@@ -223,7 +223,7 @@ export default function Dashboard({
         </div>
 
         {/* Игровая Статистика и Достижения */}
-        <div className={`border rounded-xl p-4 mb-4 ${isVIP ? 'border-amber-500/30 bg-amber-500/5' : 'border-gray-850/60 bg-[#0b0f19]/40'}`}>
+        <div className={`border rounded-xl p-4 mb-4 ${isVIP ? 'border-amber-500/30 bg-amber-500/5' : 'border-gray-850/60 bg-[#060b0b]/40'}`}>
           <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-3 flex items-center gap-1.5">
             <Trophy className="w-3.5 h-3.5 text-yellow-400" />
             Игровая статистика
@@ -285,7 +285,7 @@ export default function Dashboard({
       </div>
 
       {/* 2. СОЦИАЛЬНАЯ ПАНЕЛЬ (ДРУЗЬЯ И ЗАПРОСЫ) */}
-      <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-6 shadow-xl shadow-black/40">
+      <div className="bg-[#0d1715] border border-gray-800 rounded-2xl p-6 shadow-xl shadow-black/40">
         <div className="flex items-center gap-2 font-black text-gray-100 mb-4 uppercase tracking-wider text-sm border-b border-gray-800 pb-2.5">
           <Users className="w-4 h-4 text-cyan-400" />
           Друзья ({friends.length})
@@ -299,7 +299,7 @@ export default function Dashboard({
               placeholder="Добавить по @username..."
               value={friendUsername}
               onChange={(e) => setFriendUsername(e.target.value)}
-              className="flex-1 bg-[#0b0f19] border border-gray-850 text-xs text-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:border-cyan-500"
+              className="flex-1 bg-[#060b0b] border border-gray-850 text-xs text-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:border-cyan-500"
             />
             <button
               type="submit"
@@ -370,7 +370,7 @@ export default function Dashboard({
                 <div
                   key={friend._id}
                   onClick={() => onViewProfile && onViewProfile(friend._id)}
-                  className="flex items-center justify-between p-2.5 bg-[#0b0f19]/40 border border-gray-850/40 rounded-xl hover:border-gray-800/80 cursor-pointer transition"
+                  className="flex items-center justify-between p-2.5 bg-[#060b0b]/40 border border-gray-850/40 rounded-xl hover:border-gray-800/80 cursor-pointer transition"
                 >
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">

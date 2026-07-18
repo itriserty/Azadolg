@@ -370,7 +370,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
               className={`relative overflow-hidden flex flex-col items-center justify-center py-3 px-2 rounded-xl border transition-all duration-200 ${
                 tierIdx === i
                   ? `bg-gradient-to-br ${t.color} bg-opacity-20 ${t.border} shadow-lg ${t.glow}`
-                  : 'border-gray-800 bg-[#151c2c]/60 hover:border-gray-700'
+                  : 'border-gray-800 bg-[#0d1715]/60 hover:border-gray-700'
               } disabled:opacity-40`}
             >
               <span className={`text-base font-black ${tierIdx === i ? 'text-white' : 'text-gray-300'}`}>
@@ -391,7 +391,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
           {tier.prizes.map(p => {
             const rewards = getPrizeEloAndExp(p.tag, tier.cost);
             return (
-              <div key={p.tag} className="text-center p-1 bg-[#0b0f19]/30 border border-gray-800/20 rounded-lg flex flex-col justify-between">
+              <div key={p.tag} className="text-center p-1 bg-[#060b0b]/30 border border-gray-800/20 rounded-lg flex flex-col justify-between">
                 <div>
                   <div className="text-base">{p.emoji}</div>
                   <div className={`text-[8px] font-black ${tier.textColor}`}>{p.weight}%</div>
@@ -415,7 +415,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
       </div>
 
       {/* ── Рулетка ─────────────────────────────────────────────────────────── */}
-      <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 relative overflow-hidden">
+      <div className="bg-[#0d1715] border border-gray-800 rounded-2xl p-5 relative overflow-hidden">
 
         {/* Баланс */}
         <div className="flex justify-between items-center mb-4">
@@ -434,7 +434,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
         </div>
 
         {/* Лента */}
-        <div className="relative w-full py-3 bg-[#0b0f19]/90 border border-gray-800 rounded-xl overflow-hidden mb-4">
+        <div className="relative w-full py-3 bg-[#060b0b]/90 border border-gray-800 rounded-xl overflow-hidden mb-4">
           {/* Вертикальная стрелка-указатель (строго по центру) */}
           <div
             className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[3px] z-20 pointer-events-none rounded-full"
@@ -569,7 +569,7 @@ export default function CaseRoulette({ user, onUserUpdate }) {
 
               <button
                 onClick={() => setShowResult(false)}
-                className="w-full bg-white text-[#0b0f19] font-black py-2.5 px-6 rounded-xl text-xs hover:opacity-90 transition shadow-md uppercase tracking-wider flex items-center justify-center gap-1"
+                className="w-full bg-white text-[#060b0b] font-black py-2.5 px-6 rounded-xl text-xs hover:opacity-90 transition shadow-md uppercase tracking-wider flex items-center justify-center gap-1"
               >
                 Продолжить <ChevronRight className="w-4 h-4" />
               </button>

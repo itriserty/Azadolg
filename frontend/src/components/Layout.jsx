@@ -57,10 +57,10 @@ export default function Layout({ user, onLogout }) {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-[#070b13] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#131a2e] via-[#070b13] to-black text-gray-200 flex flex-col md:flex-row font-sans selection:bg-purple-600/40">
+    <div className="min-h-screen bg-[#050a0a] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#0b1614] via-[#050a0a] to-black text-gray-200 flex flex-col md:flex-row font-sans selection:bg-purple-600/40">
       
       {/* ── ДЕСКТОПНЫЙ САЙДБАР ── */}
-      <aside className="hidden md:flex md:w-64 flex-col border-r border-gray-800/60 bg-[#0b0f19]/70 backdrop-blur-xl shrink-0 p-5 justify-between">
+      <aside className="hidden md:flex md:w-64 flex-col border-r border-gray-800/60 bg-[#060b0b]/70 backdrop-blur-xl shrink-0 p-5 justify-between">
         <div className="space-y-6">
           {/* Логотип */}
           <div className="flex items-center gap-2 px-2 cursor-pointer" onClick={() => navigate('/feed')}>
@@ -164,7 +164,7 @@ export default function Layout({ user, onLogout }) {
       </aside>
 
       {/* ── МОБИЛЬНАЯ ШАПКА ── */}
-      <header className="md:hidden flex items-center justify-between p-4 bg-[#0b0f19]/80 backdrop-blur-xl border-b border-gray-800/50">
+      <header className="md:hidden flex items-center justify-between p-4 bg-[#060b0b]/80 backdrop-blur-xl border-b border-gray-800/50">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-650 to-cyan-500 flex items-center justify-center font-black text-white text-sm">
             AV
@@ -191,7 +191,7 @@ export default function Layout({ user, onLogout }) {
       </main>
 
       {/* ── МОБИЛЬНОЕ НИЖНЕЕ МЕНЮ ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0b0f19]/90 backdrop-blur-xl border-t border-gray-800/80 px-2 py-2 flex justify-around items-center z-40">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#060b0b]/90 backdrop-blur-xl border-t border-gray-800/80 px-2 py-2 flex justify-around items-center z-40">
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.path}

@@ -100,7 +100,7 @@ export default function Shop({ user, onUpdateUser, onViewProfile }) {
     <div className="space-y-6 text-xs text-gray-300">
       
       {/* Шапка магазина */}
-      <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[#0d1715] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-base font-black tracking-tight text-white flex items-center gap-1.5 uppercase">
             🛍️ Рынок и Кастомизация
@@ -129,7 +129,7 @@ export default function Shop({ user, onUpdateUser, onViewProfile }) {
       )}
 
       {/* Переключатель вкладок магазина */}
-      <div className="flex bg-[#151c2c]/80 border border-gray-800 p-1.5 rounded-2xl gap-1.5 max-w-xs mx-auto">
+      <div className="flex bg-[#0d1715]/80 border border-gray-800 p-1.5 rounded-2xl gap-1.5 max-w-xs mx-auto">
         <button
           onClick={() => setActiveTab('official')}
           className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
@@ -157,7 +157,7 @@ export default function Shop({ user, onUpdateUser, onViewProfile }) {
       ) : (
         <div className="space-y-6">
           {/* Официальная витрина */}
-          <div className="bg-[#151c2c] border border-gray-800 rounded-3xl p-5 shadow-xl shadow-black/40 space-y-4">
+          <div className="bg-[#0d1715] border border-gray-800 rounded-3xl p-5 shadow-xl shadow-black/40 space-y-4">
             <h3 className="text-xs font-black uppercase tracking-wider text-purple-400">
               Официальная Витрина Avarice
             </h3>
@@ -244,7 +244,7 @@ export default function Shop({ user, onUpdateUser, onViewProfile }) {
           </div>
 
           {/* Инвентарь коллекционера */}
-          <div className="bg-[#151c2c] border border-gray-800 rounded-3xl p-5 shadow-xl shadow-black/40 space-y-4">
+          <div className="bg-[#0d1715] border border-gray-800 rounded-3xl p-5 shadow-xl shadow-black/40 space-y-4">
             <h3 className="text-xs font-black uppercase tracking-wider text-cyan-400">
               Ваш косметический шкаф (Инвентарь)
             </h3>

@@ -4,7 +4,7 @@ import { api } from '../utils/api';
 import { Trophy, Award, Send, Users, Camera, Flame, Coins, ShieldAlert, ArrowLeft } from 'lucide-react';
 
 const SKIN_STYLES = {
-  default: 'bg-[#1b2838] border border-[#2a475e]/40 text-gray-200 shadow-xl',
+  default: 'bg-[#0e1715] border border-[#274e3a]/40 text-gray-200 shadow-xl',
   vaporwave_skin: 'bg-gradient-to-br from-[#1d102e] via-[#2d114d] to-[#4c165a] border border-[#e026fd]/30 text-purple-100 shadow-[0_0_20px_rgba(224,38,253,0.15)]',
   cyberpunk_skin: 'bg-gradient-to-br from-[#12141d] via-[#1b1c2b] to-[#121015] border border-[#fcee0a]/30 text-yellow-100 shadow-[0_0_20px_rgba(252,238,10,0.15)]',
   matrix_skin: 'bg-[#030c03] border border-green-500/30 text-green-400 shadow-[0_0_20px_rgba(34,197,94,0.15)] font-mono',
@@ -218,7 +218,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
       {onBack && (
         <button 
           onClick={onBack}
-          className="flex items-center gap-1 px-3 py-1.5 bg-[#1b2838]/85 hover:bg-[#203044] border border-[#2a475e]/40 rounded-xl text-xs font-bold text-gray-300 transition"
+          className="flex items-center gap-1 px-3 py-1.5 bg-[#0e1715]/85 hover:bg-[#203044] border border-[#274e3a]/40 rounded-xl text-xs font-bold text-gray-300 transition"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Назад
         </button>
@@ -329,8 +329,8 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
         <div className="md:col-span-2 space-y-6">
           
           {/* ВИТРИНА ДОСТИЖЕНИЙ */}
-          <div className="bg-[#1b2838]/85 p-5 rounded-2xl border border-[#2a475e]/30 shadow-xl space-y-4">
-            <div className="flex justify-between items-center border-b border-[#2a475e]/30 pb-3">
+          <div className="bg-[#0e1715]/85 p-5 rounded-2xl border border-[#274e3a]/30 shadow-xl space-y-4">
+            <div className="flex justify-between items-center border-b border-[#274e3a]/30 pb-3">
               <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
                 <Award className="w-4 h-4 text-cyan-400 animate-pulse" /> Витрина достижений
               </h3>
@@ -350,7 +350,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                 showcaseItems.map(ach => (
                   <div 
                     key={ach._key || ach._id} 
-                    className="p-3 bg-black/30 border border-[#2a475e]/25 rounded-xl text-center flex flex-col items-center justify-center space-y-1.5"
+                    className="p-3 bg-black/30 border border-[#274e3a]/25 rounded-xl text-center flex flex-col items-center justify-center space-y-1.5"
                     title={ach.description}
                   >
                     <span className="text-3xl filter drop-shadow">{ach.emoji}</span>
@@ -381,8 +381,8 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
           </div>
 
           {/* ВСЕ ДОСТИЖЕНИЯ */}
-          <div className="bg-[#1b2838]/85 p-5 rounded-2xl border border-[#2a475e]/30 shadow-xl space-y-4">
-            <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#2a475e]/30 pb-3">
+          <div className="bg-[#0e1715]/85 p-5 rounded-2xl border border-[#274e3a]/30 shadow-xl space-y-4">
+            <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#274e3a]/30 pb-3">
               <Trophy className="w-4 h-4 text-amber-400" /> Доступные достижения
             </h3>
 
@@ -392,7 +392,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                   key={ach._id} 
                   className={`p-3 rounded-xl border flex gap-3 items-center transition duration-200 ${
                     ach.isEarned 
-                      ? 'bg-black/40 border-[#2a475e]/30' 
+                      ? 'bg-black/40 border-[#274e3a]/30' 
                       : 'bg-black/10 border-gray-900/40 opacity-55'
                   }`}
                 >
@@ -431,8 +431,8 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
         <div className="space-y-6">
           
           {/* СПИСОК ДРУЗЕЙ */}
-          <div className="bg-[#1b2838]/85 p-5 rounded-2xl border border-[#2a475e]/30 shadow-xl space-y-4">
-            <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#2a475e]/30 pb-3">
+          <div className="bg-[#0e1715]/85 p-5 rounded-2xl border border-[#274e3a]/30 shadow-xl space-y-4">
+            <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#274e3a]/30 pb-3">
               <Users className="w-4 h-4 text-cyan-400" /> Друзья ({friends.length})
             </h3>
 
@@ -442,7 +442,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                   <div
                     key={friend._id}
                     onClick={() => onViewProfile ? onViewProfile(friend._id) : navigate(`/profile/${friend._id}`)}
-                    className="p-2 bg-black/30 hover:bg-[#203044] border border-[#2a475e]/20 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition"
+                    className="p-2 bg-black/30 hover:bg-[#203044] border border-[#274e3a]/20 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <img 
@@ -473,7 +473,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
 
           {/* ПАНЕЛЬ ПЕРЕВОДА КАРМЫ (ТОЛЬКО ДЛЯ ДРУГИХ ПОЛЬЗОВАТЕЛЕЙ) */}
           {!isSelf && (
-            <div className="bg-[#1b2838]/85 p-5 rounded-2xl border border-amber-500/20 shadow-xl space-y-4">
+            <div className="bg-[#0e1715]/85 p-5 rounded-2xl border border-amber-500/20 shadow-xl space-y-4">
               <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-amber-500/20 pb-3">
                 <Send className="w-4 h-4 text-amber-400" /> Отправить Карму
               </h3>
@@ -495,7 +495,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                     placeholder="Сумма (например: 100)"
                     value={transferAmount}
                     onChange={(e) => setTransferAmount(e.target.value)}
-                    className="w-full bg-[#121820] border border-[#2a475e]/40 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-500 transition"
+                    className="w-full bg-[#121820] border border-[#274e3a]/40 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-500 transition"
                   />
                 </div>
 
@@ -535,7 +535,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
       {/* ── МОДАЛКА ВЫБОРА ДОСТИЖЕНИЙ НА ВИТРИНУ ── */}
       {showcaseOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#1b2838] border border-[#2a475e]/50 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+          <div className="bg-[#0e1715] border border-[#274e3a]/50 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <div>
               <h3 className="text-base font-black text-white uppercase tracking-wider">
                 Настройка витрины
@@ -555,7 +555,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
                       className={`p-2.5 rounded-xl border flex items-center gap-2 cursor-pointer transition duration-150 ${
                         isSelected
                           ? 'bg-cyan-500/10 border-cyan-500 text-white'
-                          : 'bg-black/35 border-[#2a475e]/30 hover:border-cyan-500/35 text-gray-400'
+                          : 'bg-black/35 border-[#274e3a]/30 hover:border-cyan-500/35 text-gray-400'
                       }`}
                     >
                       <span className="text-2xl filter drop-shadow select-none">{ach.emoji}</span>
@@ -570,7 +570,7 @@ export default function Profile({ userId, currentUser, onBack, onViewProfile, on
               )}
             </div>
 
-            <div className="flex gap-2 justify-end pt-2 border-t border-[#2a475e]/20">
+            <div className="flex gap-2 justify-end pt-2 border-t border-[#274e3a]/20">
               <button
                 type="button"
                 onClick={() => {

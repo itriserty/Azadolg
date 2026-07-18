@@ -26,7 +26,7 @@ export default function Casino({ user, onUpdateUser }) {
     <div className="space-y-6 animate-fadeIn">
       
       {/* ── ВИДЖЕТ ДЖЕКПОТА ── */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#241a0d] via-[#151c2c] to-black border-2 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.25)] rounded-3xl p-6 text-center">
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#241a0d] via-[#0d1715] to-black border-2 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.25)] rounded-3xl p-6 text-center">
         {/* Glows */}
         <div className="absolute -left-10 -top-10 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -right-10 -bottom-10 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
@@ -45,7 +45,7 @@ export default function Casino({ user, onUpdateUser }) {
       </div>
 
       {/* Переключатель вкладок внутри Казино */}
-      <div className="flex bg-[#151c2c]/80 border border-gray-800 p-1.5 rounded-2xl gap-1.5 max-w-xs mx-auto">
+      <div className="flex bg-[#0d1715]/80 border border-gray-800 p-1.5 rounded-2xl gap-1.5 max-w-xs mx-auto">
         <button
           onClick={() => setActiveSubTab('cases')}
           className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${

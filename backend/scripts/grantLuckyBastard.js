@@ -25,6 +25,13 @@ async function grantLuckyBastard() {
             user.achievementShowcase.push(ach._id);
           }
 
+          const UserAchievementProgress = require('../models/UserAchievementProgress');
+          await UserAchievementProgress.findOneAndUpdate(
+            { userId: user._id, achievementId: ach._id },
+            { currentValue: 1, isEarned: true },
+            { upsert: true }
+          );
+
           await user.save();
           console.log(`[LuckyBastard] Достижение "Везучий ублюдок" успешно выдано пользователю ${user.username}.`);
         }

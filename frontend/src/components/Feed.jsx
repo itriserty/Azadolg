@@ -310,7 +310,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
   return (
     <div className="flex flex-col gap-4 text-xs">
       {/* Мобильный переключатель вкладок */}
-      <div className="lg:hidden flex gap-1.5 p-1 bg-[#0b0f19]/60 border border-gray-850 rounded-2xl overflow-x-auto select-none mb-2">
+      <div className="lg:hidden flex gap-1.5 p-1 bg-[#060b0b]/60 border border-gray-850 rounded-2xl overflow-x-auto select-none mb-2">
         {[
           { id: 'posts', label: 'Лента', emoji: '💬' },
           { id: 'activities', label: 'Котлы & Квесты', emoji: '🏺' },
@@ -350,7 +350,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
         )}
 
         {/* Создать Пост */}
-        <div className={`${activeMobileTab === 'posts' ? 'block' : 'hidden lg:block'} bg-[#151c2c] border border-gray-800 rounded-2xl p-4 shadow-xl`}>
+        <div className={`${activeMobileTab === 'posts' ? 'block' : 'hidden lg:block'} bg-[#0d1715] border border-gray-800 rounded-2xl p-4 shadow-xl`}>
           <form onSubmit={handleCreatePost} className="flex gap-3">
             <img
               src={user.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.username}`}
@@ -363,7 +363,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
                 value={postContent}
                 onChange={e => setPostContent(e.target.value)}
                 placeholder="Что нового в вашей финансовой жизни? Опубликуйте пост..."
-                className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl pl-4 pr-10 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition"
+                className="w-full bg-[#060b0b] border border-gray-800 rounded-xl pl-4 pr-10 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition"
               />
               <button
                 type="submit"
@@ -384,17 +384,17 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
             const frameStyle = post.author?.activeProfileFrame;
             
             // Динамические стили постов
-            let cardClass = "bg-[#151c2c] border border-gray-850 rounded-2xl p-5 shadow-lg space-y-4 transition-all duration-300";
+            let cardClass = "bg-[#0d1715] border border-gray-850 rounded-2xl p-5 shadow-lg space-y-4 transition-all duration-300";
             let badgeText = "";
             let badgeClass = "";
             let showHeaderDetails = true;
 
             if (post.type === 'debt_created') {
-              cardClass = "bg-[#151c2c] border-l-4 border-cyan-500 rounded-2xl p-5 shadow-lg space-y-4 border-t border-r border-b border-gray-850 shadow-[0_0_15px_rgba(6,182,212,0.06)]";
+              cardClass = "bg-[#0d1715] border-l-4 border-cyan-500 rounded-2xl p-5 shadow-lg space-y-4 border-t border-r border-b border-gray-850 shadow-[0_0_15px_rgba(6,182,212,0.06)]";
               badgeText = "🤝 Долг";
               badgeClass = "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[9px] px-1.5 py-0.5 rounded font-black uppercase";
             } else if (post.type === 'achievement_earned') {
-              cardClass = "bg-[#151c2c] border-l-4 border-amber-500 rounded-2xl p-5 shadow-lg space-y-4 border-t border-r border-b border-gray-850 shadow-[0_0_15px_rgba(245,158,11,0.06)]";
+              cardClass = "bg-[#0d1715] border-l-4 border-amber-500 rounded-2xl p-5 shadow-lg space-y-4 border-t border-r border-b border-gray-850 shadow-[0_0_15px_rgba(245,158,11,0.06)]";
               badgeText = "🏆 Достижение";
               badgeClass = "bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] px-1.5 py-0.5 rounded font-black uppercase";
             } else if (post.type === 'system_shaming') {
@@ -402,7 +402,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
               badgeText = "💀 Шейминг";
               badgeClass = "bg-red-500/20 text-red-400 border border-red-500/30 text-[9px] px-1.5 py-0.5 rounded font-black uppercase animate-pulse";
             } else if (post.type === 'external_meme') {
-              cardClass = "bg-[#151c2c] border border-gray-850 rounded-2xl p-5 shadow-lg space-y-4 hover:border-purple-500/30 transition-all duration-300";
+              cardClass = "bg-[#0d1715] border border-gray-850 rounded-2xl p-5 shadow-lg space-y-4 hover:border-purple-500/30 transition-all duration-300";
               badgeText = "👾 Мем";
               badgeClass = "bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[9px] px-1.5 py-0.5 rounded font-black uppercase";
               showHeaderDetails = false;
@@ -541,12 +541,12 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
                         placeholder="Написать комментарий..."
                         value={commentContent[post._id] || ''}
                         onChange={e => setCommentContent({ ...commentContent, [post._id]: e.target.value })}
-                        className="flex-1 bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-1.5 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                        className="flex-1 bg-[#060b0b] border border-gray-800 rounded-xl px-3 py-1.5 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
                         required
                       />
                       <button
                         type="submit"
-                        className="bg-cyan-600 hover:bg-cyan-500 text-[#0b0f19] font-black px-3.5 py-1.5 rounded-xl transition"
+                        className="bg-cyan-600 hover:bg-cyan-500 text-[#060b0b] font-black px-3.5 py-1.5 rounded-xl transition"
                       >
                         Ответить
                       </button>
@@ -579,7 +579,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
         {/* 🏺 ОБЩИЕ КОТЛЫ (CROWDFUNDING) */}
         <div className={`${activeMobileTab === 'activities' ? 'grid' : 'hidden lg:grid'} grid-cols-1 md:grid-cols-2 gap-6 pt-4`}>
           
-          <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4">
+          <div className="bg-[#0d1715] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4">
             <h3 className="text-sm font-black uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
               <span>🏺</span> Создать Общий Котёл
             </h3>
@@ -592,7 +592,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
                   value={fundTitle}
                   onChange={e => setFundTitle(e.target.value)}
                   placeholder="Например, На пиццу к выходным 🍕"
-                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-[#060b0b] border border-gray-800 rounded-xl px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
 
@@ -602,7 +602,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
                   type="number"
                   value={fundTarget}
                   onChange={e => setFundTarget(e.target.value)}
-                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-[#060b0b] border border-gray-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                   min="100"
                 />
               </div>
@@ -616,7 +616,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
             </form>
           </div>
 
-          <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4">
+          <div className="bg-[#0d1715] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4">
             <h3 className="text-sm font-black uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
               <span>🏺</span> Активные Котлы ({funds.length})
             </h3>
@@ -676,7 +676,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
         </div>
 
         {/* 📜 БЮЛЛЕТЕНЬ ПОРУЧЕНИЙ (КВЕСТЫ) */}
-        <div className={`${activeMobileTab === 'activities' ? 'block' : 'hidden lg:block'} bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4`}>
+        <div className={`${activeMobileTab === 'activities' ? 'block' : 'hidden lg:block'} bg-[#0d1715] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4`}>
           <h3 className="text-sm font-black uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
             <span>🛡️</span> Бюллетень поручений (Квесты за Карму)
           </h3>
@@ -692,7 +692,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
                   value={questTitle}
                   onChange={e => setQuestTitle(e.target.value)}
                   placeholder="Например, Забрать посылку с почты 📦"
-                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-lg px-3 py-1.5 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                  className="w-full bg-[#060b0b] border border-gray-800 rounded-lg px-3 py-1.5 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
                 />
               </div>
               <div>
@@ -702,7 +702,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
                   value={questDesc}
                   onChange={e => setQuestDesc(e.target.value)}
                   placeholder="Привезти в кабинет к 15:00"
-                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-lg px-3 py-1.5 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                  className="w-full bg-[#060b0b] border border-gray-800 rounded-lg px-3 py-1.5 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
                 />
               </div>
               <div>
@@ -711,7 +711,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
                   type="number"
                   value={questReward}
                   onChange={e => setQuestReward(e.target.value)}
-                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500"
+                  className="w-full bg-[#060b0b] border border-gray-800 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-purple-500"
                   min="50"
                 />
               </div>
@@ -754,7 +754,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
                       {quest.status === 'open' && !isCreator && (
                         <button
                           onClick={() => handleTakeQuest(quest._id)}
-                          className="bg-cyan-600 hover:bg-cyan-500 text-[#0b0f19] font-bold text-[9px] py-1 px-2.5 rounded-lg transition"
+                          className="bg-cyan-600 hover:bg-cyan-500 text-[#060b0b] font-bold text-[9px] py-1 px-2.5 rounded-lg transition"
                         >
                           Взять поручение
                         </button>
@@ -816,7 +816,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
         
         {/* Виджет Еженедельных заданий */}
         <div className={activeMobileTab === 'leaderboard' ? 'block' : 'hidden lg:block'}>
-          <div className="bg-[#151c2c] border border-amber-500/20 rounded-2xl p-5 shadow-xl space-y-4">
+          <div className="bg-[#0d1715] border border-amber-500/20 rounded-2xl p-5 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-gray-800 pb-2">
               <h3 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
                 <span>📅</span> Еженедельные задания
@@ -872,7 +872,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
         </div>
 
         {/* Управление друзьями и социальная панель */}
-        <div className={`${activeMobileTab === 'friends' ? 'block' : 'hidden lg:block'} bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4`}>
+        <div className={`${activeMobileTab === 'friends' ? 'block' : 'hidden lg:block'} bg-[#0d1715] border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4`}>
           <div className="flex items-center gap-2 font-black text-gray-100 uppercase tracking-wider text-xs border-b border-gray-850 pb-2 flex-wrap">
             <Users className="w-4 h-4 text-cyan-400" />
             <span>Моя Община ({friends.length} друзей)</span>
@@ -895,7 +895,7 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
               type="text"
               name="friendUsername"
               placeholder="Добавить @username..."
-              className="flex-1 bg-[#0b0f19] border border-gray-800 text-[10px] text-gray-100 rounded-lg px-3 py-1.5 focus:outline-none focus:border-cyan-500"
+              className="flex-1 bg-[#060b0b] border border-gray-800 text-[10px] text-gray-100 rounded-lg px-3 py-1.5 focus:outline-none focus:border-cyan-500"
             />
             <button
               type="submit"

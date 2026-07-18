@@ -7,7 +7,7 @@ const SKIN_STYLES = {
   'vaporwave_skin': 'bg-gradient-to-br from-indigo-950 via-purple-950 to-pink-950 border-purple-500 shadow-lg shadow-purple-500/20',
   'cyberpunk_skin': 'bg-gradient-to-br from-slate-950 via-slate-900 to-yellow-950 border-yellow-500 shadow-lg shadow-yellow-500/20',
   'matrix_skin': 'bg-gradient-to-br from-slate-950 via-emerald-950 to-black border-emerald-500 shadow-lg shadow-emerald-500/20',
-  'default': 'bg-[#151c2c] border-gray-850 shadow-2xl'
+  'default': 'bg-[#0d1715] border-gray-850 shadow-2xl'
 };
 
 const FRAME_STYLES = {
@@ -27,7 +27,7 @@ export default function Leaderboard({ users, currentUser, onViewProfile }) {
   };
 
   return (
-    <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-6 shadow-xl shadow-black/40">
+    <div className="bg-[#0d1715] border border-gray-800 rounded-2xl p-6 shadow-xl shadow-black/40">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold flex items-center gap-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">
           <Shield className="w-5 h-5 text-purple-400" />
@@ -52,7 +52,7 @@ export default function Leaderboard({ users, currentUser, onViewProfile }) {
               className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
                 isMe
                   ? 'bg-purple-500/10 border-purple-500/50 shadow-purple-500/10 shadow-md'
-                  : 'bg-[#0b0f19]/60 border-gray-900 hover:border-slate-800'
+                  : 'bg-[#060b0b]/60 border-gray-900 hover:border-slate-800'
               }`}
             >
               {/* Место + аватар + имя */}
@@ -72,7 +72,7 @@ export default function Leaderboard({ users, currentUser, onViewProfile }) {
                     ) : (
                       <div className={`w-8 h-8 flex items-center justify-center font-bold text-sm ${
                         isTop
-                          ? 'bg-gradient-to-tr from-yellow-400 to-yellow-500 text-[#0b0f19]'
+                          ? 'bg-gradient-to-tr from-yellow-400 to-yellow-500 text-[#060b0b]'
                           : 'bg-gray-800 text-gray-300'
                       }`}>
                         {user.name.charAt(0).toUpperCase()}

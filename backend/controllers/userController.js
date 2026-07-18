@@ -383,7 +383,38 @@ async function getUserProfile(req, res) {
     });
 
     const Achievement = require('../models/Achievement');
-    const allAchievements = await Achievement.find({ isActive: true });
+    const UserAchievementProgress = require('../models/UserAchievementProgress');
+
+    const [rawAchievements, progresses] = await Promise.all([
+      Achievement.find({ isActive: true }),
+      UserAchievementProgress.find({ userId: id })
+    ]);
+
+    const progressMap = {};
+    progresses.forEach(p => {
+      if (p.achievementId) {
+        progressMap[p.achievementId.toString()] = {
+          isEarned: p.isEarned,
+          currentValue: p.currentValue
+        };
+      }
+    });
+
+    const allAchievements = rawAchievements.map(ach => {
+      const achObj = ach.toObject();
+      const prog = progressMap[ach._id.toString()];
+      achObj.isEarned = prog ? prog.isEarned : false;
+      achObj.progress = prog ? prog.currentValue : 0;
+
+      const userEarned = targetUser.achievements.find(
+        ua => ua.achievement && ua.achievement._id.toString() === ach._id.toString()
+      );
+      if (userEarned) {
+        achObj.isEarned = true;
+        achObj.earnedAt = userEarned.earnedAt;
+      }
+      return achObj;
+    });
 
     res.status(200).json({
       user: targetUser,

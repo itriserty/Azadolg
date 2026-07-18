@@ -376,13 +376,13 @@ export default function AdminPanel({ token }) {
   const tabBtn = (t) => `px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
     tab === t 
       ? 'bg-gradient-to-r from-purple-650 to-indigo-650 text-white border-purple-500 shadow-lg shadow-purple-500/10' 
-      : 'bg-[#151c2c]/40 text-gray-400 border-gray-800 hover:bg-[#151c2c]/80 hover:text-white'
+      : 'bg-[#0d1715]/40 text-gray-400 border-gray-800 hover:bg-[#0d1715]/80 hover:text-white'
   }`;
 
   return (
     <div className="space-y-6 text-xs text-gray-300">
       {/* Header card with glassmorphism */}
-      <div className="bg-gradient-to-br from-[#1a0a2e]/60 via-[#151c2c]/40 to-black/30 border border-purple-500/20 rounded-2xl p-5 flex items-center gap-3 backdrop-blur-md relative overflow-hidden shadow-2xl">
+      <div className="bg-gradient-to-br from-[#0b1614]/60 via-[#0d1715]/40 to-black/30 border border-purple-500/20 rounded-2xl p-5 flex items-center gap-3 backdrop-blur-md relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
         <div className="w-11 h-11 bg-purple-600/15 border border-purple-500/35 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/5">
           <Shield className="w-5 h-5 text-purple-400 animate-pulse-slow" />
@@ -415,7 +415,7 @@ export default function AdminPanel({ token }) {
       {/* Global Economy stats with glassmorphic cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Karma supply card */}
-        <div className="bg-[#151c2c]/50 backdrop-blur-sm border border-gray-800/80 rounded-2xl p-4 flex flex-col justify-between shadow-xl relative overflow-hidden group hover:border-amber-500/30 transition-all duration-300">
+        <div className="bg-[#0d1715]/50 backdrop-blur-sm border border-gray-800/80 rounded-2xl p-4 flex flex-col justify-between shadow-xl relative overflow-hidden group hover:border-amber-500/30 transition-all duration-300">
           <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
           <div>
             <div className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Всего Кармы в игре</div>
@@ -427,7 +427,7 @@ export default function AdminPanel({ token }) {
         </div>
 
         {/* Global Jackpot card */}
-        <div className="bg-[#151c2c]/50 backdrop-blur-sm border border-gray-800/80 rounded-2xl p-4 flex flex-col justify-between shadow-xl relative overflow-hidden group hover:border-cyan-500/30 transition-all duration-300">
+        <div className="bg-[#0d1715]/50 backdrop-blur-sm border border-gray-800/80 rounded-2xl p-4 flex flex-col justify-between shadow-xl relative overflow-hidden group hover:border-cyan-500/30 transition-all duration-300">
           <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
           <div>
             <div className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Глобальный Джекпот</div>
@@ -439,7 +439,7 @@ export default function AdminPanel({ token }) {
         </div>
 
         {/* Actions panel card */}
-        <div className="bg-[#151c2c]/50 backdrop-blur-sm border border-gray-800/80 rounded-2xl p-4 flex flex-col justify-between shadow-xl">
+        <div className="bg-[#0d1715]/50 backdrop-blur-sm border border-gray-800/80 rounded-2xl p-4 flex flex-col justify-between shadow-xl">
           <div>
             <div className="text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-2">Оперативные действия</div>
             <div className="grid grid-cols-2 gap-2">
@@ -489,7 +489,7 @@ export default function AdminPanel({ token }) {
       {tab === 'users' && (
         <div className="space-y-4">
           {/* Mass Karma Distribution banner */}
-          <div className="bg-gradient-to-br from-[#131b2e] to-[#151c2c] border border-cyan-500/25 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+          <div className="bg-gradient-to-br from-[#131b2e] to-[#0d1715] border border-cyan-500/25 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
             <div>
               <h3 className="font-black text-cyan-400 flex items-center gap-1.5 text-sm uppercase tracking-wide">
                 <span>🎁 Массовая раздача Кармы</span>
@@ -503,14 +503,14 @@ export default function AdminPanel({ token }) {
                 placeholder="Сумма Кармы" 
                 value={distKarmaAmt}
                 onChange={e => setDistKarmaAmt(e.target.value)}
-                className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 w-32 font-bold" 
+                className="bg-[#060b0b] border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 w-32 font-bold" 
               />
               <input 
                 type="text" 
                 placeholder="Укажите причину..." 
                 value={distKarmaReason}
                 onChange={e => setDistKarmaReason(e.target.value)}
-                className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 w-48" 
+                className="bg-[#060b0b] border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 w-48" 
               />
               <button 
                 onClick={doDistributeKarma}
@@ -522,8 +522,8 @@ export default function AdminPanel({ token }) {
             </div>
           </div>
 
-          <div className="bg-[#151c2c]/40 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-gray-800/80 flex items-center gap-2 bg-[#151c2c]/10">
+          <div className="bg-[#0d1715]/40 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
+            <div className="p-4 border-b border-gray-800/80 flex items-center gap-2 bg-[#0d1715]/10">
               <Search className="w-4 h-4 text-gray-500" />
               <input 
                 type="text" 
@@ -535,7 +535,7 @@ export default function AdminPanel({ token }) {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
-                <thead className="bg-[#0b0f19]/40 text-gray-500 uppercase tracking-wider text-[10px]">
+                <thead className="bg-[#060b0b]/40 text-gray-500 uppercase tracking-wider text-[10px]">
                   <tr>
                     <th className="px-4 py-3 text-left font-bold">Имя / Юзернейм</th>
                     <th className="px-4 py-3 text-left font-bold">Балансы</th>
@@ -546,7 +546,7 @@ export default function AdminPanel({ token }) {
                 </thead>
                 <tbody>
                   {filteredUsers.map(u => (
-                    <tr key={u._id} className="border-t border-gray-800/40 hover:bg-[#151c2c]/20 transition">
+                    <tr key={u._id} className="border-t border-gray-800/40 hover:bg-[#0d1715]/20 transition">
                       <td className="px-4 py-3">
                         <div className="font-bold text-gray-200">{u.name}</div>
                         <div className="text-gray-500 text-[10px] font-mono mt-0.5">@{u.username} | {u.email}</div>
@@ -636,10 +636,10 @@ export default function AdminPanel({ token }) {
 
       {/* ── TRANSACTIONS TAB ── */}
       {tab === 'debts' && (
-        <div className="bg-[#151c2c]/40 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
+        <div className="bg-[#0d1715]/40 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="bg-[#0b0f19]/40 text-gray-500 uppercase tracking-wider text-[10px]">
+              <thead className="bg-[#060b0b]/40 text-gray-500 uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-4 py-3 text-left font-bold">Участники / Описание</th>
                   <th className="px-4 py-3 text-left font-bold">Сумма</th>
@@ -652,7 +652,7 @@ export default function AdminPanel({ token }) {
                 {(Array.isArray(debts) ? debts : []).map(d => {
                   if (!d) return null;
                   return (
-                    <tr key={d._id} className="border-t border-gray-800/40 hover:bg-[#151c2c]/20 transition">
+                    <tr key={d._id} className="border-t border-gray-800/40 hover:bg-[#0d1715]/20 transition">
                       <td className="px-4 py-3">
                         <div className="text-gray-200 font-bold">
                           {d.creditor?.name || 'Удален'} <span className="text-gray-650 mx-1">→</span> {d.debtor?.name || 'Удален'}
@@ -708,7 +708,7 @@ export default function AdminPanel({ token }) {
       {/* ── ACHIEVEMENTS TAB ── */}
       {tab === 'achievements' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center bg-[#151c2c]/40 border border-gray-800 rounded-2xl p-4 shadow-xl">
+          <div className="flex justify-between items-center bg-[#0d1715]/40 border border-gray-800 rounded-2xl p-4 shadow-xl">
             <span className="text-gray-300 font-black uppercase tracking-wider text-[10px]">Список игровых достижений</span>
             <button 
               onClick={openCreateAchModal} 
@@ -718,9 +718,9 @@ export default function AdminPanel({ token }) {
             </button>
           </div>
 
-          <div className="bg-[#151c2c]/40 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className="bg-[#0d1715]/40 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
             <table className="w-full text-xs">
-              <thead className="bg-[#0b0f19]/40 text-gray-500 uppercase tracking-wider text-[10px]">
+              <thead className="bg-[#060b0b]/40 text-gray-500 uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-4 py-3 text-left font-bold">Ачивка / Описание</th>
                   <th className="px-4 py-3 text-left font-bold">Триггер события</th>
@@ -733,7 +733,7 @@ export default function AdminPanel({ token }) {
                 {(Array.isArray(achievements) ? achievements : []).map(ach => {
                   if (!ach) return null;
                   return (
-                    <tr key={ach._id} className="border-t border-gray-800/40 hover:bg-[#151c2c]/20 transition">
+                    <tr key={ach._id} className="border-t border-gray-800/40 hover:bg-[#0d1715]/20 transition">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <span className="text-3xl select-none filter drop-shadow-[0_0_4px_rgba(255,255,255,0.1)]">{ach.emoji}</span>
@@ -797,8 +797,8 @@ export default function AdminPanel({ token }) {
       {/* ── QUESTS TAB ── */}
       {tab === 'quests' && (
         <div className="space-y-5">
-          <div className="bg-[#151c2c]/40 border border-gray-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
-            <div className="flex items-center gap-2 bg-[#0b0f19] border border-gray-850 rounded-xl px-3.5 py-2.5 text-xs text-white focus-within:border-cyan-500 w-full max-w-md">
+          <div className="bg-[#0d1715]/40 border border-gray-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-center gap-2 bg-[#060b0b] border border-gray-850 rounded-xl px-3.5 py-2.5 text-xs text-white focus-within:border-cyan-500 w-full max-w-md">
               <Search className="w-4 h-4 text-gray-500" />
               <input 
                 type="text" 
@@ -825,7 +825,7 @@ export default function AdminPanel({ token }) {
               .map(u => (
                 <div 
                   key={u._id} 
-                  className="bg-[#151c2c]/40 border border-gray-800/80 hover:border-gray-700/80 rounded-2xl p-5 shadow-xl transition duration-200 flex flex-col justify-between"
+                  className="bg-[#0d1715]/40 border border-gray-800/80 hover:border-gray-700/80 rounded-2xl p-5 shadow-xl transition duration-200 flex flex-col justify-between"
                 >
                   <div>
                     {/* User short info */}
@@ -875,7 +875,7 @@ export default function AdminPanel({ token }) {
                               className={`p-3 rounded-xl border transition-colors ${
                                 isCompleted 
                                   ? 'bg-emerald-950/15 border-emerald-500/30 text-emerald-100' 
-                                  : 'bg-[#0b0f19]/30 border-gray-800 text-gray-300'
+                                  : 'bg-[#060b0b]/30 border-gray-800 text-gray-300'
                               }`}
                             >
                               <div className="flex justify-between items-start gap-2 mb-1.5">
@@ -900,7 +900,7 @@ export default function AdminPanel({ token }) {
                                   <span>Выполнено</span>
                                   <span>{task.current_value || 0} / {task.target_value || 1}</span>
                                 </div>
-                                <div className="w-full bg-[#0b0f19] h-1 rounded-full overflow-hidden">
+                                <div className="w-full bg-[#060b0b] h-1 rounded-full overflow-hidden">
                                   <div 
                                     className={`h-full rounded-full transition-all duration-300 ${
                                       isCompleted 
@@ -933,10 +933,10 @@ export default function AdminPanel({ token }) {
 
       {/* ── ACTION LOGS TAB ── */}
       {tab === 'logs' && (
-        <div className="bg-[#151c2c]/40 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
+        <div className="bg-[#0d1715]/40 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="bg-[#0b0f19]/40 text-gray-500 uppercase tracking-wider text-[10px]">
+              <thead className="bg-[#060b0b]/40 text-gray-500 uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-4 py-3 text-left font-bold">Дата / Время</th>
                   <th className="px-4 py-3 text-left font-bold">Администратор</th>
@@ -948,7 +948,7 @@ export default function AdminPanel({ token }) {
                 {(Array.isArray(logs) ? logs : []).map(l => {
                   if (!l) return null;
                   return (
-                    <tr key={l._id} className="border-t border-gray-800/40 hover:bg-[#151c2c]/20 transition">
+                    <tr key={l._id} className="border-t border-gray-800/40 hover:bg-[#0d1715]/20 transition">
                       <td className="px-4 py-3 text-gray-500 font-medium">
                         {l.createdAt ? new Date(l.createdAt).toLocaleString('ru-RU') : '—'}
                       </td>
@@ -986,7 +986,7 @@ export default function AdminPanel({ token }) {
               initial={{ scale: 0.95, y: 10 }} 
               animate={{ scale: 1, y: 0 }} 
               exit={{ scale: 0.95, y: 10 }}
-              className="bg-[#151c2c] border border-red-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative overflow-hidden"
+              className="bg-[#0d1715] border border-red-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative overflow-hidden"
             >
               <h3 className="font-black text-white mb-4 flex items-center gap-2 text-sm uppercase tracking-wide">
                 <Ban className="w-4 h-4 text-red-400" /> Блокировка игрока
@@ -996,7 +996,7 @@ export default function AdminPanel({ token }) {
                 onChange={e => setBanReason(e.target.value)} 
                 rows={3}
                 placeholder="Укажите подробную причину блокировки..."
-                className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-xs text-gray-250 focus:outline-none focus:border-red-500/50 mb-4 resize-none placeholder-gray-600 focus:ring-1 focus:ring-red-500/10" 
+                className="w-full bg-[#060b0b] border border-gray-800 rounded-xl p-3 text-xs text-gray-250 focus:outline-none focus:border-red-500/50 mb-4 resize-none placeholder-gray-600 focus:ring-1 focus:ring-red-500/10" 
               />
               <div className="flex gap-2">
                 <button 
@@ -1031,7 +1031,7 @@ export default function AdminPanel({ token }) {
               initial={{ scale: 0.95, y: 10 }} 
               animate={{ scale: 1, y: 0 }} 
               exit={{ scale: 0.95, y: 10 }}
-              className="bg-[#151c2c] border border-amber-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+              className="bg-[#0d1715] border border-amber-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl"
             >
               <h3 className="font-black text-white mb-4 flex items-center gap-2 text-sm uppercase tracking-wide">
                 <Key className="w-4 h-4 text-amber-400" /> Задать временный пароль
@@ -1041,7 +1041,7 @@ export default function AdminPanel({ token }) {
                 value={newPw} 
                 onChange={e => setNewPw(e.target.value)}
                 placeholder="Минимум 6 символов..."
-                className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3.5 text-xs text-white focus:outline-none focus:border-amber-500/60 mb-4 placeholder-gray-600 focus:ring-1 focus:ring-amber-500/10 font-bold" 
+                className="w-full bg-[#060b0b] border border-gray-800 rounded-xl p-3.5 text-xs text-white focus:outline-none focus:border-amber-500/60 mb-4 placeholder-gray-600 focus:ring-1 focus:ring-amber-500/10 font-bold" 
               />
               <div className="flex gap-2">
                 <button 
@@ -1076,7 +1076,7 @@ export default function AdminPanel({ token }) {
               initial={{ scale: 0.95, y: 10 }} 
               animate={{ scale: 1, y: 0 }} 
               exit={{ scale: 0.95, y: 10 }}
-              className="bg-[#151c2c] border border-cyan-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative overflow-hidden"
+              className="bg-[#0d1715] border border-cyan-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative overflow-hidden"
             >
               <h3 className="font-black text-white mb-4 flex items-center gap-2 text-sm uppercase tracking-wide border-b border-gray-800 pb-3">
                 {grantModal.type === 'elo' ? '🔥 Изменить рейтинг ELO' : '💰 Изменить баланс Кармы'}
@@ -1091,7 +1091,7 @@ export default function AdminPanel({ token }) {
                     value={grantAmt} 
                     onChange={e => setGrantAmt(e.target.value)}
                     placeholder={grantModal.type === 'elo' ? 'Например, +50 или -20' : 'Например, +1000 или -250'}
-                    className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold" 
+                    className="w-full bg-[#060b0b] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold" 
                   />
                 </div>
 
@@ -1102,7 +1102,7 @@ export default function AdminPanel({ token }) {
                     value={grantReason} 
                     onChange={e => setGrantReason(e.target.value)}
                     placeholder="Укажите причину для аудита..."
-                    className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500" 
+                    className="w-full bg-[#060b0b] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500" 
                   />
                 </div>
               </div>
@@ -1140,7 +1140,7 @@ export default function AdminPanel({ token }) {
               initial={{ scale: 0.95, y: 15 }} 
               animate={{ scale: 1, y: 0 }} 
               exit={{ scale: 0.95, y: 15 }}
-              className="bg-[#151c2c] border border-cyan-500/20 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl relative"
+              className="bg-[#0d1715] border border-cyan-500/20 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl relative"
             >
               <div className="flex justify-between items-center mb-5 border-b border-gray-850 pb-3">
                 <h3 className="font-black text-white text-sm flex items-center gap-2 uppercase tracking-wide">
@@ -1160,7 +1160,7 @@ export default function AdminPanel({ token }) {
                     value={achForm.slug}
                     onChange={e => setAchForm({ ...achForm, slug: e.target.value })}
                     placeholder="Например: empty_promises_5"
-                    className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono disabled:opacity-40"
+                    className="w-full bg-[#060b0b] border border-gray-800 rounded-xl p-3.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono disabled:opacity-40"
                   />
                 </div>
 
@@ -1172,7 +1172,7 @@ export default function AdminPanel({ token }) {
                       required
                       value={achForm.emoji}
                       onChange={e => setAchForm({ ...achForm, emoji: e.target.value })}
-                      className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-center text-lg focus:outline-none focus:border-cyan-500 font-bold"
+                      className="w-full bg-[#060b0b] border border-gray-800 rounded-xl p-3 text-center text-lg focus:outline-none focus:border-cyan-500 font-bold"
                     />
                   </div>
                   <div className="col-span-3">
@@ -1183,7 +1183,7 @@ export default function AdminPanel({ token }) {
                       value={achForm.title}
                       onChange={e => setAchForm({ ...achForm, title: e.target.value })}
                       placeholder="Например: Сказочный пиздабол"
-                      className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold"
+                      className="w-full bg-[#060b0b] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold"
                     />
                   </div>
                 </div>
@@ -1196,7 +1196,7 @@ export default function AdminPanel({ token }) {
                     onChange={e => setAchForm({ ...achForm, description: e.target.value })}
                     rows={2}
                     placeholder="Коротко опишите условия выдачи..."
-                    className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500 resize-none"
+                    className="w-full bg-[#060b0b] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500 resize-none"
                   />
                 </div>
 
@@ -1206,7 +1206,7 @@ export default function AdminPanel({ token }) {
                     <select
                       value={achForm.rarity}
                       onChange={e => setAchForm({ ...achForm, rarity: e.target.value })}
-                      className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl p-3.5 text-xs text-gray-300 focus:outline-none focus:border-cyan-500"
+                      className="w-full bg-[#060b0b] border border-gray-850 rounded-xl p-3.5 text-xs text-gray-300 focus:outline-none focus:border-cyan-500"
                     >
                       <option value="common">Common (Обычное)</option>
                       <option value="rare">Rare (Редкое)</option>
@@ -1219,7 +1219,7 @@ export default function AdminPanel({ token }) {
                     <select
                       value={achForm.trigger}
                       onChange={e => setAchForm({ ...achForm, trigger: e.target.value })}
-                      className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl p-3.5 text-xs text-gray-300 focus:outline-none focus:border-cyan-500"
+                      className="w-full bg-[#060b0b] border border-gray-850 rounded-xl p-3.5 text-xs text-gray-300 focus:outline-none focus:border-cyan-500"
                     >
                       <option value="custom">Ручная выдача</option>
                       <option value="declined_loan_streak">Серия отклонений</option>
@@ -1242,15 +1242,15 @@ export default function AdminPanel({ token }) {
                     required
                     value={achForm.threshold}
                     onChange={e => setAchForm({ ...achForm, threshold: Number(e.target.value) })}
-                    className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold"
+                    className="w-full bg-[#060b0b] border border-gray-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold"
                   />
                 </div>
 
-                <div className="flex justify-between items-center gap-3 bg-[#0b0f19]/80 p-3 rounded-xl border border-gray-850">
+                <div className="flex justify-between items-center gap-3 bg-[#060b0b]/80 p-3 rounded-xl border border-gray-850">
                   <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-gray-400">
                     <input 
                       type="checkbox" 
-                      className="rounded bg-[#0b0f19] border-gray-800 text-cyan-500 focus:ring-0 focus:ring-offset-0"
+                      className="rounded bg-[#060b0b] border-gray-800 text-cyan-500 focus:ring-0 focus:ring-offset-0"
                       checked={achForm.isSecret} 
                       onChange={e => setAchForm({ ...achForm, isSecret: e.target.checked })} 
                     />
@@ -1259,7 +1259,7 @@ export default function AdminPanel({ token }) {
                   <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-gray-400">
                     <input 
                       type="checkbox" 
-                      className="rounded bg-[#0b0f19] border-gray-800 text-cyan-500 focus:ring-0 focus:ring-offset-0"
+                      className="rounded bg-[#060b0b] border-gray-800 text-cyan-500 focus:ring-0 focus:ring-offset-0"
                       checked={achForm.isRepeatable} 
                       onChange={e => setAchForm({ ...achForm, isRepeatable: e.target.checked })} 
                     />
@@ -1268,7 +1268,7 @@ export default function AdminPanel({ token }) {
                   <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-gray-400">
                     <input 
                       type="checkbox" 
-                      className="rounded bg-[#0b0f19] border-gray-800 text-cyan-500 focus:ring-0 focus:ring-offset-0"
+                      className="rounded bg-[#060b0b] border-gray-800 text-cyan-500 focus:ring-0 focus:ring-offset-0"
                       checked={achForm.isActive} 
                       onChange={e => setAchForm({ ...achForm, isActive: e.target.checked })} 
                     />

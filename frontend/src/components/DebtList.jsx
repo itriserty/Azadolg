@@ -37,7 +37,7 @@ export default function DebtList({
       const iconBg = isSent ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400';
 
       return (
-        <div className="rounded-xl border border-gray-800 bg-[#0b0f19]/85 p-4 flex items-center justify-between gap-3 transition hover:border-gray-700">
+        <div className="rounded-xl border border-gray-800 bg-[#060b0b]/85 p-4 flex items-center justify-between gap-3 transition hover:border-gray-700">
           <div className="flex items-start gap-3">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
               {arrowIcon}
@@ -130,7 +130,7 @@ export default function DebtList({
 
     return (
       <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-        className={`rounded-xl border transition-all ${isOverdue ? 'bg-red-500/5 border-red-500/35' : 'bg-[#0b0f19]/80 border-gray-800 hover:border-gray-700'}`}>
+        className={`rounded-xl border transition-all ${isOverdue ? 'bg-red-500/5 border-red-500/35' : 'bg-[#060b0b]/80 border-gray-800 hover:border-gray-700'}`}>
 
         {/* Основной ряд */}
         <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -258,7 +258,7 @@ export default function DebtList({
                     <div className="flex flex-col gap-2">
                       <input type="number" placeholder={`Частичная сумма (макс. ${remaining} ₸, пусто = всё)`}
                         value={partialAmt} onChange={e => setPartialAmt(e.target.value)} min="1" max={remaining}
-                        className="bg-[#0b0f19] border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-purple-500/60"
+                        className="bg-[#060b0b] border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-purple-500/60"
                       />
                       <div className="flex items-center gap-2">
                         <input ref={fileRef} type="file" accept="image/*" onChange={e => setProofFile(e.target.files[0])} className="hidden" id={`proof-${debt._id}`} />
@@ -285,7 +285,7 @@ export default function DebtList({
                     </div>
                     <div className="flex gap-2">
                       <select value={transferTarget} onChange={e => setTransferTarget(e.target.value)}
-                        className="flex-1 bg-[#0b0f19] border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-amber-500/60">
+                        className="flex-1 bg-[#060b0b] border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-amber-500/60">
                         <option value="">-- Выберите нового должника --</option>
                         {friends.filter(f => f._id !== currentUser?._id).map(f => (
                           <option key={f._id} value={f._id}>{f.name}</option>
@@ -346,7 +346,7 @@ export default function DebtList({
   };
 
   const Section = ({ title, items, direction, colorClass }) => (
-    <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40">
+    <div className="bg-[#0d1715] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40">
       <h2 className={`text-lg font-black flex items-center gap-2 mb-4 text-transparent bg-clip-text bg-gradient-to-r ${colorClass}`}>
         <Landmark className="w-5 h-5" style={{ color: 'currentColor' }} />
         {title} ({items.length})
@@ -379,7 +379,7 @@ export default function DebtList({
       <Section title="Мне должны" items={owesMe} direction="owes-me" colorClass="from-emerald-400 to-cyan-400" />
 
       {transfers.length > 0 && (
-        <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40">
+        <div className="bg-[#0d1715] border border-gray-800 rounded-2xl p-5 shadow-xl shadow-black/40">
           <h2 className="text-lg font-black flex items-center gap-2 mb-4 text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400">
             <RefreshCw className="w-5 h-5 text-amber-400" />
             История переводов ({transfers.length})

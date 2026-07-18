@@ -72,11 +72,11 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
     }
   };
 
-  const inputCls = 'w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-gray-200 text-sm focus:outline-none focus:border-purple-500/60 transition';
+  const inputCls = 'w-full bg-[#060b0b] border border-gray-800 rounded-xl p-3 text-gray-200 text-sm focus:outline-none focus:border-purple-500/60 transition';
   const labelCls = 'block text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-widest';
 
   return (
-    <div className="bg-[#151c2c] border border-gray-800 rounded-2xl p-6 shadow-xl shadow-black/40">
+    <div className="bg-[#0d1715] border border-gray-800 rounded-2xl p-6 shadow-xl shadow-black/40">
       <h2 className="text-lg font-black flex items-center gap-2 mb-5 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
         <PlusCircle className="w-5 h-5 text-emerald-400" />
         Создать долг
@@ -234,7 +234,7 @@ export default function DebtForm({ users, currentUser, onSubmit }) {
         </div>
 
         <button type="submit" disabled={loading}
-          className="w-full bg-gradient-to-r from-emerald-500 to-cyan-500 text-[#0b0f19] font-black py-3 px-4 rounded-xl hover:opacity-90 shadow-emerald-500/20 shadow-md transition disabled:opacity-50 mt-1 text-sm">
+          className="w-full bg-gradient-to-r from-emerald-500 to-cyan-500 text-[#060b0b] font-black py-3 px-4 rounded-xl hover:opacity-90 shadow-emerald-500/20 shadow-md transition disabled:opacity-50 mt-1 text-sm">
           {loading ? 'Создание...' : witnessRequired ? '⚖️ Создать долг (со свидетелем)' : '✅ Создать долг'}
         </button>
       </form>

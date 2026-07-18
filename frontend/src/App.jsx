@@ -75,8 +75,8 @@ function AppRoutes({
 
   if (!token || !currentUser) {
     return (
-      <div className="min-h-screen bg-[#070b13] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#131a2e] via-[#070b13] to-black flex items-center justify-center p-4 selection:bg-purple-650/40">
-        <div className="w-full max-w-md bg-[#151c2c]/75 backdrop-blur-xl border border-gray-800/80 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+      <div className="min-h-screen bg-[#050a0a] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#0b1614] via-[#050a0a] to-black flex items-center justify-center p-4 selection:bg-purple-650/40">
+        <div className="w-full max-w-md bg-[#0d1715]/75 backdrop-blur-xl border border-gray-800/80 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
           {/* Декор */}
           <div className="absolute -right-16 -top-16 w-36 h-36 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -left-16 -bottom-16 w-36 h-36 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -113,7 +113,7 @@ function AppRoutes({
                     placeholder="Например, Роман"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                    className="w-full bg-[#060b0b] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition"
                   />
                 </div>
               </div>
@@ -131,7 +131,7 @@ function AppRoutes({
                       placeholder="roman"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-9 pr-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition font-mono"
+                      className="w-full bg-[#060b0b] border border-gray-850 rounded-xl pl-9 pr-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition font-mono"
                     />
                   </div>
                 </div>
@@ -147,7 +147,7 @@ function AppRoutes({
                         placeholder="your@email.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                        className="w-full bg-[#060b0b] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition"
                       />
                     </div>
                   </div>
@@ -174,7 +174,7 @@ function AppRoutes({
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                      className="w-full bg-[#060b0b] border border-gray-850 rounded-xl pl-10 pr-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition"
                     />
                   </div>
                 </div>
@@ -192,7 +192,7 @@ function AppRoutes({
                     placeholder="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl pl-9 pr-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                    className="w-full bg-[#060b0b] border border-gray-850 rounded-xl pl-9 pr-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition"
                   />
                 </div>
               </div>
@@ -208,7 +208,7 @@ function AppRoutes({
                     placeholder="Код подтверждения"
                     value={resetCode}
                     onChange={(e) => setResetCode(e.target.value)}
-                    className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl px-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition text-center font-bold tracking-widest"
+                    className="w-full bg-[#060b0b] border border-gray-850 rounded-xl px-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition text-center font-bold tracking-widest"
                   />
                 </div>
                 <div>
@@ -219,7 +219,7 @@ function AppRoutes({
                     placeholder="Новый пароль"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-[#0b0f19] border border-gray-850 rounded-xl px-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition"
+                    className="w-full bg-[#060b0b] border border-gray-850 rounded-xl px-4 py-3 text-xs text-gray-250 focus:outline-none focus:border-cyan-500 transition"
                   />
                 </div>
               </div>
