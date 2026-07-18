@@ -294,6 +294,12 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 })
     } catch (err) {
       console.error('[app.js] Ошибка запуска выдачи достижений Везучий ублюдок:', err);
     }
+    try {
+      const publishAnnouncement = require('./scripts/publishAnnouncement');
+      await publishAnnouncement();
+    } catch (err) {
+      console.error('[app.js] Ошибка запуска публикации объявлений об обновлении:', err);
+    }
     startReminderScheduler();
     startCronScheduler();
     app.listen(PORT, () => console.log(`🚀 Сервер запущен на порту ${PORT}`));
