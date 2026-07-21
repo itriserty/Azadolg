@@ -306,15 +306,12 @@ async function getDebts(req, res) {
   }
 }
 
-// ── Загрузка пруфа оплаты + частичный платёж ─────────────────────────────────
+// ── Загрузка пруфа оплаты + частичный платёж (или подтверждение физической оплаты) ──
 async function submitPaymentProof(req, res) {
   try {
     const { transactionId } = req.params;
     const { partialAmount } = req.body;  // опционально: частичная сумма
     const userId            = req.user;
-
-    if (!req.file)
-      return res.status(400).json({ error: 'Необходимо прикрепить пруф оплаты (изображение)' });
 
     const result = await runInTransaction(async (session) => {
       const tx = await Transaction.findById(transactionId).populate('creditor debtor').session(session);
@@ -322,11 +319,8 @@ async function submitPaymentProof(req, res) {
       if (tx.status !== 'active' && tx.status !== 'partially_paid')
         throw new Error(`Долг имеет статус "${tx.status}" и не может быть оплачен`);
 
-      // Только должник или третье лицо может вносить платёж
-      const isDebtor       = tx.debtor._id.toString() === userId.toString();
-      const isCreditor     = tx.creditor._id.toString() === userId.toString();
-      if (isCreditor && !isDebtor)
-        throw new Error('Кредитор не может сам закрыть этот долг. Используйте "Простить долг".');
+      const isDebtor   = tx.debtor._id.toString() === userId.toString();
+      const isCreditor = tx.creditor._id.toString() === userId.toString();
 
       const now          = new Date();
       const currentAmount = getCalculatedAmount(tx, now);
@@ -340,7 +334,7 @@ async function submitPaymentProof(req, res) {
       if (payAmt <= 0)
         throw new Error('Долг уже полностью оплачен');
 
-      const proofPath = `/uploads/proofs/${req.file.filename}`;
+      const proofPath = req.file ? `/uploads/proofs/${req.file.filename}` : null;
 
       // Добавляем запись платежа
       tx.payments.push({
@@ -351,8 +345,8 @@ async function submitPaymentProof(req, res) {
       });
       tx.paidAmount = (tx.paidAmount || 0) + payAmt;
 
-      // Если не должник платит — фиксируем paidByThirdParty
-      if (!isDebtor) tx.paidByThirdParty = userId;
+      // Если не должник и не кредитор платит — фиксируем paidByThirdParty
+      if (!isDebtor && !isCreditor) tx.paidByThirdParty = userId;
 
       const isFullyPaid = tx.paidAmount >= currentAmount;
 
@@ -533,12 +527,13 @@ async function submitPaymentProof(req, res) {
       });
     } else {
       const remainingAfter = Math.max(0, result.currentAmount - result.tx.paidAmount);
+      const proofNotice = result.tx.payments?.slice(-1)[0]?.proofImage ? 'Пруф прикреплён.' : 'Платёж внесен физически/наличными.';
       const notifyText = `💳 <b>Частичный платёж по долгу!</b>\n\n` +
         `👤 Кредитор: <b>${result.creditorName}</b>\n` +
         `👤 Должник: <b>${result.debtorName}</b>\n` +
         `✅ Внесено: <b>${result.payAmt} ₸</b>\n` +
         `💰 Остаток: <b>${remainingAfter} ₸</b> из ${result.currentAmount} ₸\n\n` +
-        `Пруф прикреплён. Кредитор может просмотреть.`;
+        `${proofNotice}`;
 
       if (result.creditorTelegramId) tg.sendMessage(notifyText, result.creditorTelegramId);
 

@@ -84,19 +84,18 @@ export default function DebtList({
     const remaining      = Math.max(0, currentAmount - paidSoFar);
     const paidPct        = currentAmount > 0 ? Math.min(100, Math.round((paidSoFar / currentAmount) * 100)) : 0;
 
-    // Загружаем пруф оплаты
+    // Загружаем платёж (с пруфом или без пруфа)
     const handlePayProof = async () => {
       setLocalError('');
-      if (!proofFile) return setLocalError('Прикрепите скриншот перевода или чека');
       setBusy(true);
       try {
         const fd = new FormData();
-        fd.append('proof', proofFile);
+        if (proofFile) fd.append('proof', proofFile);
         if (partialAmt && Number(partialAmt) > 0) fd.append('partialAmount', partialAmt);
         await onPayProof(debt._id, fd);
         setProofFile(null); setPartialAmt('');
       } catch (err) {
-        setLocalError(err.message || 'Ошибка загрузки пруфа');
+        setLocalError(err.message || 'Ошибка проведения платежа');
       } finally {
         setBusy(false);
       }
@@ -249,11 +248,11 @@ export default function DebtList({
                   </div>
                 )}
 
-                {/* Оплата с пруфом (для должника) */}
+                {/* Оплата долга (для должника) */}
                 {isOwe && (
                   <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-3">
                     <div className="text-[10px] text-purple-400 font-bold uppercase tracking-wider mb-2 flex items-center gap-1">
-                      <Upload className="w-3.5 h-3.5" /> Оплатить (с пруфом)
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Внести платёж / Закрыть долг
                     </div>
                     <div className="flex flex-col gap-2">
                       <input type="number" placeholder={`Частичная сумма (макс. ${remaining} ₸, пусто = всё)`}
@@ -264,13 +263,13 @@ export default function DebtList({
                         <input ref={fileRef} type="file" accept="image/*" onChange={e => setProofFile(e.target.files[0])} className="hidden" id={`proof-${debt._id}`} />
                         <label htmlFor={`proof-${debt._id}`}
                           className="cursor-pointer flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold px-3 py-2 rounded-lg transition">
-                          <Upload className="w-3 h-3" />
-                          {proofFile ? proofFile.name : 'Прикрепить скриншот'}
+                          <Upload className="w-3 h-3 text-purple-400" />
+                          {proofFile ? proofFile.name : 'Чек (необязательно)'}
                         </label>
-                        <button onClick={handlePayProof} disabled={busy || !proofFile}
+                        <button onClick={handlePayProof} disabled={busy}
                           className="flex-1 bg-gradient-to-r from-emerald-600 to-cyan-600 text-white font-bold text-[10px] py-2 px-3 rounded-lg transition disabled:opacity-40 flex items-center justify-center gap-1">
                           {busy ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-                          {partialAmt ? `Внести ${partialAmt} ₸` : 'Оплатить полностью'}
+                          {partialAmt ? `Внести ${partialAmt} ₸` : 'Оплатить / Отметить оплаченным'}
                         </button>
                       </div>
                     </div>
@@ -295,6 +294,37 @@ export default function DebtList({
                         className="bg-amber-600/80 hover:bg-amber-600 text-white font-bold text-[10px] py-2 px-3 rounded-lg transition disabled:opacity-40">
                         Передать
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Подтверждение получения долга (кредитор) */}
+                {isCreditor && (
+                  <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
+                    <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-2 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Подтвердить получение (Оплачено)
+                    </div>
+                    <p className="text-[10px] text-gray-400 mb-2">
+                      Должник вернул вам деньги наличными или переводом? Нажмите здесь для закрытия долга.
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      <input type="number" placeholder={`Сумма получения (макс. ${remaining} ₸, пусто = всё)`}
+                        value={partialAmt} onChange={e => setPartialAmt(e.target.value)} min="1" max={remaining}
+                        className="bg-[#060b0b] border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-emerald-500/60"
+                      />
+                      <div className="flex items-center gap-2">
+                        <input ref={fileRef} type="file" accept="image/*" onChange={e => setProofFile(e.target.files[0])} className="hidden" id={`creditor-proof-${debt._id}`} />
+                        <label htmlFor={`creditor-proof-${debt._id}`}
+                          className="cursor-pointer flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold px-3 py-2 rounded-lg transition">
+                          <Upload className="w-3 h-3 text-emerald-400" />
+                          {proofFile ? proofFile.name : 'Чек (необязательно)'}
+                        </label>
+                        <button onClick={handlePayProof} disabled={busy}
+                          className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-[10px] py-2 px-3 rounded-lg transition disabled:opacity-40 flex items-center justify-center gap-1">
+                          {busy ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                          {partialAmt ? `Подтвердить ${partialAmt} ₸` : `Подтвердить получение ${remaining} ₸`}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
