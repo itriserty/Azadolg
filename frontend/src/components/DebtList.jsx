@@ -117,6 +117,42 @@ export default function DebtList({
       finally { setBusy(false); }
     };
 
+    const handleConfirmAction = async () => {
+      setLocalError('');
+      setBusy(true);
+      try {
+        await onConfirm(debt._id);
+      } catch (err) {
+        setLocalError(err.message || 'Ошибка подтверждения долга');
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    const handleDeclineAction = async () => {
+      setLocalError('');
+      setBusy(true);
+      try {
+        await onDecline(debt._id);
+      } catch (err) {
+        setLocalError(err.message || 'Ошибка отклонения долга');
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    const handleWitnessAction = async (act) => {
+      setLocalError('');
+      setBusy(true);
+      try {
+        await onWitness(debt._id, act);
+      } catch (err) {
+        setLocalError(err.message || 'Ошибка обработки свидетелем');
+      } finally {
+        setBusy(false);
+      }
+    };
+
     const statusBadge = () => {
       if (debt.status === 'pending_witness') return <span className="badge-amber animate-pulse">⚖️ Ждёт свидетеля</span>;
       if (debt.status === 'pending_approval') return <span className="badge-yellow animate-pulse">⏳ Ждёт подтверждения</span>;
@@ -204,14 +240,22 @@ export default function DebtList({
           </div>
         )}
 
+        {/* Плашка ошибки для карточки */}
+        {localError && (
+          <div className="mx-4 mb-3 text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-2 flex items-center gap-1.5">
+            <ShieldAlert className="w-3.5 h-3.5 shrink-0" />{localError}
+            <button onClick={() => setLocalError('')} className="ml-auto"><X className="w-3 h-3" /></button>
+          </div>
+        )}
+
         {/* Подтверждение свидетелем */}
         {debt.status === 'pending_witness' && debt.witness?._id === currentUser?._id && (
-          <div className="px-4 pb-4 flex gap-2 border-t border-gray-800/50 pt-3">
+          <div className="px-4 pb-4 flex gap-2 border-t border-gray-800/50 pt-3 items-center">
             <span className="text-xs text-purple-400 mr-2">Вы свидетель — подтвердите долг:</span>
-            <button onClick={() => onWitness(debt._id, 'approve')} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] py-1.5 px-3 rounded-xl transition">
-              ✅ Подтвердить
+            <button onClick={() => handleWitnessAction('approve')} disabled={busy} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] py-1.5 px-3 rounded-xl transition disabled:opacity-40 flex items-center gap-1">
+              {busy ? <RefreshCw className="w-3 h-3 animate-spin" /> : '✅ Подтвердить'}
             </button>
-            <button onClick={() => onWitness(debt._id, 'reject')} className="bg-red-600/20 border border-red-500/30 text-red-400 font-bold text-[10px] py-1.5 px-3 rounded-xl hover:bg-red-600/30 transition">
+            <button onClick={() => handleWitnessAction('reject')} disabled={busy} className="bg-red-600/20 border border-red-500/30 text-red-400 font-bold text-[10px] py-1.5 px-3 rounded-xl hover:bg-red-600/30 transition disabled:opacity-40">
               ❌ Отклонить
             </button>
           </div>
@@ -222,10 +266,10 @@ export default function DebtList({
           <div className="px-4 pb-4 border-t border-gray-800/50 pt-3">
             {(debt.debtor?._id === currentUser?._id || debt.debtor === currentUser?._id) && debt.createdBy !== currentUser._id ? (
               <div className="flex gap-2">
-                <button onClick={() => onConfirm(debt._id)} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] py-1.5 px-3 rounded-xl transition">
-                  ✅ Подтвердить долг
+                <button onClick={handleConfirmAction} disabled={busy} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] py-1.5 px-3 rounded-xl transition disabled:opacity-40 flex items-center gap-1">
+                  {busy ? <RefreshCw className="w-3 h-3 animate-spin" /> : '✅ Подтвердить долг'}
                 </button>
-                <button onClick={() => onDecline(debt._id)} className="bg-red-600/20 border border-red-500/30 text-red-400 font-bold text-[10px] py-1.5 px-3 rounded-xl hover:bg-red-600/30 transition">
+                <button onClick={handleDeclineAction} disabled={busy} className="bg-red-600/20 border border-red-500/30 text-red-400 font-bold text-[10px] py-1.5 px-3 rounded-xl hover:bg-red-600/30 transition disabled:opacity-40">
                   ❌ Оспорить
                 </button>
               </div>

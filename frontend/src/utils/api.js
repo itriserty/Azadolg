@@ -1,8 +1,13 @@
 const API_BASE_URL = '/api';
 let successCallback = null;
+let unauthorizedCallback = null;
 
 export const setSuccessCallback = (cb) => {
   successCallback = cb;
+};
+
+export const setUnauthorizedCallback = (cb) => {
+  unauthorizedCallback = cb;
 };
 
 async function request(url, options = {}) {
@@ -26,7 +31,15 @@ async function request(url, options = {}) {
   });
   
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Что-то пошло не так');
+  if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      if (unauthorizedCallback) {
+        unauthorizedCallback(data.error || 'Сессия истекла');
+      }
+    }
+    throw new Error(data.error || 'Что-то пошло не так');
+  }
   
   if (successCallback) {
     try {

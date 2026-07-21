@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { api, setSuccessCallback } from './utils/api';
+import { api, setSuccessCallback, setUnauthorizedCallback } from './utils/api';
 import Layout         from './components/Layout';
 import Feed           from './components/Feed';
 import Casino         from './components/Casino';
@@ -446,8 +446,15 @@ export default function App() {
     setSuccessCallback((data) => {
       checkAchievementsAndQuests(data);
     });
-    return () => setSuccessCallback(null);
-  }, [checkAchievementsAndQuests]);
+    setUnauthorizedCallback((errMessage) => {
+      handleLogout();
+      setAuthError(errMessage || 'Сессия истекла. Войдите в аккаунт снова.');
+    });
+    return () => {
+      setSuccessCallback(null);
+      setUnauthorizedCallback(null);
+    };
+  }, [checkAchievementsAndQuests, handleLogout]);
 
   // Состояния для форм авторизации
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot' | 'reset'
