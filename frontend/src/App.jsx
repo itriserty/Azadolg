@@ -453,6 +453,28 @@ export default function App() {
     }
   }, [addToast]);
 
+  // Состояния для форм авторизации
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot' | 'reset'
+  const [authError, setAuthError] = useState('');
+  const [authSuccess, setAuthSuccess] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token');
+    setToken('');
+    setCurrentUser(null);
+    setUsers([]);
+    setFriends([]);
+    setPendingRequests([]);
+    setDebts([]);
+  }, []);
+
   useEffect(() => {
     setSuccessCallback((data) => {
       checkAchievementsAndQuests(data);
@@ -466,18 +488,6 @@ export default function App() {
       setUnauthorizedCallback(null);
     };
   }, [checkAchievementsAndQuests, handleLogout]);
-
-  // Состояния для форм авторизации
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot' | 'reset'
-  const [authError, setAuthError] = useState('');
-  const [authSuccess, setAuthSuccess] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
-  const [name, setName] = useState('');
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [resetCode, setResetCode] = useState('');
-  const [newPassword, setNewPassword] = useState('');
 
   const fetchAppData = useCallback(async () => {
     const storedToken = localStorage.getItem('token');
@@ -512,7 +522,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [handleLogout]);
 
   useEffect(() => {
     if (token) {
@@ -564,16 +574,6 @@ export default function App() {
     } finally {
       setAuthLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setToken('');
-    setCurrentUser(null);
-    setUsers([]);
-    setFriends([]);
-    setPendingRequests([]);
-    setDebts([]);
   };
 
   // ── Финансовые методы ──
