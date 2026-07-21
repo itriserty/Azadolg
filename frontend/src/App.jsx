@@ -73,6 +73,17 @@ function AppRoutes({
     }
   }, [token, currentUser, navigate]);
 
+  if (token && loading && !currentUser) {
+    return (
+      <div className="min-h-screen bg-[#050a0a] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#0b1614] via-[#050a0a] to-black flex flex-col items-center justify-center p-4">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-650 to-cyan-500 flex items-center justify-center font-black text-white text-3xl shadow-xl shadow-purple-500/20 mb-3 animate-pulse">
+          AV
+        </div>
+        <div className="text-xs text-gray-400 font-bold animate-pulse">Загрузка данных...</div>
+      </div>
+    );
+  }
+
   if (!token || !currentUser) {
     return (
       <div className="min-h-screen bg-[#050a0a] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#0b1614] via-[#050a0a] to-black flex items-center justify-center p-4 selection:bg-purple-650/40">
@@ -90,9 +101,9 @@ function AppRoutes({
             <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Закрытая финансовая ELO-система</p>
           </div>
 
-          {authError && (
+          {(authError || error) && (
             <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl text-xs text-red-400 mb-6 font-bold">
-              ⚠️ {authError}
+              ⚠️ {authError || error}
             </div>
           )}
           {authSuccess && (
@@ -469,7 +480,11 @@ export default function App() {
   const [newPassword, setNewPassword] = useState('');
 
   const fetchAppData = useCallback(async () => {
-    if (!localStorage.getItem('token')) return;
+    const storedToken = localStorage.getItem('token');
+    if (!storedToken) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const profile = await api.getMe();
@@ -487,10 +502,12 @@ export default function App() {
       setDebts(debtsList);
       setError('');
     } catch (err) {
-      console.error(err);
-      setError(err.message || 'Ошибка загрузки данных');
-      if (err.message?.includes('401') || err.message?.includes('token')) {
+      console.error('[fetchAppData]', err);
+      const errMsg = err.message || 'Ошибка загрузки данных';
+      setError(errMsg);
+      if (errMsg.includes('401') || errMsg.includes('token') || errMsg.includes('Токен')) {
         handleLogout();
+        setAuthError(errMsg);
       }
     } finally {
       setLoading(false);
