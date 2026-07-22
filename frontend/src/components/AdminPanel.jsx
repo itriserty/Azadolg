@@ -258,14 +258,19 @@ export default function AdminPanel({ token }) {
     }
   };
 
+  const [tourneyCustomPool, setTourneyCustomPool] = useState('');
+
   const doStartTournament = async () => {
     setLoading(true);
+    const customPool = tourneyCustomPool ? Number(tourneyCustomPool) : null;
     const res = await safeFetch(`${API}/api/tournament/admin/start`, {
-      method: 'POST'
+      method: 'POST',
+      body: JSON.stringify({ customPool })
     });
     setLoading(false);
     if (res.ok) {
       flash(res.data?.message || 'Турнирный Джекпот успешно запущен!');
+      setTourneyCustomPool('');
     } else {
       flash(res.data?.error || res.error || 'Ошибка запуска турнира', 'err');
     }
@@ -510,15 +515,25 @@ export default function AdminPanel({ token }) {
               <h3 className="font-black text-amber-400 flex items-center gap-1.5 text-sm uppercase tracking-wide">
                 <span>🏆 Турнирный Джекпот (6 Игроков)</span>
               </h3>
-              <p className="text-gray-400 text-[10px] mt-0.5">Сформировать 2 группы по 3 игрока, сгенерировать дуэли и запустить турнир</p>
+              <p className="text-gray-400 text-[10px] mt-0.5">2 группы по 3 обычных игрока (без админов) • Bo3 в группах • Bo5 в Финале</p>
             </div>
-            <button 
-              onClick={doStartTournament}
-              disabled={loading}
-              className="bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black px-5 py-2.5 rounded-xl transition text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-40"
-            >
-              {loading ? 'Запуск...' : '🏆 Запустить Турнир'}
-            </button>
+            
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <input 
+                type="number" 
+                placeholder="Сумма (например 5000)" 
+                value={tourneyCustomPool}
+                onChange={e => setTourneyCustomPool(e.target.value)}
+                className="bg-[#060b0b] border border-amber-500/40 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 w-44 font-bold" 
+              />
+              <button 
+                onClick={doStartTournament}
+                disabled={loading}
+                className="bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black px-5 py-2.5 rounded-xl transition text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-40"
+              >
+                {loading ? 'Запуск...' : '🏆 Запустить Турнир'}
+              </button>
+            </div>
           </div>
 
           {/* Mass Karma Distribution banner */}

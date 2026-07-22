@@ -9,7 +9,7 @@ function assert(condition, message) {
 }
 
 async function runTournamentTest() {
-  console.log('🧪 Starting 6-Player Jackpot Tournament Simulation Test (Unit Mode)...');
+  console.log('🧪 Starting 6-Player Jackpot Tournament Simulation Test (Unit Mode: Bo3 / Bo5)...');
 
   // Mock player IDs
   const mockPlayers = [
@@ -64,6 +64,15 @@ async function runTournamentTest() {
   JackpotTournament.findById = () => Promise.resolve(currentDoc);
   JackpotTournament.findOne = () => createPopulateChain();
 
+  // Helper to play a series until player1 wins (winsRequired times)
+  const playSeries = async (tourneyId, match) => {
+    const targetWins = match.winsRequired || 2;
+    for (let leg = 0; leg < targetWins; leg++) {
+      await tournamentService.reportMatchResult(tourneyId, match._id, match.player1, match.player1);
+      await tournamentService.confirmMatchResult(tourneyId, match._id, match.player2);
+    }
+  };
+
   // 1. Create Tournament
   console.log('1. Creating tournament...');
   const pool = 10000;
@@ -76,47 +85,44 @@ async function runTournamentTest() {
   assert(tournament.status === 'group_stage', 'Status should be group_stage');
   console.log('  ✅ Group stage setup verified!');
 
-  // 2. Play Group Stage matches
-  console.log('2. Playing Group Stage matches (12 matches)...');
+  // 2. Play Group Stage matches (Bo3: 2 wins each)
+  console.log('2. Playing Group Stage matches (12 Bo3 series)...');
   const groupMatches = tournament.matches.filter(m => ['group_A', 'group_B'].includes(m.stage));
 
   for (let i = 0; i < groupMatches.length; i++) {
     const m = groupMatches[i];
-    await tournamentService.reportMatchResult(tournament._id, m._id, m.player1, m.player1);
-    await tournamentService.confirmMatchResult(tournament._id, m._id, m.player2);
+    await playSeries(tournament._id, m);
   }
 
   const updatedTourney = await tournamentService.getActiveTournament();
   assert(updatedTourney.status === 'playoffs', 'Tournament should advance to playoffs stage');
-  console.log('  ✅ Group stage completed & advanced to Playoffs!');
+  console.log('  ✅ Group stage Bo3 series completed & advanced to Playoffs!');
 
-  // 3. Play Semi-Finals
-  console.log('3. Playing Semi-Finals...');
+  // 3. Play Semi-Finals (Bo3: 2 wins each)
+  console.log('3. Playing Semi-Finals (Bo3)...');
   const sf1 = updatedTourney.matches.find(m => m.stage === 'semi_final_1');
   const sf2 = updatedTourney.matches.find(m => m.stage === 'semi_final_2');
 
   assert(sf1 && sf2, 'Semi-finals should exist');
+  assert(sf1.winsRequired === 2, 'Semi-finals should be Bo3 (winsRequired = 2)');
 
-  await tournamentService.reportMatchResult(updatedTourney._id, sf1._id, sf1.player1, sf1.player1);
-  await tournamentService.confirmMatchResult(updatedTourney._id, sf1._id, sf1.player2);
-
-  await tournamentService.reportMatchResult(updatedTourney._id, sf2._id, sf2.player1, sf2.player1);
-  await tournamentService.confirmMatchResult(updatedTourney._id, sf2._id, sf2.player2);
+  await playSeries(updatedTourney._id, sf1);
+  await playSeries(updatedTourney._id, sf2);
 
   const playoffTourney = await tournamentService.getActiveTournament();
   const finalMatch = playoffTourney.matches.find(m => m.stage === 'final');
   const thirdMatch = playoffTourney.matches.find(m => m.stage === 'third_place');
 
   assert(finalMatch && thirdMatch, 'Final and 3rd place match should exist');
-  console.log('  ✅ Semi-Finals completed & Finals generated!');
+  assert(finalMatch.winsRequired === 3, 'Final match MUST be Bo5 (winsRequired = 3)');
+  assert(thirdMatch.winsRequired === 2, '3rd place match should be Bo3 (winsRequired = 2)');
 
-  // 4. Play Finals
-  console.log('4. Playing Final and 3rd Place match...');
-  await tournamentService.reportMatchResult(playoffTourney._id, thirdMatch._id, thirdMatch.player1, thirdMatch.player1);
-  await tournamentService.confirmMatchResult(playoffTourney._id, thirdMatch._id, thirdMatch.player2);
+  console.log('  ✅ Semi-Finals Bo3 completed & Final Bo5 generated!');
 
-  await tournamentService.reportMatchResult(playoffTourney._id, finalMatch._id, finalMatch.player1, finalMatch.player1);
-  await tournamentService.confirmMatchResult(playoffTourney._id, finalMatch._id, finalMatch.player2);
+  // 4. Play Finals (Final is Bo5: 3 wins required)
+  console.log('4. Playing 3rd Place match (Bo3) and Final (Bo5)...');
+  await playSeries(playoffTourney._id, thirdMatch); // 2 wins
+  await playSeries(playoffTourney._id, finalMatch); // 3 wins
 
   const completedTourney = await tournamentService.getActiveTournament();
   assert(completedTourney.status === 'completed', 'Status should be completed');
@@ -134,7 +140,7 @@ async function runTournamentTest() {
   const totalDistributed = p.reduce((sum, item) => sum + item.prize, 0);
   assert(totalDistributed === pool, `Total distributed (${totalDistributed}) should match pool (${pool})`);
 
-  console.log('  ✅ Final placements and 100% prize pool distribution (40%, 25%, 10%, 10%, 7.5%, 7.5%) verified!');
+  console.log('  ✅ Final placements, Bo3/Bo5 series win conditions, and 100% prize pool distribution verified!');
   console.log('🎉 ALL TOURNAMENT LOGIC TESTS PASSED SUCCESSFULLY!');
 }
 

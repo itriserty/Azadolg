@@ -58,12 +58,16 @@ export default function JackpotTournament({ currentUser }) {
     }
   };
 
+  const [customPoolInput, setCustomPoolInput] = useState('');
+
   const handleStartTournament = async () => {
     try {
       setActionLoading(true);
       setMessage(null);
-      const res = await api.startTournamentAdmin();
+      const poolVal = customPoolInput ? Number(customPoolInput) : null;
+      const res = await api.startTournamentAdmin(null, poolVal);
       setMessage({ type: 'success', text: res.message || 'Турнир успешно запущен!' });
+      setCustomPoolInput('');
       await fetchTournament();
     } catch (err) {
       setMessage({ type: 'error', text: err.message || 'Ошибка запуска турнира' });
@@ -88,7 +92,7 @@ export default function JackpotTournament({ currentUser }) {
         <div className="text-4xl mb-1">🎰</div>
         <h3 className="text-lg font-black text-white">Турнирный Джекпот не запущен</h3>
         <p className="text-xs text-slate-400 max-w-md mx-auto">
-          Администратор запустить турнир на 6 игроков, где участники сразятся в групповом этапе и Плей-офф за призовой фонд!
+          Администратор запустит турнир на 6 обычных игроков (без админов), где участники сразятся в групповом этапе (до 2 побед, Bo3) и ФИНАЛЕ (до 3 побед, Bo5) за призовой фонд!
         </p>
 
         {message && (
@@ -100,11 +104,21 @@ export default function JackpotTournament({ currentUser }) {
         )}
 
         {isAdmin && (
-          <div className="pt-2">
+          <div className="pt-2 max-w-xs mx-auto space-y-3">
+            <div>
+              <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Выделить сумму из Джекпота (опционально):</label>
+              <input
+                type="number"
+                placeholder="Вся сумма джекпота или укажите число (например 5000)"
+                value={customPoolInput}
+                onChange={e => setCustomPoolInput(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white text-center font-bold focus:outline-none focus:border-amber-400"
+              />
+            </div>
             <button
               onClick={handleStartTournament}
               disabled={actionLoading}
-              className="bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black px-6 py-3 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 active:scale-95 transition disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black py-3 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 active:scale-95 transition disabled:opacity-50"
             >
               {actionLoading ? 'Запуск...' : '🏆 Запустить Турнирный Джекпот (6 игроков)'}
             </button>
@@ -284,18 +298,22 @@ export default function JackpotTournament({ currentUser }) {
                 }`}>
                   <div className="flex justify-between items-center text-[10px] uppercase font-bold text-slate-400 mb-2">
                     <span className="text-amber-400">{stageLabels[match.stage] || match.stage}</span>
-                    <span>Круг {match.round}</span>
+                    <span className="bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/20">
+                      {match.winsRequired === 3 ? 'Bo5 (до 3 побед)' : 'Bo3 (до 2 побед)'}
+                    </span>
                   </div>
 
                   <div className="flex justify-between items-center my-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
-                    <div className={`font-bold text-xs ${match.winner?._id === p1?._id ? 'text-emerald-400 font-extrabold' : 'text-white'}`}>
-                      {p1?.name || 'Игрок 1'}
-                      {match.winner?._id === p1?._id && ' 🏆'}
+                    <div className={`font-bold text-xs flex items-center gap-1.5 ${match.winner?._id === p1?._id ? 'text-emerald-400 font-extrabold' : 'text-white'}`}>
+                      <span>{p1?.name || 'Игрок 1'}</span>
+                      {match.winner?._id === p1?._id && '🏆'}
+                      <span className="bg-slate-800 text-amber-400 px-2 py-0.5 rounded font-black text-xs">{match.winsP1 || 0}</span>
                     </div>
-                    <span className="text-xs text-slate-500 font-black px-2">VS</span>
-                    <div className={`font-bold text-xs ${match.winner?._id === p2?._id ? 'text-emerald-400 font-extrabold' : 'text-white'}`}>
-                      {p2?.name || 'Игрок 2'}
-                      {match.winner?._id === p2?._id && ' 🏆'}
+                    <span className="text-xs text-slate-500 font-black px-1">:</span>
+                    <div className={`font-bold text-xs flex items-center gap-1.5 ${match.winner?._id === p2?._id ? 'text-emerald-400 font-extrabold' : 'text-white'}`}>
+                      <span className="bg-slate-800 text-amber-400 px-2 py-0.5 rounded font-black text-xs">{match.winsP2 || 0}</span>
+                      <span>{p2?.name || 'Игрок 2'}</span>
+                      {match.winner?._id === p2?._id && '🏆'}
                     </div>
                   </div>
 
@@ -309,14 +327,14 @@ export default function JackpotTournament({ currentUser }) {
                             disabled={actionLoading}
                             className="flex-1 bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-bold py-2 rounded-xl transition"
                           >
-                            Победил {p1?.name}
+                            Партию выиграл {p1?.name}
                           </button>
                           <button
                             onClick={() => handleReportMatch(match._id, p2._id)}
                             disabled={actionLoading}
                             className="flex-1 bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-bold py-2 rounded-xl transition"
                           >
-                            Победил {p2?.name}
+                            Партию выиграл {p2?.name}
                           </button>
                         </div>
                       )}
@@ -327,13 +345,13 @@ export default function JackpotTournament({ currentUser }) {
                           disabled={actionLoading}
                           className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-lg transition active:scale-95"
                         >
-                          ✅ Подтвердить победу: {match.reportedWinner?.name}
+                          ✅ Подтвердить партию: {match.reportedWinner?.name}
                         </button>
                       )}
 
                       {isReported && hasUserConfirmed && (
                         <div className="text-center text-[11px] font-bold text-amber-400 animate-pulse">
-                          ⏳ Ожидается подтверждение соперника...
+                          ⏳ Ожидается подтверждение соперника для текущей партии...
                         </div>
                       )}
                     </div>

@@ -12,37 +12,46 @@ class TournamentService {
   async createTournament(playerIds = null, customPool = null) {
     let participants = [];
 
+    // Исключаем админов при поиске пользователей
+    const query = {
+      username: { $exists: true, $ne: null },
+      isBanned: { $ne: true },
+      role: { $ne: 'admin' }
+    };
+
     if (playerIds && Array.isArray(playerIds) && playerIds.length === 6) {
       participants = playerIds;
     } else {
-      // Автоматический выбор 6 случайных активных незаблокированных пользователей
-      const query = { username: { $exists: true, $ne: null }, isBanned: { $ne: true } };
       const users = await User.find(query).select('_id');
       if (users.length < 6) {
-        throw new Error(`Для турнира требуется минимум 6 игроков. Найдено в БД: ${users.length}`);
+        throw new Error(`Для турнира требуется минимум 6 обычных игроков (без админов). Найдено в БД: ${users.length}`);
       }
-      // Случайное перемешивание
       const shuffled = users.sort(() => 0.5 - Math.random());
       participants = shuffled.slice(0, 6).map(u => u._id);
     }
 
-    // Определяем пул джекпота
-    let pool = Number(customPool);
-    if (isNaN(pool) || pool <= 0) {
-      let state = await SystemState.findOne();
-      if (!state) {
-        state = new SystemState();
-        await state.save();
-      }
-      pool = state.jackpotPool || 1000;
+    // Определяем призовой фонд турнира и вычитаем из накопительного пула
+    let state = await SystemState.findOne();
+    if (!state) {
+      state = new SystemState();
+      await state.save();
     }
 
-    // Случайное перемешивание 6 игроков и деление на 2 группы по 3 человека
+    let pool = Number(customPool);
+    if (!isNaN(pool) && pool > 0) {
+      pool = Math.min(pool, state.jackpotPool || pool);
+      state.jackpotPool = Math.max(0, (state.jackpotPool || 0) - pool);
+    } else {
+      pool = state.jackpotPool || 1000;
+      state.jackpotPool = 0;
+    }
+    await state.save();
+
+    // Деление на 2 группы по 3 человека
     const shuffledPlayers = [...participants].sort(() => 0.5 - Math.random());
     const groupA = shuffledPlayers.slice(0, 3);
     const groupB = shuffledPlayers.slice(3, 6);
 
-    // Генерируем 12 групповых дуэлей (6 матчей на группу в 2 круга)
     const matches = [];
 
     const generateGroupMatches = (groupPlayers, stageName) => {
@@ -51,24 +60,32 @@ class TournamentService {
         [groupPlayers[0], groupPlayers[2]],
         [groupPlayers[1], groupPlayers[2]]
       ];
-      // 1-й круг
+      // 1-й круг (Bo3: до 2-х побед)
       pairs.forEach(pair => {
         matches.push({
           stage: stageName,
           round: 1,
           player1: pair[0],
           player2: pair[1],
-          status: 'pending'
+          winsP1: 0,
+          winsP2: 0,
+          winsRequired: 2,
+          status: 'pending',
+          currentLegStatus: 'pending'
         });
       });
-      // 2-й круг (меняем очередность хозяина/гостя)
+      // 2-й круг (Bo3: до 2-х побед)
       pairs.forEach(pair => {
         matches.push({
           stage: stageName,
           round: 2,
           player1: pair[1],
           player2: pair[0],
-          status: 'pending'
+          winsP1: 0,
+          winsP2: 0,
+          winsRequired: 2,
+          status: 'pending',
+          currentLegStatus: 'pending'
         });
       });
     };
@@ -76,7 +93,6 @@ class TournamentService {
     generateGroupMatches(groupA, 'group_A');
     generateGroupMatches(groupB, 'group_B');
 
-    // Инициализация таблицы очков
     const standings = {
       groupA: groupA.map(p => ({ user: p, wins: 0, losses: 0, points: 0 })),
       groupB: groupB.map(p => ({ user: p, wins: 0, losses: 0, points: 0 }))
@@ -93,7 +109,6 @@ class TournamentService {
 
     await tournament.save();
 
-    // Загружаем данные игроков для уведомления
     const loadedUsers = await User.find({ _id: { $in: participants } }).select('name username');
     const userMap = {};
     loadedUsers.forEach(u => { userMap[u._id.toString()] = u.name; });
@@ -101,20 +116,17 @@ class TournamentService {
     const groupANames = groupA.map(id => userMap[id.toString()] || 'Игрок').join(', ');
     const groupBNames = groupB.map(id => userMap[id.toString()] || 'Игрок').join(', ');
 
-    const tgText = `🏆 <b>СТАРТОВАЛ ЕЖЕНЕДЕЛЬНЫЙ ТУРНИР ДЖЕКПОТ!</b> 🏆\n\n` +
-      `💰 Призовой фонд: <b>${pool} ✧ Кармы</b>\n\n` +
+    const tgText = `🏆 <b>СТАРТОВАЛ ТУРНИРНЫЙ ДЖЕКПОТ!</b> 🏆\n\n` +
+      `💰 Выделенный призовой фонд: <b>${pool} ✧ Кармы</b>\n\n` +
       `🅰️ <b>Группа A:</b> ${groupANames}\n` +
       `🅱️ <b>Группа B:</b> ${groupBNames}\n\n` +
-      `Формат: 2 круга дуэлей в группах. Первые 2 места выходят в Плей-офф! Подтверждайте матчи в приложении! 🚀`;
+      `Формат матчей: <b>до 2-х побед (Bo3)</b>. В Финале — <b>до 3-х побед (Bo5)</b>! 🚀`;
 
     tg.sendMessage(tgText);
 
     return tournament;
   }
 
-  /**
-   * Получить активный или последний турнир
-   */
   async getActiveTournament() {
     let tournament = await JackpotTournament.findOne({ status: { $ne: 'completed' } })
       .populate('participants', 'name username avatar avatar_url eloRating karma')
@@ -145,9 +157,6 @@ class TournamentService {
     return tournament;
   }
 
-  /**
-   * Подать результат матча игроком
-   */
   async reportMatchResult(tournamentId, matchId, reportingUserId, winnerId) {
     const tournament = await JackpotTournament.findById(tournamentId);
     if (!tournament) throw new Error('Турнир не найден');
@@ -155,7 +164,7 @@ class TournamentService {
 
     const match = tournament.matches.id(matchId);
     if (!match) throw new Error('Матч не найден');
-    if (match.status === 'confirmed') throw new Error('Результат матча уже подтверждён');
+    if (match.status === 'confirmed') throw new Error('Матч серии уже полностью завершён');
 
     const p1 = match.player1.toString();
     const p2 = match.player2.toString();
@@ -171,6 +180,7 @@ class TournamentService {
 
     match.reportedWinner = winnerId;
     match.confirmedBy = [reportingUserId];
+    match.currentLegStatus = 'reported';
     match.status = 'reported';
 
     await tournament.save();
@@ -182,21 +192,19 @@ class TournamentService {
       User.findById(winnerId)
     ]);
 
-    const msg = `⚔️ <b>Результат дуэли заявлен!</b>\n\n` +
-      `Игрок <b>${reporterUser.name}</b> указал победителя: <b>${winnerUser.name}</b>.\n` +
-      `⚠️ <b>${opponentUser.name}</b>, подтвердите результат матча в приложении!`;
+    const targetWins = match.winsRequired || 2;
+    const formatName = targetWins === 3 ? 'Bo5 (до 3 побед)' : 'Bo3 (до 2 побед)';
+
+    const msg = `⚔️ <b>Результат партии заявлен! (${formatName})</b>\n\n` +
+      `Игрок <b>${reporterUser.name}</b> указал победителя партии: <b>${winnerUser.name}</b>.\n` +
+      `Текущий счёт в серии: <b>${match.winsP1} : ${match.winsP2}</b>.\n` +
+      `⚠️ <b>${opponentUser.name}</b>, подтвердите результат партии в приложении!`;
 
     tg.sendMessage(msg);
-    if (opponentUser.telegramId) {
-      tg.sendMessage(`⚠️ Пожалуйста, подтвердите результат вашей дуэли против ${reporterUser.name} в Azadolg!`, opponentUser.telegramId);
-    }
 
     return tournament;
   }
 
-  /**
-   * Подтвердить результат матча соперником
-   */
   async confirmMatchResult(tournamentId, matchId, confirmingUserId) {
     const tournament = await JackpotTournament.findById(tournamentId);
     if (!tournament) throw new Error('Турнир не найден');
@@ -204,7 +212,7 @@ class TournamentService {
 
     const match = tournament.matches.id(matchId);
     if (!match) throw new Error('Матч не найден');
-    if (match.status !== 'reported') throw new Error('Матч не ожидает подтверждения');
+    if (match.status !== 'reported') throw new Error('Партия матча не ожидает подтверждения');
 
     const p1 = match.player1.toString();
     const p2 = match.player2.toString();
@@ -217,35 +225,63 @@ class TournamentService {
       throw new Error('Вы уже подтвердили этот результат');
     }
 
-    match.confirmedBy.push(confirmingUserId);
-    match.status = 'confirmed';
-    match.winner = match.reportedWinner;
+    const legWinnerId = match.reportedWinner.toString();
+    if (legWinnerId === p1) {
+      match.winsP1 += 1;
+    } else {
+      match.winsP2 += 1;
+    }
 
-    const loserId = match.winner.toString() === p1 ? p2 : p1;
+    const targetWins = match.winsRequired || 2;
+    const isSeriesFinished = match.winsP1 >= targetWins || match.winsP2 >= targetWins;
 
-    // Обновляем очки в группе если это групповой этап
-    if (['group_A', 'group_B'].includes(match.stage)) {
-      const groupKey = match.stage === 'group_A' ? 'groupA' : 'groupB';
-      const standingsList = tournament.standings[groupKey];
+    let finishMsg = '';
 
-      const winnerItem = standingsList.find(s => s.user.toString() === match.winner.toString());
-      const loserItem = standingsList.find(s => s.user.toString() === loserId);
+    if (isSeriesFinished) {
+      match.status = 'confirmed';
+      match.currentLegStatus = 'pending';
+      match.winner = match.winsP1 >= targetWins ? match.player1 : match.player2;
 
-      if (winnerItem) { winnerItem.wins += 1; winnerItem.points += 3; }
-      if (loserItem)  { loserItem.losses += 1; }
+      const loserId = match.winner.toString() === p1 ? p2 : p1;
+
+      // Очки в группе
+      if (['group_A', 'group_B'].includes(match.stage)) {
+        const groupKey = match.stage === 'group_A' ? 'groupA' : 'groupB';
+        const standingsList = tournament.standings[groupKey];
+
+        const winnerItem = standingsList.find(s => s.user.toString() === match.winner.toString());
+        const loserItem = standingsList.find(s => s.user.toString() === loserId);
+
+        if (winnerItem) { winnerItem.wins += 1; winnerItem.points += 3; }
+        if (loserItem)  { loserItem.losses += 1; }
+      }
+
+      const [winnerUser, loserUser] = await Promise.all([
+        User.findById(match.winner),
+        User.findById(loserId)
+      ]);
+
+      finishMsg = `🏆 <b>СЕРИЯ ЗАВЕРШЕНА!</b>\n\n` +
+        `⚔️ <b>${winnerUser.name}</b> победил <b>${loserUser.name}</b> со счётом <b>${match.winsP1} : ${match.winsP2}</b>!\n` +
+        `Этап: <i>${match.stage.replace('_', ' ').toUpperCase()}</i>`;
+    } else {
+      // Идет серия (например 1:1 в Bo3 или 2:1 в Bo5)
+      match.status = 'pending';
+      match.currentLegStatus = 'pending';
+      match.reportedWinner = null;
+      match.confirmedBy = [];
+
+      const [u1, u2] = await Promise.all([
+        User.findById(match.player1),
+        User.findById(match.player2)
+      ]);
+
+      finishMsg = `✅ <b>ПАРТИЯ ПОДТВЕРЖДЕНА!</b>\n\n` +
+        `Счёт в серии между <b>${u1.name}</b> и <b>${u2.name}</b>: <b>${match.winsP1} : ${match.winsP2}</b> (играют до ${targetWins} побед).\n` +
+        `Проведите следующую партию!`;
     }
 
     await tournament.save();
-
-    const [winnerUser, loserUser] = await Promise.all([
-      User.findById(match.winner),
-      User.findById(loserId)
-    ]);
-
-    const finishMsg = `✅ <b>МАТЧ ПОДТВЕРЖДЁН!</b>\n\n` +
-      `⚔️ <b>${winnerUser.name}</b> одержал победу над <b>${loserUser.name}</b>!\n` +
-      `Этап: <i>${match.stage.replace('_', ' ').toUpperCase()}</i>`;
-
     tg.sendMessage(finishMsg);
 
     // Проверяем прогресс этапов
@@ -275,11 +311,7 @@ class TournamentService {
     return tournament;
   }
 
-  /**
-   * Переход из группового этапа в Полуфиналы (Плей-офф)
-   */
   async advanceToPlayoffs(tournament) {
-    // Сортируем участников группы A и B по очкам/победам
     const sortStandings = (list) => {
       return [...list].sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
@@ -292,28 +324,33 @@ class TournamentService {
 
     const a1 = groupAStandings[0].user;
     const a2 = groupAStandings[1].user;
-    const a3 = groupAStandings[2].user; // 5-е / 6-е место
-
     const b1 = groupBStandings[0].user;
     const b2 = groupBStandings[1].user;
-    const b3 = groupBStandings[2].user; // 5-е / 6-е место
 
-    // Полуфинал 1: 1A vs 2B
+    // Полуфинал 1: 1A vs 2B (Bo3: до 2 побед)
     tournament.matches.push({
       stage: 'semi_final_1',
       round: 3,
       player1: a1,
       player2: b2,
-      status: 'pending'
+      winsP1: 0,
+      winsP2: 0,
+      winsRequired: 2,
+      status: 'pending',
+      currentLegStatus: 'pending'
     });
 
-    // Полуфинал 2: 1B vs 2A
+    // Полуфинал 2: 1B vs 2A (Bo3: до 2 побед)
     tournament.matches.push({
       stage: 'semi_final_2',
       round: 3,
       player1: b1,
       player2: a2,
-      status: 'pending'
+      winsP1: 0,
+      winsP2: 0,
+      winsRequired: 2,
+      status: 'pending',
+      currentLegStatus: 'pending'
     });
 
     tournament.status = 'playoffs';
@@ -324,17 +361,14 @@ class TournamentService {
       User.findById(b1), User.findById(b2)
     ]);
 
-    const playoffMsg = `🔥 <b>ГРУППОВОЙ ЭТАП ЗАВЕРШЁН! СТАРТ ПЛЕЙ-ОФФ!</b> 🔥\n\n` +
+    const playoffMsg = `🔥 <b>ГРУППОВОЙ ЭТАП ЗАВЕРШЁН! СТАРТ ПЛЕЙ-ОФФ (Bo3)!</b> 🔥\n\n` +
       `⚔️ <b>Полуфинал 1:</b> ${uA1.name} (1A) vs ${uB2.name} (2B)\n` +
       `⚔️ <b>Полуфинал 2:</b> ${uB1.name} (1B) vs ${uA2.name} (2A)\n\n` +
-      `Матчи созданы в приложении. Победители выходят в ФИНАЛ! 🏆`;
+      `Матчи проходят до 2-х побед! 🚀`;
 
     tg.sendMessage(playoffMsg);
   }
 
-  /**
-   * Генерация финала и матча за 3-е место
-   */
   async generatePlayoffFinals(tournament) {
     const sf1 = tournament.matches.find(m => m.stage === 'semi_final_1');
     const sf2 = tournament.matches.find(m => m.stage === 'semi_final_2');
@@ -345,22 +379,30 @@ class TournamentService {
     const sf2Winner = sf2.winner;
     const sf2Loser  = sf2.winner.toString() === sf2.player1.toString() ? sf2.player2 : sf2.player1;
 
-    // Матч за 3-е место
+    // Матч за 3-е место (Bo3: до 2 побед)
     tournament.matches.push({
       stage: 'third_place',
       round: 4,
       player1: sf1Loser,
       player2: sf2Loser,
-      status: 'pending'
+      winsP1: 0,
+      winsP2: 0,
+      winsRequired: 2,
+      status: 'pending',
+      currentLegStatus: 'pending'
     });
 
-    // Финал
+    // ФИНАЛ (Bo5: до 3-х побед!)
     tournament.matches.push({
       stage: 'final',
       round: 4,
       player1: sf1Winner,
       player2: sf2Winner,
-      status: 'pending'
+      winsP1: 0,
+      winsP2: 0,
+      winsRequired: 3, // <--- До 3-х побед в Финале!
+      status: 'pending',
+      currentLegStatus: 'pending'
     });
 
     await tournament.save();
@@ -371,16 +413,13 @@ class TournamentService {
     ]);
 
     const finalsMsg = `👑 <b>ПОЛУФИНАЛЫ СЫГРАНЫ! ФИНАЛ И МАТЧ ЗА 3-Е МЕСТО!</b> 👑\n\n` +
-      `🥇 <b>ФИНАЛ:</b> ${w1.name} vs ${w2.name}\n` +
-      `🥉 <b>Матч за 3-е место:</b> ${l1.name} vs ${l2.name}\n\n` +
-      `Проведите финальные дуэли и подтвердите результат! 🔥`;
+      `🥇 <b>ФИНАЛ (до 3-х побед, Bo5):</b> ${w1.name} vs ${w2.name}\n` +
+      `🥉 <b>Матч за 3-е место (до 2-х побед, Bo3):</b> ${l1.name} vs ${l2.name}\n\n` +
+      `Удачи финалистам! 🔥`;
 
     tg.sendMessage(finalsMsg);
   }
 
-  /**
-   * Подведение итогов турнира и распределение призового фонда
-   */
   async finalizeTournament(tournament) {
     const finalMatch = tournament.matches.find(m => m.stage === 'final');
     const thirdMatch = tournament.matches.find(m => m.stage === 'third_place');
@@ -391,7 +430,6 @@ class TournamentService {
     const p3rd = thirdMatch.winner;
     const p4th = thirdMatch.winner.toString() === thirdMatch.player1.toString() ? thirdMatch.player2 : thirdMatch.player1;
 
-    // 5-е и 6-е места — третьи места группового этапа
     const sortStandings = (list) => [...list].sort((a, b) => b.points - a.points || b.wins - a.wins);
     const gA = sortStandings(tournament.standings.groupA);
     const gB = sortStandings(tournament.standings.groupB);
@@ -401,7 +439,6 @@ class TournamentService {
 
     const pool = tournament.jackpotPool;
 
-    // Проценты выплат: 40%, 25%, 10%, 10%, 7.5%, 7.5%
     const prizes = [
       { rank: 1, user: p1st, prize: Math.round(pool * 0.40) },
       { rank: 2, user: p2nd, prize: Math.round(pool * 0.25) },
@@ -415,7 +452,6 @@ class TournamentService {
     tournament.status = 'completed';
     await tournament.save();
 
-    // Зачисляем Карму победителям
     for (const item of prizes) {
       if (item.prize > 0) {
         await User.findByIdAndUpdate(item.user, {
@@ -431,14 +467,6 @@ class TournamentService {
       }
     }
 
-    // Сбрасываем пул джекпота в SystemState
-    const state = await SystemState.findOne();
-    if (state) {
-      state.jackpotPool = 0;
-      await state.save();
-    }
-
-    // Уведомление в Телеграм
     const users = await User.find({ _id: { $in: prizes.map(p => p.user) } }).select('name username telegramId');
     const uMap = {};
     users.forEach(u => { uMap[u._id.toString()] = u; });
@@ -454,7 +482,6 @@ class TournamentService {
 
     tg.sendMessage(announceText);
 
-    // Персональные сообщения
     for (const item of prizes) {
       const u = uMap[item.user.toString()];
       if (u && u.telegramId && item.prize > 0) {

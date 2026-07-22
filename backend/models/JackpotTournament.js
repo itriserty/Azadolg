@@ -20,9 +20,26 @@ const MatchSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  winsP1: {
+    type: Number,
+    default: 0
+  },
+  winsP2: {
+    type: Number,
+    default: 0
+  },
+  winsRequired: {
+    type: Number,
+    default: 2 // 2 победы для Bo3 (группы, 1/2, за 3-е место), 3 победы для Bo5 (Финал)
+  },
   status: {
     type: String,
     enum: ['pending', 'reported', 'confirmed'],
+    default: 'pending'
+  },
+  currentLegStatus: {
+    type: String,
+    enum: ['pending', 'reported'],
     default: 'pending'
   },
   reportedWinner: {
