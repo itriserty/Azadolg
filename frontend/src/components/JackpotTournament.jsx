@@ -14,6 +14,7 @@ export default function JackpotTournament({ currentUser }) {
   const [activeTab, setActiveTab] = useState('groups'); // 'groups' | 'matches' | 'playoffs' | 'prizes'
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const [selectedH2H, setSelectedH2H] = useState(null);
 
   const fetchTournament = async () => {
     try {
@@ -369,6 +370,28 @@ export default function JackpotTournament({ currentUser }) {
                     </div>
                   </div>
 
+                  {/* H2H Head-to-Head Statistics Widget */}
+                  {match.h2h && (
+                    <div className="flex justify-between items-center bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800 text-[11px] my-2">
+                      <div className="flex items-center gap-1.5 text-[11px] truncate">
+                        <span className="font-bold text-amber-400">⚔️ H2H:</span>
+                        <span className="text-slate-300">
+                          <b className="text-white font-bold">{p1?.name}</b> <b className="text-emerald-400 font-extrabold">{match.h2h.winsP1}В</b> ({match.h2h.winrateP1}%)
+                        </span>
+                        <span className="text-slate-600 font-black">vs</span>
+                        <span className="text-slate-300">
+                          ({match.h2h.winrateP2}%) <b className="text-emerald-400 font-extrabold">{match.h2h.winsP2}В</b> <b className="text-white font-bold">{p2?.name}</b>
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => setSelectedH2H(match.h2h)}
+                        className="text-[10px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-lg border border-amber-500/30 font-bold transition flex-shrink-0 ml-2"
+                      >
+                        История ({match.h2h.totalMatches}) 📜
+                      </button>
+                    </div>
+                  )}
+
                   {/* Actions for players */}
                   {isParticipant && !isConfirmed && (
                     <div className="space-y-2 mt-3 pt-2 border-t border-slate-800/60">
@@ -629,6 +652,87 @@ export default function JackpotTournament({ currentUser }) {
           })()}
         </div>
       </div>
+
+      {/* HEAD-TO-HEAD RIVALRY MODAL */}
+      {selectedH2H && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                <span>⚔️ История Личных Встреч (Head-to-Head)</span>
+              </h3>
+              <button 
+                onClick={() => setSelectedH2H(null)}
+                className="text-slate-400 hover:text-white font-black text-lg p-1 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Winrate Stats Header */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <div className="flex justify-between items-center text-xs font-bold">
+                <div className="text-left">
+                  <div className="text-white text-sm font-black">{selectedH2H.userA?.name}</div>
+                  <div className="text-emerald-400 text-xs font-extrabold">{selectedH2H.winsP1} Побед ({selectedH2H.winrateP1}%)</div>
+                </div>
+                <div className="text-center bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-slate-400 text-[11px]">
+                  Всего встреч: <b className="text-white font-black">{selectedH2H.totalMatches}</b>
+                </div>
+                <div className="text-right">
+                  <div className="text-white text-sm font-black">{selectedH2H.userB?.name}</div>
+                  <div className="text-cyan-400 text-xs font-extrabold">{selectedH2H.winsP2} Побед ({selectedH2H.winrateP2}%)</div>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full bg-slate-900 rounded-full h-3 flex overflow-hidden border border-slate-800">
+                <div 
+                  className="bg-gradient-to-r from-amber-500 to-yellow-400 h-full transition-all duration-500"
+                  style={{ width: `${selectedH2H.winrateP1}%` }}
+                />
+                <div 
+                  className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full transition-all duration-500"
+                  style={{ width: `${selectedH2H.winrateP2}%` }}
+                />
+              </div>
+            </div>
+
+            {/* History List */}
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-wider">Хронология всех дуэлей и матчей:</h4>
+              {selectedH2H.history?.length === 0 ? (
+                <div className="text-xs text-slate-500 italic p-4 text-center bg-slate-950 rounded-xl border border-slate-800">
+                  Игроки еще не встречались на арене. Это их первое принципиальное противостояние! ⚔️
+                </div>
+              ) : (
+                selectedH2H.history?.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${
+                        item.type === 'tournament' ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30' : 'bg-blue-500/10 text-blue-300 border border-blue-500/30'
+                      }`}>
+                        {item.type === 'tournament' ? '🏆 Турнир' : '⚔️ Дуэль'}
+                      </span>
+                      <span className="text-slate-300">Победил: <b className="text-emerald-400 font-bold">{item.winnerName}</b></span>
+                    </div>
+                    <div className="text-right text-[11px] text-amber-400 font-mono font-bold">
+                      {item.score || (item.wager ? `+${item.wager} ✧` : '1 : 0')}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button
+              onClick={() => setSelectedH2H(null)}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs py-2.5 rounded-xl border border-slate-700 transition"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

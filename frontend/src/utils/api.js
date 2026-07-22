@@ -118,6 +118,7 @@ export const api = {
   createDuelChallenge: (opponentId, debtId, wager) => request('/duel/challenge', { method: 'POST', body: JSON.stringify({ opponentId, debtId, wager }) }),
   respondToDuel:       (duelId, action) => request('/duel/respond', { method: 'POST', body: JSON.stringify({ duelId, action }) }),
   getMyDuels:          () => request('/duel/my'),
+  getH2HStats:         (opponentId) => request(`/duel/h2h/${opponentId}`),
   placeBet:            (debtId, prediction, wager) => request('/bets/create', { method: 'POST', body: JSON.stringify({ debtId, prediction, wager }) }),
   getMyBets:           () => request('/bets/my'),
 

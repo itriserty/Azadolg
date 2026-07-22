@@ -66,9 +66,10 @@ async function runTournamentTest() {
 
   // Helper to play a series until match completes
   const playSeries = async (tourneyId, match) => {
-    while (match.status !== 'confirmed') {
-      await tournamentService.startMatchLeg(tourneyId, match._id, match.player1);
-      await tournamentService.acceptMatchLeg(tourneyId, match._id, match.player2);
+    const liveMatch = currentDoc.matches.find(m => m._id.toString() === match._id.toString());
+    while (liveMatch && liveMatch.status !== 'confirmed') {
+      await tournamentService.startMatchLeg(tourneyId, liveMatch._id, liveMatch.player1);
+      await tournamentService.acceptMatchLeg(tourneyId, liveMatch._id, liveMatch.player2);
     }
   };
 

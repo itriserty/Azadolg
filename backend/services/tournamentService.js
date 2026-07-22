@@ -6,6 +6,7 @@ const BalanceLog = require('../models/BalanceLog');
 const tg = require('./telegramService');
 const { calculateEloWinProbability } = require('../utils/eloHelper');
 const { checkAndAward } = require('../utils/achievementHelper');
+const { calculateH2H } = require('../utils/h2hHelper');
 
 class TournamentService {
   /**
@@ -196,7 +197,20 @@ class TournamentService {
         .populate('finalPlacements.user', 'name username avatar avatar_url eloRating');
     }
 
-    return tournament;
+    if (!tournament) return null;
+
+    const tourneyObj = typeof tournament.toObject === 'function' ? tournament.toObject() : tournament;
+    if (tourneyObj && tourneyObj.matches) {
+      for (const m of tourneyObj.matches) {
+        if (m.player1 && m.player2) {
+          const p1Id = m.player1._id || m.player1;
+          const p2Id = m.player2._id || m.player2;
+          m.h2h = await calculateH2H(p1Id, p2Id);
+        }
+      }
+    }
+
+    return tourneyObj;
   }
 
   async startMatchLeg(tournamentId, matchId, requestingUserId) {
