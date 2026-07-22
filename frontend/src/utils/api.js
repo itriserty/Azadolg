@@ -130,3 +130,5 @@ export const api = {
   getQuests:        () => request('/quests'),
   getSeason:        () => request('/system/season')
 };
+
+export default api;
