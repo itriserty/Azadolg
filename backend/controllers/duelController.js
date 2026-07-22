@@ -196,9 +196,6 @@ async function getMyDuels(req, res) {
   }
 }
 
-  }
-}
-
 // Получить H2H статистику между текущим пользователем и соперником
 const { calculateH2H } = require('../utils/h2hHelper');
 async function getHeadToHeadStats(req, res) {
