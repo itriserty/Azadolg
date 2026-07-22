@@ -58,6 +58,20 @@ export default function JackpotTournament({ currentUser }) {
     }
   };
 
+  const handleStartTournament = async () => {
+    try {
+      setActionLoading(true);
+      setMessage(null);
+      const res = await api.startTournamentAdmin();
+      setMessage({ type: 'success', text: res.message || 'Турнир успешно запущен!' });
+      await fetchTournament();
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Ошибка запуска турнира' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 text-center text-cyan-400 font-bold animate-pulse">
@@ -66,14 +80,36 @@ export default function JackpotTournament({ currentUser }) {
     );
   }
 
+  const isAdmin = currentUser?.role === 'admin';
+
   if (!tournament) {
     return (
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-8 text-center text-slate-300">
-        <div className="text-4xl mb-3">🎰</div>
-        <h3 className="text-lg font-black text-white mb-2">Турнирный Джекпот не запущен</h3>
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-8 text-center text-slate-300 space-y-4">
+        <div className="text-4xl mb-1">🎰</div>
+        <h3 className="text-lg font-black text-white">Турнирный Джекпот не запущен</h3>
         <p className="text-xs text-slate-400 max-w-md mx-auto">
-          Администратор запустит еженедельный турнир на 6 игроков, где участники сразятся в групповом этапе и Плей-офф за призовой фонд!
+          Администратор запустить турнир на 6 игроков, где участники сразятся в групповом этапе и Плей-офф за призовой фонд!
         </p>
+
+        {message && (
+          <div className={`p-3 rounded-xl text-xs font-bold ${
+            message.type === 'success' ? 'bg-emerald-950/80 border border-emerald-500/50 text-emerald-300' : 'bg-rose-950/80 border border-rose-500/50 text-rose-300'
+          }`}>
+            {message.text}
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="pt-2">
+            <button
+              onClick={handleStartTournament}
+              disabled={actionLoading}
+              className="bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black px-6 py-3 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 active:scale-95 transition disabled:opacity-50"
+            >
+              {actionLoading ? 'Запуск...' : '🏆 Запустить Турнирный Джекпот (6 игроков)'}
+            </button>
+          </div>
+        )}
       </div>
     );
   }

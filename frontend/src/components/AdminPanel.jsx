@@ -258,6 +258,19 @@ export default function AdminPanel({ token }) {
     }
   };
 
+  const doStartTournament = async () => {
+    setLoading(true);
+    const res = await safeFetch(`${API}/api/tournament/admin/start`, {
+      method: 'POST'
+    });
+    setLoading(false);
+    if (res.ok) {
+      flash(res.data?.message || 'Турнирный Джекпот успешно запущен!');
+    } else {
+      flash(res.data?.error || res.error || 'Ошибка запуска турнира', 'err');
+    }
+  };
+
   const doDistributeKarma = async () => {
     if (!distKarmaAmt || Number(distKarmaAmt) <= 0) {
       return flash('Укажите корректную сумму Кармы', 'err');
@@ -491,6 +504,23 @@ export default function AdminPanel({ token }) {
       {/* ── USERS TAB ── */}
       {tab === 'users' && (
         <div className="space-y-4">
+          {/* Jackpot Tournament Launcher Banner */}
+          <div className="bg-gradient-to-r from-amber-950/60 via-amber-900/30 to-[#0d1715] border border-amber-500/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+            <div>
+              <h3 className="font-black text-amber-400 flex items-center gap-1.5 text-sm uppercase tracking-wide">
+                <span>🏆 Турнирный Джекпот (6 Игроков)</span>
+              </h3>
+              <p className="text-gray-400 text-[10px] mt-0.5">Сформировать 2 группы по 3 игрока, сгенерировать дуэли и запустить турнир</p>
+            </div>
+            <button 
+              onClick={doStartTournament}
+              disabled={loading}
+              className="bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black px-5 py-2.5 rounded-xl transition text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-40"
+            >
+              {loading ? 'Запуск...' : '🏆 Запустить Турнир'}
+            </button>
+          </div>
+
           {/* Mass Karma Distribution banner */}
           <div className="bg-gradient-to-br from-[#131b2e] to-[#0d1715] border border-cyan-500/25 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
             <div>
