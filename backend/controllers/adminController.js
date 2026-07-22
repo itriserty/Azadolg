@@ -226,7 +226,7 @@ async function grantKarma(req, res) {
     const adminId    = req.user;
 
     if (!amount || Number(amount) <= 0)
-      return res.status(400).json({ error: 'Укажите корректную сумму Кармы' });
+      return res.status(400).json({ error: 'Укажите положительную сумму Кармы (больше 0)' });
 
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
@@ -350,7 +350,7 @@ async function distributeKarma(req, res) {
 
     const karmaAmount = Math.round(Number(amount));
     if (isNaN(karmaAmount) || karmaAmount <= 0)
-      return res.status(400).json({ error: 'Укажите корректное количество Кармы' });
+      return res.status(400).json({ error: 'Нельзя отнять Карму. Укажите число больше 0' });
 
     // Массово начисляем карму всем активным (незаблокированным) пользователям
     const result = await User.updateMany(
@@ -376,7 +376,7 @@ async function distributeKarma(req, res) {
   }
 }
 
-// ── Редактирование баланса Кармы (прибавить/убавить) ───────────────────────
+// ── Редактирование баланса Кармы (только позитивное начисление) ─────────────
 async function adjustKarma(req, res) {
   try {
     const { id } = req.params;
@@ -384,20 +384,19 @@ async function adjustKarma(req, res) {
     const adminId = req.user;
 
     const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount === 0)
-      return res.status(400).json({ error: 'Укажите корректную сумму изменения Кармы (ненулевое число)' });
+    if (isNaN(numAmount) || numAmount <= 0)
+      return res.status(400).json({ error: 'Нельзя отнять или списать Карму. Укажите положительное число (больше 0)' });
 
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
 
     user.karma = (user.karma || 0) + numAmount;
-    if (user.karma < 0) user.karma = 0;
     user._karmaReason = 'admin_adjustment';
     
     await user.save();
 
     await logAction(adminId, 'manual_karma_grant', id, 'User', reason || 'Корректировка баланса', { amount: numAmount });
-    res.status(200).json({ message: `Баланс Кармы изменен на ${numAmount}. Текущий: ${user.karma}`, newKarma: user.karma });
+    res.status(200).json({ message: `Баланс Кармы пополнен на +${numAmount}. Текущий: ${user.karma}`, newKarma: user.karma });
   } catch (err) {
     console.error('[admin/adjustKarma]', err);
     res.status(500).json({ error: 'Ошибка изменения баланса Кармы' });

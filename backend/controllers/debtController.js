@@ -361,12 +361,19 @@ async function submitPaymentProof(req, res) {
         creditor = await User.findById(tx.creditor._id).session(session);
       }
 
-      // Обновление баланса Karma
-      if (debtor) {
-        debtor.karma -= payAmt;
-      }
-      if (creditor && creditor !== debtor) {
-        creditor.karma += payAmt;
+      // Обновление баланса Karma (100 ₸ = 1 ✧ Кармы)
+      const karmaDelta = Math.round(payAmt / 100);
+      if (karmaDelta > 0) {
+        if (debtor) {
+          debtor.karma -= karmaDelta;
+          debtor._karmaReason = 'debt_repayment';
+          debtor._karmaRelatedEntityId = tx._id;
+        }
+        if (creditor && creditor !== debtor) {
+          creditor.karma += karmaDelta;
+          creditor._karmaReason = 'debt_repayment';
+          creditor._karmaRelatedEntityId = tx._id;
+        }
       }
 
       let note = '';

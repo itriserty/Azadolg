@@ -98,6 +98,12 @@ export const api = {
   // Кейсы
   openCase:   (userId)        => request('/open-case', { method: 'POST', body: JSON.stringify({ userId }) }),
 
+  // Турнирный Джекпот
+  getActiveTournament: () => request('/tournament/active'),
+  reportTournamentMatch: (tournamentId, matchId, winnerId) => request(`/tournament/${tournamentId}/matches/${matchId}/report`, { method: 'POST', body: JSON.stringify({ winnerId }) }),
+  confirmTournamentMatch: (tournamentId, matchId) => request(`/tournament/${tournamentId}/matches/${matchId}/confirm`, { method: 'POST' }),
+  startTournamentAdmin: (playerIds, customPool) => request('/tournament/admin/start', { method: 'POST', body: JSON.stringify({ playerIds, customPool }) }),
+
   // Магазин и Гача
   getShopItems:      () => request('/shop/items'),
   buyShopItem:       (itemId) => request('/shop/buy', { method: 'POST', body: JSON.stringify({ itemId }) }),

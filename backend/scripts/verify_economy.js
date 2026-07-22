@@ -43,3 +43,17 @@ assert(calcPenalty(500, 10000, 10) === 15, 'calcPenalty(500, 10000, 10) should b
 assert(calcPenalty(100, 1000, 1) === 1, 'calcPenalty(100, 1000, 1) should be at least 1');
 
 console.log('✅ All penalty formula tests passed!');
+
+console.log('Testing karma conversion on debt repayment (100 KZT = 1 Karma)...');
+function calcKarmaFromPayment(payAmt) {
+  return Math.round(payAmt / 100);
+}
+
+assert(calcKarmaFromPayment(10000) === 100, '10,000 KZT debt payment should convert to 100 Karma');
+assert(calcKarmaFromPayment(500) === 5, '500 KZT debt payment should convert to 5 Karma');
+assert(calcKarmaFromPayment(100) === 1, '100 KZT debt payment should convert to 1 Karma');
+assert(calcKarmaFromPayment(50) === 1, '50 KZT debt payment should round to 1 Karma');
+assert(calcKarmaFromPayment(0) === 0, '0 KZT payment should be 0 Karma');
+
+console.log('✅ All karma conversion tests passed!');
+

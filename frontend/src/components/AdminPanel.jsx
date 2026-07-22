@@ -283,8 +283,11 @@ export default function AdminPanel({ token }) {
     if (!grantAmt || isNaN(amount) || amount === 0) {
       return flash('Укажите корректное количество (ненулевое число)', 'err');
     }
-    setLoading(true);
     const modalType = grantModal.type || 'karma';
+    if (modalType === 'karma' && amount <= 0) {
+      return flash('Нельзя отнять Карму. Укажите положительное число', 'err');
+    }
+    setLoading(true);
     const endpoint = modalType === 'elo' ? 'adjust-elo' : 'adjust-karma';
     const res = await safeFetch(`${API}/api/admin/users/${grantModal.userId}/${endpoint}`, {
       method: 'POST',
@@ -1085,12 +1088,14 @@ export default function AdminPanel({ token }) {
 
               <div className="space-y-4 mb-5">
                 <div>
-                  <label className="text-[9px] uppercase font-bold text-gray-500 block mb-1">Сумма / Количество (со знаком + или -)</label>
+                  <label className="text-[9px] uppercase font-bold text-gray-500 block mb-1">
+                    {grantModal.type === 'elo' ? 'Сумма / Количество (со знаком + или -)' : 'Количество Кармы (только положительное)'}
+                  </label>
                   <input 
                     type="number" 
                     value={grantAmt} 
                     onChange={e => setGrantAmt(e.target.value)}
-                    placeholder={grantModal.type === 'elo' ? 'Например, +50 или -20' : 'Например, +1000 или -250'}
+                    placeholder={grantModal.type === 'elo' ? 'Например, +50 или -20' : 'Например, 1000'}
                     className="w-full bg-[#060b0b] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold" 
                   />
                 </div>

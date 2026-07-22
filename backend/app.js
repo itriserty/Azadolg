@@ -27,6 +27,7 @@ const marketRoutes = require('./routes/marketRoutes');
 const postRoutes    = require('./routes/postRoutes');
 const rouletteRoutes = require('./routes/rouletteRoutes');
 const feedRoutes = require('./routes/feedRoutes');
+const tournamentRoutes = require('./routes/tournamentRoutes');
 const { startReminderScheduler } = require('./services/reminderService');
 const { startCronScheduler } = require('./services/cronService');
 const achievementObserver = require('./services/AchievementObserver');
@@ -67,6 +68,7 @@ app.use('/api/market',    marketRoutes);
 app.use('/api/posts',     postRoutes);
 app.use('/api/roulette',  rouletteRoutes);
 app.use('/api/feed',      feedRoutes);
+app.use('/api/tournament', tournamentRoutes);
 
 // Статика загруженных пруфов оплаты
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
