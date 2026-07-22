@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const MatchSchema = new mongoose.Schema({
   stage: {
     type: String,
-    enum: ['group_A', 'group_B', 'semi_final_1', 'semi_final_2', 'third_place', 'final'],
+    enum: ['group_A', 'group_B', 'group_A_tiebreak', 'group_B_tiebreak', 'semi_final_1', 'semi_final_2', 'third_place', 'final'],
     required: true
   },
   round: {
@@ -71,7 +71,8 @@ const StandingsItemSchema = new mongoose.Schema({
   },
   wins: { type: Number, default: 0 },
   losses: { type: Number, default: 0 },
-  points: { type: Number, default: 0 }
+  points: { type: Number, default: 0 },
+  tiebreakWins: { type: Number, default: 0 }
 }, { _id: false });
 
 const FinalPlacementSchema = new mongoose.Schema({

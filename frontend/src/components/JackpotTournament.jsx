@@ -140,6 +140,8 @@ export default function JackpotTournament({ currentUser }) {
   const stageLabels = {
     group_A: 'Группа A',
     group_B: 'Группа B',
+    group_A_tiebreak: '⚡ ТАЙ-БРЕЙК Группа A',
+    group_B_tiebreak: '⚡ ТАЙ-БРЕЙК Группа B',
     semi_final_1: 'Полуфинал 1 (1A vs 2B)',
     semi_final_2: 'Полуфинал 2 (1B vs 2A)',
     third_place: 'Матч за 3-е место',

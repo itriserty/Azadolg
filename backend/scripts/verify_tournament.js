@@ -84,18 +84,24 @@ async function runTournamentTest() {
   assert(tournament.status === 'group_stage', 'Status should be group_stage');
   console.log('  ✅ Group stage setup verified!');
 
-  // 2. Play Group Stage matches (Bo3: 2 wins each)
-  console.log('2. Playing Group Stage matches (12 Bo3 series)...');
-  const groupMatches = tournament.matches.filter(m => ['group_A', 'group_B'].includes(m.stage));
+  // 2. Play Group Stage matches and any Tie-Breakers
+  console.log('2. Playing Group Stage matches and Tie-Breakers...');
+  let currentTourney = await tournamentService.getActiveTournament();
 
-  for (let i = 0; i < groupMatches.length; i++) {
-    const m = groupMatches[i];
-    await playSeries(tournament._id, m);
+  while (currentTourney.status === 'group_stage') {
+    const pendingGroupMatches = currentTourney.matches.filter(m => 
+      ['group_A', 'group_B', 'group_A_tiebreak', 'group_B_tiebreak'].includes(m.stage) && m.status !== 'confirmed'
+    );
+    if (pendingGroupMatches.length === 0) break;
+    for (const m of pendingGroupMatches) {
+      await playSeries(currentTourney._id, m);
+    }
+    currentTourney = await tournamentService.getActiveTournament();
   }
 
-  const updatedTourney = await tournamentService.getActiveTournament();
+  const updatedTourney = currentTourney;
   assert(updatedTourney.status === 'playoffs', 'Tournament should advance to playoffs stage');
-  console.log('  ✅ Group stage Bo3 series completed & advanced to Playoffs!');
+  console.log('  ✅ Group stage & Tie-Breaker series completed & advanced to Playoffs!');
 
   // 3. Play Semi-Finals (Bo3: 2 wins each)
   console.log('3. Playing Semi-Finals (Bo3)...');

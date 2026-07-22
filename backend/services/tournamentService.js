@@ -106,8 +106,8 @@ class TournamentService {
     generateGroupMatches(groupB, 'group_B');
 
     const standings = {
-      groupA: groupA.map(p => ({ user: p, wins: 0, losses: 0, points: 0 })),
-      groupB: groupB.map(p => ({ user: p, wins: 0, losses: 0, points: 0 }))
+      groupA: groupA.map(p => ({ user: p, wins: 0, losses: 0, points: 0, tiebreakWins: 0 })),
+      groupB: groupB.map(p => ({ user: p, wins: 0, losses: 0, points: 0, tiebreakWins: 0 }))
     };
 
     const tournament = new JackpotTournament({
@@ -199,9 +199,6 @@ class TournamentService {
     return tournament;
   }
 
-  /**
-   * Игрок предлагает начать партию матча
-   */
   async startMatchLeg(tournamentId, matchId, requestingUserId) {
     const tournament = await JackpotTournament.findById(tournamentId);
     if (!tournament) throw new Error('Турнир не найден');
@@ -247,9 +244,6 @@ class TournamentService {
     return tournament;
   }
 
-  /**
-   * Второй игрок подтверждает дуэль -> Автоматический математический ролл победителя по ELO
-   */
   async acceptMatchLeg(tournamentId, matchId, acceptingUserId) {
     const tournament = await JackpotTournament.findById(tournamentId);
     if (!tournament) throw new Error('Турнир не найден');
@@ -266,7 +260,6 @@ class TournamentService {
       throw new Error('Вы не являетесь участником этого матча');
     }
 
-    // Если партию запрашивал тот же самый пользователь
     if (match.requestedBy && match.requestedBy.toString() === accepter) {
       throw new Error('Вы уже отправили вызов. Ожидается подтверждение соперника.');
     }
@@ -276,7 +269,6 @@ class TournamentService {
       User.findById(match.player2)
     ]);
 
-    // Рассчитываем ELO вероятность для Player 1
     const probP1 = calculateEloWinProbability(u1.eloRating, u2.eloRating);
     const roll = Math.random();
 
@@ -296,7 +288,6 @@ class TournamentService {
       match.winsP2 += 1;
     }
 
-    // Обновляем серии побед и поражений в турнире
     legWinnerUser.tourneyWinStreak = (legWinnerUser.tourneyWinStreak || 0) + 1;
     legWinnerUser.tourneyLossStreak = 0;
 
@@ -310,7 +301,6 @@ class TournamentService {
       ]);
     }
 
-    // Проверяем выдачу достижений за серии
     await checkAndAward(legWinnerUser._id, 'tournament_win_streak', legWinnerUser.tourneyWinStreak);
     await checkAndAward(legLoserUser._id, 'tournament_loss_streak', legLoserUser.tourneyLossStreak);
 
@@ -336,6 +326,13 @@ class TournamentService {
 
         if (winnerItem) { winnerItem.wins += 1; winnerItem.points += 3; }
         if (loserItem)  { loserItem.losses += 1; }
+      } else if (match.stage.endsWith('_tiebreak')) {
+        const groupKey = match.stage.startsWith('group_A') ? 'groupA' : 'groupB';
+        const standingsList = tournament.standings[groupKey];
+        const winnerItem = standingsList.find(s => s.user.toString() === match.winner.toString());
+        if (winnerItem) {
+          winnerItem.tiebreakWins = (winnerItem.tiebreakWins || 0) + 1;
+        }
       }
 
       finishMsg = `🏆 <b>СЕРИЯ ЗАВЕРШЕНА!</b>\n\n` +
@@ -356,10 +353,14 @@ class TournamentService {
     tg.sendMessage(finishMsg);
 
     if (tournament.status === 'group_stage') {
-      const groupMatches = tournament.matches.filter(m => ['group_A', 'group_B'].includes(m.stage));
-      const allGroupDone = groupMatches.every(m => m.status === 'confirmed');
-      if (allGroupDone) {
-        await this.advanceToPlayoffs(tournament);
+      const allMatchesDone = tournament.matches.every(m => m.status === 'confirmed');
+      if (allMatchesDone) {
+        const needsTiebreakA = await this.checkGroupTieBreak(tournament, 'groupA', 'group_A');
+        const needsTiebreakB = await this.checkGroupTieBreak(tournament, 'groupB', 'group_B');
+
+        if (!needsTiebreakA && !needsTiebreakB) {
+          await this.advanceToPlayoffs(tournament);
+        }
       }
     } else if (tournament.status === 'playoffs') {
       const sfMatches = tournament.matches.filter(m => ['semi_final_1', 'semi_final_2'].includes(m.stage));
@@ -381,11 +382,98 @@ class TournamentService {
     return tournament;
   }
 
+  /**
+   * Проверка ничьих в группе и назначение тай-брейков (переигровок)
+   */
+  async checkGroupTieBreak(tournament, groupKey, stagePrefix) {
+    const standingsList = tournament.standings[groupKey];
+    
+    // Сортировка: очки > победы > победы в тай-брейках
+    const sorted = [...standingsList].sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      return (b.tiebreakWins || 0) - (a.tiebreakWins || 0);
+    });
+
+    const p1 = sorted[0];
+    const p2 = sorted[1];
+    const p3 = sorted[2];
+
+    // Проверяем несыгранные тай-брейк матчи
+    const unconfirmedTiebreakers = tournament.matches.filter(m => 
+      m.stage === `${stagePrefix}_tiebreak` && m.status !== 'confirmed'
+    );
+    if (unconfirmedTiebreakers.length > 0) {
+      return true; // Тай-брейк в процессе
+    }
+
+    // Проверяем, есть ли уже сыгранные тай-брейк матчи
+    const hasPlayedTiebreak = tournament.matches.some(m => m.stage === `${stagePrefix}_tiebreak`);
+
+    // Если тай-брейк уже проводился и победы начислены — проверяем еще раз
+    if (hasPlayedTiebreak) {
+      // Решилась ли ничья по tiebreakWins
+      if (p2.points === p3.points && (p2.tiebreakWins || 0) === (p3.tiebreakWins || 0)) {
+        // Дополнительный тай-брейк при повторной ничьей
+        const stageName = `${stagePrefix}_tiebreak`;
+        tournament.matches.push({
+          stage: stageName, round: 4, player1: p2.user, player2: p3.user, winsP1: 0, winsP2: 0, winsRequired: 2, status: 'pending'
+        });
+        await tournament.save();
+        return true;
+      }
+      return false; // Ничья успешно разрешена
+    }
+
+    // Случай 1: 3-way tie (Все 3 игрока набрали равные очки и победы, например 2:2 / 6 очков)
+    if (p1.points === p2.points && p2.points === p3.points) {
+      const stageName = `${stagePrefix}_tiebreak`;
+      tournament.matches.push({
+        stage: stageName, round: 3, player1: p1.user, player2: p2.user, winsP1: 0, winsP2: 0, winsRequired: 2, status: 'pending'
+      });
+      tournament.matches.push({
+        stage: stageName, round: 3, player1: p2.user, player2: p3.user, winsP1: 0, winsP2: 0, winsRequired: 2, status: 'pending'
+      });
+      tournament.matches.push({
+        stage: stageName, round: 3, player1: p1.user, player2: p3.user, winsP1: 0, winsP2: 0, winsRequired: 2, status: 'pending'
+      });
+      await tournament.save();
+
+      const [u1, u2, u3] = await Promise.all([
+        User.findById(p1.user), User.findById(p2.user), User.findById(p3.user)
+      ]);
+
+      tg.sendMessage(`⚡ <b>3-WAY ТАЙ-БРЕЙК В ${stagePrefix.replace('_', ' ').toUpperCase()}!</b> ⚡\n\n` +
+        `Все 3 игрока (${u1.name}, ${u2.name}, ${u3.name}) сыграли с равным счётом (${p1.points} очков)!\n` +
+        `Назначены круговые переигровки (Bo3) за 2 путевки в Плей-офф! 🚀`);
+      return true;
+    }
+
+    // Случай 2: 2-way tie за 2-е место (p2 и p3 имеют равные очки)
+    if (p2.points === p3.points && p2.wins === p3.wins) {
+      const stageName = `${stagePrefix}_tiebreak`;
+      tournament.matches.push({
+        stage: stageName, round: 3, player1: p2.user, player2: p3.user, winsP1: 0, winsP2: 0, winsRequired: 2, status: 'pending'
+      });
+      await tournament.save();
+
+      const [u2, u3] = await Promise.all([User.findById(p2.user), User.findById(p3.user)]);
+
+      tg.sendMessage(`⚡ <b>ТАЙ-БРЕЙК В ${stagePrefix.replace('_', ' ').toUpperCase()}!</b> ⚡\n\n` +
+        `Игроки <b>${u2.name}</b> и <b>${u3.name}</b> набрали равные ${p2.points} очков за 2-е место!\n` +
+        `Назначена переигровка (Bo3) за выход в Плей-офф! 🔥`);
+      return true;
+    }
+
+    return false;
+  }
+
   async advanceToPlayoffs(tournament) {
     const sortStandings = (list) => {
       return [...list].sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
-        return b.wins - a.wins;
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        return (b.tiebreakWins || 0) - (a.tiebreakWins || 0);
       });
     };
 
@@ -429,7 +517,7 @@ class TournamentService {
       User.findById(b1), User.findById(b2)
     ]);
 
-    const playoffMsg = `🔥 <b>ГРУППОВОЙ ЭТАП ЗАВЕРШЁН! СТАРТ ПЛЕЙ-ОФФ (Bo3)!</b> 🔥\n\n` +
+    const playoffMsg = `🔥 <b>ГРУППОВОЙ ЭТАП И ТАЙ-БРЕЙКИ ЗАВЕРШЕНЫ! СТАРТ ПЛЕЙ-ОФФ!</b> 🔥\n\n` +
       `⚔️ <b>Полуфинал 1:</b> ${uA1.name} (1A) vs ${uB2.name} (2B)\n` +
       `⚔️ <b>Полуфинал 2:</b> ${uB1.name} (1B) vs ${uA2.name} (2A)\n\n` +
       `Матчи проходят до 2-х побед! 🚀`;
@@ -496,7 +584,14 @@ class TournamentService {
     const p3rd = thirdMatch.winner;
     const p4th = thirdMatch.winner.toString() === thirdMatch.player1.toString() ? thirdMatch.player2 : thirdMatch.player1;
 
-    const sortStandings = (list) => [...list].sort((a, b) => b.points - a.points || b.wins - a.wins);
+    const sortStandings = (list) => {
+      return [...list].sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        return (b.tiebreakWins || 0) - (a.tiebreakWins || 0);
+      });
+    };
+
     const gA = sortStandings(tournament.standings.groupA);
     const gB = sortStandings(tournament.standings.groupB);
 
