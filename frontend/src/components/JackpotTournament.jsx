@@ -35,31 +35,31 @@ export default function JackpotTournament({ currentUser }) {
     fetchTournament();
   }, []);
 
-  const handleReportMatch = async (matchId, winnerId) => {
+  const handleStartMatch = async (matchId) => {
     if (!tournament) return;
     try {
       setActionLoading(true);
       setMessage(null);
-      const res = await api.reportTournamentMatch(tournament._id, matchId, winnerId);
-      setMessage({ type: 'success', text: res.message || 'Результат отправлен на подтверждение!' });
+      const res = await api.startTournamentMatch(tournament._id, matchId);
+      setMessage({ type: 'success', text: res.message || 'Вызов на дуэль отправлен сопернику!' });
       await fetchTournament();
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Ошибка отправки результата' });
+      setMessage({ type: 'error', text: err.message || 'Ошибка вызова' });
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleConfirmMatch = async (matchId) => {
+  const handleAcceptMatch = async (matchId) => {
     if (!tournament) return;
     try {
       setActionLoading(true);
       setMessage(null);
-      const res = await api.confirmTournamentMatch(tournament._id, matchId);
-      setMessage({ type: 'success', text: res.message || 'Результат дуэли подтверждён!' });
+      const res = await api.acceptTournamentMatch(tournament._id, matchId);
+      setMessage({ type: 'success', text: res.message || 'Дуэль принята! Математический жребий сыгран.' });
       await fetchTournament();
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Ошибка подтверждения' });
+      setMessage({ type: 'error', text: err.message || 'Ошибка принятия дуэли' });
     } finally {
       setActionLoading(false);
     }
@@ -371,37 +371,30 @@ export default function JackpotTournament({ currentUser }) {
                   {isParticipant && !isConfirmed && (
                     <div className="space-y-2 mt-3 pt-2 border-t border-slate-800/60">
                       {match.status === 'pending' && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleReportMatch(match._id, p1._id)}
-                            disabled={actionLoading}
-                            className="flex-1 bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-bold py-2 rounded-xl transition"
-                          >
-                            Партию выиграл {p1?.name}
-                          </button>
-                          <button
-                            onClick={() => handleReportMatch(match._id, p2._id)}
-                            disabled={actionLoading}
-                            className="flex-1 bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[11px] font-bold py-2 rounded-xl transition"
-                          >
-                            Партию выиграл {p2?.name}
-                          </button>
-                        </div>
-                      )}
-
-                      {isReported && !hasUserConfirmed && (
                         <button
-                          onClick={() => handleConfirmMatch(match._id)}
+                          onClick={() => handleStartMatch(match._id)}
                           disabled={actionLoading}
-                          className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-lg transition active:scale-95"
+                          className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black text-xs py-2.5 rounded-xl shadow-lg transition active:scale-95 disabled:opacity-50"
                         >
-                          ✅ Подтвердить партию: {match.reportedWinner?.name}
+                          🎲 Начать партию (Шансы: {prob1}% / {prob2}%)
                         </button>
                       )}
 
-                      {isReported && hasUserConfirmed && (
-                        <div className="text-center text-[11px] font-bold text-amber-400 animate-pulse">
-                          ⏳ Ожидается подтверждение соперника для текущей партии...
+                      {(match.status === 'requested' || match.currentLegStatus === 'requested') && (
+                        <div>
+                          {match.requestedBy?._id === currentUserId || match.requestedBy === currentUserId ? (
+                            <div className="text-center text-[11px] font-bold text-amber-400 animate-pulse bg-amber-500/10 p-2 rounded-xl border border-amber-500/20">
+                              ⏳ Вы бросили вызов! Ожидается подтверждение соперника...
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleAcceptMatch(match._id)}
+                              disabled={actionLoading}
+                              className="w-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-lg shadow-emerald-500/20 transition active:scale-95 disabled:opacity-50"
+                            >
+                              ⚡ Принять вызов и бросить жребий ELO ({prob1}% / {prob2}%)
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -550,16 +543,90 @@ export default function JackpotTournament({ currentUser }) {
             </div>
 
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-              <div className="font-bold text-amber-400 uppercase text-[11px]">🤝 Взаимное подтверждение</div>
+              <div className="font-bold text-amber-400 uppercase text-[11px]">🤝 Проведение партий</div>
               <ul className="list-disc list-inside space-y-1 text-slate-300 text-[11px]">
-                <li>Оба игрока проводят дуэль и отмечают победителя партии.</li>
-                <li>Соперник подтверждает результат в приложении.</li>
-                <li>Результаты мгновенно публикуются в Telegram-группу!</li>
+                <li>Игрок бросает вызов на партию <b>«🎲 Начать партию»</b>.</li>
+                <li>Соперник подтверждает дуэль <b>«⚡ Принять вызов»</b>.</li>
+                <li>Система автоматически бросает математический жребий по ELO!</li>
               </ul>
             </div>
           </div>
         </div>
       )}
+
+      {/* DYNAMIC TOURNAMENT WIN PROBABILITY WIDGET (AT BOTTOM) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <div>
+            <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+              <span>📊 Динамический Шанс на Занятие 1-го Места</span>
+            </h3>
+            <p className="text-[10px] text-slate-400">
+              Вероятность победы рассчитывается в реальном времени на основе ELO рейтинга, очков в группе и побед
+            </p>
+          </div>
+          <span className="text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+            Live Аналитика
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {(() => {
+            if (!tournament || !tournament.participants) return null;
+            const statsMap = {};
+            tournament.participants.forEach(p => {
+              statsMap[p._id] = { user: p, wins: 0, points: 0, elo: p.eloRating || 1000 };
+            });
+
+            ['groupA', 'groupB'].forEach(gKey => {
+              tournament.standings?.[gKey]?.forEach(item => {
+                const uId = item.user?._id || item.user;
+                if (statsMap[uId]) {
+                  statsMap[uId].wins = item.wins || 0;
+                  statsMap[uId].points = item.points || 0;
+                }
+              });
+            });
+
+            const items = Object.values(statsMap);
+            let totalWeight = 0;
+            const scored = items.map(it => {
+              const w = it.elo + (it.points * 150) + (it.wins * 100);
+              totalWeight += w;
+              return { ...it, weight: w };
+            });
+
+            const ranked = scored.map(it => ({
+              ...it,
+              chance: totalWeight > 0 ? Math.round((it.weight / totalWeight) * 100) : 16
+            })).sort((a, b) => b.chance - a.chance);
+
+            return ranked.map((item, idx) => (
+              <div key={item.user?._id || idx} className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-amber-400 text-[11px]">#{idx + 1}</span>
+                    <span className="font-bold text-white text-xs">{item.user?.name || 'Игрок'}</span>
+                  </div>
+                  <span className="text-amber-400 font-extrabold text-xs">{item.chance}%</span>
+                </div>
+
+                <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+                  <div 
+                    className="bg-gradient-to-r from-amber-500 to-yellow-400 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${item.chance}%` }}
+                  />
+                </div>
+
+                <div className="flex justify-between items-center text-[10px] text-slate-500">
+                  <span>{item.elo} ELO</span>
+                  <span>{item.points} Очков ({item.wins} Побед)</span>
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+      </div>
     </div>
   );
 }

@@ -34,13 +34,18 @@ const MatchSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'reported', 'confirmed'],
+    enum: ['pending', 'requested', 'reported', 'confirmed'],
     default: 'pending'
   },
   currentLegStatus: {
     type: String,
-    enum: ['pending', 'reported'],
+    enum: ['pending', 'requested', 'reported'],
     default: 'pending'
+  },
+  requestedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
   },
   reportedWinner: {
     type: mongoose.Schema.Types.ObjectId,

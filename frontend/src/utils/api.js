@@ -100,6 +100,8 @@ export const api = {
 
   // Турнирный Джекпот
   getActiveTournament: () => request('/tournament/active'),
+  startTournamentMatch: (tournamentId, matchId) => request(`/tournament/${tournamentId}/matches/${matchId}/start`, { method: 'POST' }),
+  acceptTournamentMatch: (tournamentId, matchId) => request(`/tournament/${tournamentId}/matches/${matchId}/accept`, { method: 'POST' }),
   reportTournamentMatch: (tournamentId, matchId, winnerId) => request(`/tournament/${tournamentId}/matches/${matchId}/report`, { method: 'POST', body: JSON.stringify({ winnerId }) }),
   confirmTournamentMatch: (tournamentId, matchId) => request(`/tournament/${tournamentId}/matches/${matchId}/confirm`, { method: 'POST' }),
   startTournamentAdmin: (playerIds, customPool) => request('/tournament/admin/start', { method: 'POST', body: JSON.stringify({ playerIds, customPool }) }),

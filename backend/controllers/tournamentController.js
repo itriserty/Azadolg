@@ -10,34 +10,29 @@ async function getActiveTournament(req, res) {
   }
 }
 
-async function reportMatch(req, res) {
+async function startMatchLeg(req, res) {
   try {
     const { tournamentId, matchId } = req.params;
-    const { winnerId } = req.body;
     const userId = req.user;
 
-    if (!winnerId) {
-      return res.status(400).json({ error: 'Укажите ID победителя' });
-    }
-
-    const tournament = await tournamentService.reportMatchResult(tournamentId, matchId, userId, winnerId);
-    res.status(200).json({ message: 'Результат матча отправлен на подтверждение', tournament });
+    const tournament = await tournamentService.startMatchLeg(tournamentId, matchId, userId);
+    res.status(200).json({ message: 'Вызов на дуэль отправлен сопернику!', tournament });
   } catch (error) {
-    console.error('[tournamentController/reportMatch]', error);
-    res.status(500).json({ error: error.message || 'Ошибка отправки результата матча' });
+    console.error('[tournamentController/startMatchLeg]', error);
+    res.status(500).json({ error: error.message || 'Ошибка старта партии' });
   }
 }
 
-async function confirmMatch(req, res) {
+async function acceptMatchLeg(req, res) {
   try {
     const { tournamentId, matchId } = req.params;
     const userId = req.user;
 
-    const tournament = await tournamentService.confirmMatchResult(tournamentId, matchId, userId);
-    res.status(200).json({ message: 'Результат матча подтвержден!', tournament });
+    const tournament = await tournamentService.acceptMatchLeg(tournamentId, matchId, userId);
+    res.status(200).json({ message: 'Дуэль принята! Результат жребия по ELO успешно рассчитан.', tournament });
   } catch (error) {
-    console.error('[tournamentController/confirmMatch]', error);
-    res.status(500).json({ error: error.message || 'Ошибка подтверждения результата матча' });
+    console.error('[tournamentController/acceptMatchLeg]', error);
+    res.status(500).json({ error: error.message || 'Ошибка проведения дуэли' });
   }
 }
 
@@ -64,8 +59,8 @@ async function cancelTournament(req, res) {
 
 module.exports = {
   getActiveTournament,
-  reportMatch,
-  confirmMatch,
+  startMatchLeg,
+  acceptMatchLeg,
   startTournament,
   cancelTournament
 };

@@ -64,12 +64,11 @@ async function runTournamentTest() {
   JackpotTournament.findById = () => Promise.resolve(currentDoc);
   JackpotTournament.findOne = () => createPopulateChain();
 
-  // Helper to play a series until player1 wins (winsRequired times)
+  // Helper to play a series until match completes
   const playSeries = async (tourneyId, match) => {
-    const targetWins = match.winsRequired || 2;
-    for (let leg = 0; leg < targetWins; leg++) {
-      await tournamentService.reportMatchResult(tourneyId, match._id, match.player1, match.player1);
-      await tournamentService.confirmMatchResult(tourneyId, match._id, match.player2);
+    while (match.status !== 'confirmed') {
+      await tournamentService.startMatchLeg(tourneyId, match._id, match.player1);
+      await tournamentService.acceptMatchLeg(tourneyId, match._id, match.player2);
     }
   };
 

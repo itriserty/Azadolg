@@ -5,21 +5,20 @@
 
 /**
  * Расчет математической вероятности победы Игрока 1 против Игрока 2 на основе рейтинга ELO.
- * Формула: P_1 = 0.5 + (ELO_1 - ELO_2) / 4000
- * Диапазон: от 10% (0.10) до 90% (0.90).
+ * Сигмоидальная логистическая формула ELO:
+ * P(A) = 1 / (1 + 10^((ELO_B - ELO_A) / 2000))
  *
- * Примеры:
+ * Точные примеры:
  * - 1000 vs 1000 => 50% / 50%
- * - 1500 vs 1000 => 62.5% / 37.5%
- * - 2000 vs 1000 => 75.0% / 25.0%
+ * - 1500 vs 1000 => 64.0% (~62%) / 36.0%
+ * - 2000 vs 1000 => 76.0% (~75%) / 24.0%
  */
 function calculateEloWinProbability(elo1 = 1000, elo2 = 1000) {
   const e1 = Number(elo1) || 1000;
   const e2 = Number(elo2) || 1000;
-  const diff = e1 - e2;
-  const rawProb = 0.5 + (diff / 4000);
-  // Ограничиваем от 10% до 90%
-  return Math.max(0.10, Math.min(0.90, rawProb));
+  const exponent = (e2 - e1) / 2000;
+  const prob = 1 / (1 + Math.pow(10, exponent));
+  return Math.max(0.05, Math.min(0.95, prob));
 }
 
 module.exports = {

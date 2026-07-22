@@ -4,6 +4,7 @@ const User = require('../models/User');
 const SystemState = require('../models/SystemState');
 const BalanceLog = require('../models/BalanceLog');
 const tg = require('./telegramService');
+const { calculateEloWinProbability } = require('../utils/eloHelper');
 
 class TournamentService {
   /**
@@ -15,7 +16,6 @@ class TournamentService {
     if (playerIds && Array.isArray(playerIds) && playerIds.length === 6) {
       participants = playerIds;
     } else {
-      // Находим всех активных пользователей и строго фильтруем админов
       const allUsers = await User.find({
         username: { $exists: true, $ne: null },
         isBanned: { $ne: true }
@@ -34,13 +34,11 @@ class TournamentService {
       participants = shuffled.slice(0, 6).map(u => u._id);
     }
 
-    // Проверяем, есть ли уже незавершённый турнир
     const existingActive = await JackpotTournament.findOne({ status: { $ne: 'completed' } });
     if (existingActive) {
       throw new Error('Уже есть активный турнир! Сначала отмените текущий турнир.');
     }
 
-    // Определяем призовой фонд турнира и вычитаем из накопительного пула
     let state = await SystemState.findOne();
     if (!state) {
       state = new SystemState();
@@ -61,7 +59,6 @@ class TournamentService {
     }
     await state.save();
 
-    // Деление на 2 группы по 3 человека
     const shuffledPlayers = [...participants].sort(() => 0.5 - Math.random());
     const groupA = shuffledPlayers.slice(0, 3);
     const groupB = shuffledPlayers.slice(3, 6);
@@ -141,9 +138,6 @@ class TournamentService {
     return tournament;
   }
 
-  /**
-   * Отмена активного турнира с возвратом призового фонда в накопительный пул
-   */
   async cancelActiveTournament() {
     const tournament = await JackpotTournament.findOne({ status: { $ne: 'completed' } });
     if (!tournament) {
@@ -177,32 +171,37 @@ class TournamentService {
       .populate('participants', 'name username avatar avatar_url eloRating karma role')
       .populate('groups.groupA', 'name username avatar avatar_url eloRating karma role')
       .populate('groups.groupB', 'name username avatar avatar_url eloRating karma role')
-      .populate('matches.player1', 'name username avatar avatar_url')
-      .populate('matches.player2', 'name username avatar avatar_url')
+      .populate('matches.player1', 'name username avatar avatar_url eloRating')
+      .populate('matches.player2', 'name username avatar avatar_url eloRating')
       .populate('matches.winner', 'name username')
+      .populate('matches.requestedBy', 'name username')
       .populate('matches.reportedWinner', 'name username')
-      .populate('standings.groupA.user', 'name username avatar avatar_url')
-      .populate('standings.groupB.user', 'name username avatar avatar_url')
-      .populate('finalPlacements.user', 'name username avatar avatar_url');
+      .populate('standings.groupA.user', 'name username avatar avatar_url eloRating')
+      .populate('standings.groupB.user', 'name username avatar avatar_url eloRating')
+      .populate('finalPlacements.user', 'name username avatar avatar_url eloRating');
 
     if (!tournament) {
       tournament = await JackpotTournament.findOne().sort({ createdAt: -1 })
         .populate('participants', 'name username avatar avatar_url eloRating karma role')
         .populate('groups.groupA', 'name username avatar avatar_url eloRating karma role')
         .populate('groups.groupB', 'name username avatar avatar_url eloRating karma role')
-        .populate('matches.player1', 'name username avatar avatar_url')
-        .populate('matches.player2', 'name username avatar avatar_url')
+        .populate('matches.player1', 'name username avatar avatar_url eloRating')
+        .populate('matches.player2', 'name username avatar avatar_url eloRating')
         .populate('matches.winner', 'name username')
+        .populate('matches.requestedBy', 'name username')
         .populate('matches.reportedWinner', 'name username')
-        .populate('standings.groupA.user', 'name username avatar avatar_url')
-        .populate('standings.groupB.user', 'name username avatar avatar_url')
-        .populate('finalPlacements.user', 'name username avatar avatar_url');
+        .populate('standings.groupA.user', 'name username avatar avatar_url eloRating')
+        .populate('standings.groupB.user', 'name username avatar avatar_url eloRating')
+        .populate('finalPlacements.user', 'name username avatar avatar_url eloRating');
     }
 
     return tournament;
   }
 
-  async reportMatchResult(tournamentId, matchId, reportingUserId, winnerId) {
+  /**
+   * Игрок предлагает начать партию матча
+   */
+  async startMatchLeg(tournamentId, matchId, requestingUserId) {
     const tournament = await JackpotTournament.findById(tournamentId);
     if (!tournament) throw new Error('Турнир не найден');
     if (tournament.status === 'completed') throw new Error('Турнир уже завершён');
@@ -213,67 +212,86 @@ class TournamentService {
 
     const p1 = match.player1.toString();
     const p2 = match.player2.toString();
-    const reporter = reportingUserId.toString();
-    const winner = winnerId.toString();
+    const requester = requestingUserId.toString();
 
-    if (reporter !== p1 && reporter !== p2) {
+    if (requester !== p1 && requester !== p2) {
       throw new Error('Вы не являетесь участником этого матча');
     }
-    if (winner !== p1 && winner !== p2) {
-      throw new Error('Указанный победитель не участвует в этом матче');
-    }
 
-    match.reportedWinner = winnerId;
-    match.confirmedBy = [reportingUserId];
-    match.currentLegStatus = 'reported';
-    match.status = 'reported';
+    match.currentLegStatus = 'requested';
+    match.status = 'requested';
+    match.requestedBy = requestingUserId;
 
     await tournament.save();
 
-    const opponentId = reporter === p1 ? p2 : p1;
-    const [reporterUser, opponentUser, winnerUser] = await Promise.all([
-      User.findById(reportingUserId),
+    const opponentId = requester === p1 ? p2 : p1;
+    const [reqUser, oppUser, user1, user2] = await Promise.all([
+      User.findById(requestingUserId),
       User.findById(opponentId),
-      User.findById(winnerId)
+      User.findById(match.player1),
+      User.findById(match.player2)
     ]);
 
-    const targetWins = match.winsRequired || 2;
-    const formatName = targetWins === 3 ? 'Bo5 (до 3 побед)' : 'Bo3 (до 2 побед)';
+    const probP1 = calculateEloWinProbability(user1.eloRating, user2.eloRating);
+    const pctP1 = Math.round(probP1 * 100);
+    const pctP2 = 100 - pctP1;
 
-    const msg = `⚔️ <b>Результат партии заявлен! (${formatName})</b>\n\n` +
-      `Игрок <b>${reporterUser.name}</b> указал победителя партии: <b>${winnerUser.name}</b>.\n` +
-      `Текущий счёт в серии: <b>${match.winsP1} : ${match.winsP2}</b>.\n` +
-      `⚠️ <b>${opponentUser.name}</b>, подтвердите результат партии в приложении!`;
+    const msg = `🎲 <b>Запрос на проведение партии!</b>\n\n` +
+      `Игрок <b>${reqUser.name}</b> вызывают на партию <b>${oppUser.name}</b>.\n` +
+      `Математический шанс (по ELO): <b>${user1.name} (${pctP1}%) vs ${user2.name} (${pctP2}%)</b>.\n` +
+      `⚠️ <b>${oppUser.name}</b>, подтвердите проведение дуэли в приложении!`;
 
     tg.sendMessage(msg);
 
     return tournament;
   }
 
-  async confirmMatchResult(tournamentId, matchId, confirmingUserId) {
+  /**
+   * Второй игрок подтверждает дуэль -> Автоматический математический ролл победителя по ELO
+   */
+  async acceptMatchLeg(tournamentId, matchId, acceptingUserId) {
     const tournament = await JackpotTournament.findById(tournamentId);
     if (!tournament) throw new Error('Турнир не найден');
     if (tournament.status === 'completed') throw new Error('Турнир уже завершён');
 
     const match = tournament.matches.id(matchId);
     if (!match) throw new Error('Матч не найден');
-    if (match.status !== 'reported') throw new Error('Партия матча не ожидает подтверждения');
 
     const p1 = match.player1.toString();
     const p2 = match.player2.toString();
-    const confirmer = confirmingUserId.toString();
+    const accepter = acceptingUserId.toString();
 
-    if (confirmer !== p1 && confirmer !== p2) {
+    if (accepter !== p1 && accepter !== p2) {
       throw new Error('Вы не являетесь участником этого матча');
     }
-    if (match.confirmedBy.map(c => c.toString()).includes(confirmer)) {
-      throw new Error('Вы уже подтвердили этот результат');
+
+    // Если партию запрашивал тот же самый пользователь
+    if (match.requestedBy && match.requestedBy.toString() === accepter) {
+      throw new Error('Вы уже отправили вызов. Ожидается подтверждение соперника.');
     }
 
-    const legWinnerId = match.reportedWinner.toString();
-    if (legWinnerId === p1) {
+    const [u1, u2] = await Promise.all([
+      User.findById(match.player1),
+      User.findById(match.player2)
+    ]);
+
+    // Рассчитываем ELO вероятность для Player 1
+    const probP1 = calculateEloWinProbability(u1.eloRating, u2.eloRating);
+    const roll = Math.random();
+
+    let legWinnerId = null;
+    let legWinnerUser = null;
+    let legLoserUser = null;
+
+    if (roll < probP1) {
+      legWinnerId = p1;
+      legWinnerUser = u1;
+      legLoserUser = u2;
       match.winsP1 += 1;
     } else {
+      legWinnerId = p2;
+      legWinnerUser = u2;
+      legLoserUser = u1;
       match.winsP2 += 1;
     }
 
@@ -285,6 +303,7 @@ class TournamentService {
     if (isSeriesFinished) {
       match.status = 'confirmed';
       match.currentLegStatus = 'pending';
+      match.requestedBy = null;
       match.winner = match.winsP1 >= targetWins ? match.player1 : match.player2;
 
       const loserId = match.winner.toString() === p1 ? p2 : p1;
@@ -300,28 +319,18 @@ class TournamentService {
         if (loserItem)  { loserItem.losses += 1; }
       }
 
-      const [winnerUser, loserUser] = await Promise.all([
-        User.findById(match.winner),
-        User.findById(loserId)
-      ]);
-
       finishMsg = `🏆 <b>СЕРИЯ ЗАВЕРШЕНА!</b>\n\n` +
-        `⚔️ <b>${winnerUser.name}</b> победил <b>${loserUser.name}</b> со счётом <b>${match.winsP1} : ${match.winsP2}</b>!\n` +
+        `🎲 Автоматический жребий выявил победителя партии: <b>${legWinnerUser.name}</b>!\n` +
+        `⚔️ <b>${legWinnerUser.name}</b> выиграл всю серию у <b>${legLoserUser.name}</b> со счётом <b>${match.winsP1} : ${match.winsP2}</b>!\n` +
         `Этап: <i>${match.stage.replace('_', ' ').toUpperCase()}</i>`;
     } else {
       match.status = 'pending';
       match.currentLegStatus = 'pending';
-      match.reportedWinner = null;
-      match.confirmedBy = [];
+      match.requestedBy = null;
 
-      const [u1, u2] = await Promise.all([
-        User.findById(match.player1),
-        User.findById(match.player2)
-      ]);
-
-      finishMsg = `✅ <b>ПАРТИЯ ПОДТВЕРЖДЕНА!</b>\n\n` +
-        `Счёт в серии между <b>${u1.name}</b> и <b>${u2.name}</b>: <b>${match.winsP1} : ${match.winsP2}</b> (играют до ${targetWins} побед).\n` +
-        `Проведите следующую партию!`;
+      finishMsg = `✅ <b>ПАРТИЯ СЫГРАНА!</b>\n\n` +
+        `🎲 Математический жребий присудил победу в партии: <b>${legWinnerUser.name}</b>!\n` +
+        `Текущий счёт в серии между <b>${u1.name}</b> и <b>${u2.name}</b>: <b>${match.winsP1} : ${match.winsP2}</b> (серия до ${targetWins} побед).`;
     }
 
     await tournament.save();
