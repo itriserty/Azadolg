@@ -613,39 +613,113 @@ export default function JackpotTournament({ currentUser }) {
               });
             });
 
+            // Определяем выбывших из борьбы за 1-е место пользователей
+            const eliminatedUserIds = new Set();
+
+            if (tournament.status === 'playoffs' || tournament.status === 'completed') {
+              const sortStandings = (list) => {
+                return [...(list || [])].sort((a, b) => {
+                  if (b.points !== a.points) return b.points - a.points;
+                  if (b.wins !== a.wins) return b.wins - a.wins;
+                  return (b.tiebreakWins || 0) - (a.tiebreakWins || 0);
+                });
+              };
+              const gA = sortStandings(tournament.standings?.groupA);
+              const gB = sortStandings(tournament.standings?.groupB);
+
+              if (gA[2]?.user) {
+                const id5 = gA[2].user._id?.toString() || gA[2].user.toString();
+                eliminatedUserIds.add(id5);
+              }
+              if (gB[2]?.user) {
+                const id6 = gB[2].user._id?.toString() || gB[2].user.toString();
+                eliminatedUserIds.add(id6);
+              }
+
+              const finalMatch = tournament.matches?.find(m => m.stage === 'final');
+              if (finalMatch) {
+                const finalist1 = finalMatch.player1?._id?.toString() || finalMatch.player1?.toString();
+                const finalist2 = finalMatch.player2?._id?.toString() || finalMatch.player2?.toString();
+
+                tournament.participants.forEach(p => {
+                  const pId = p._id?.toString() || p.toString();
+                  if (pId !== finalist1 && pId !== finalist2) {
+                    eliminatedUserIds.add(pId);
+                  }
+                });
+              }
+            }
+
+            if (tournament.status === 'completed') {
+              const winnerId = tournament.finalPlacements?.find(p => p.rank === 1)?.user?._id?.toString() || 
+                               tournament.finalPlacements?.find(p => p.rank === 1)?.user?.toString();
+              tournament.participants.forEach(p => {
+                const pId = p._id?.toString() || p.toString();
+                if (pId !== winnerId) eliminatedUserIds.add(pId);
+              });
+            }
+
             const items = Object.values(statsMap);
-            let totalWeight = 0;
-            const scored = items.map(it => {
-              const w = it.elo + (it.points * 150) + (it.wins * 100);
-              totalWeight += w;
-              return { ...it, weight: w };
+            const activeItems = [];
+            const eliminatedItems = [];
+            let totalActiveWeight = 0;
+
+            items.forEach(it => {
+              const uId = it.user._id?.toString() || it.user.toString();
+              if (eliminatedUserIds.has(uId)) {
+                eliminatedItems.push({ ...it, chance: 0, isEliminated: true });
+              } else {
+                let playoffWins = 0;
+                tournament.matches?.forEach(m => {
+                  if (['semi_final_1', 'semi_final_2', 'final'].includes(m.stage)) {
+                    if (m.player1?._id?.toString() === uId || m.player1?.toString() === uId) playoffWins += m.winsP1 || 0;
+                    if (m.player2?._id?.toString() === uId || m.player2?.toString() === uId) playoffWins += m.winsP2 || 0;
+                  }
+                });
+
+                const w = it.elo + (it.points * 150) + (it.wins * 100) + (playoffWins * 200);
+                totalActiveWeight += w;
+                activeItems.push({ ...it, weight: w, isEliminated: false });
+              }
             });
 
-            const ranked = scored.map(it => ({
+            const rankedActive = activeItems.map(it => ({
               ...it,
-              chance: totalWeight > 0 ? Math.round((it.weight / totalWeight) * 100) : 16
+              chance: totalActiveWeight > 0 ? Math.round((it.weight / totalActiveWeight) * 100) : Math.round(100 / activeItems.length)
             })).sort((a, b) => b.chance - a.chance);
 
-            return ranked.map((item, idx) => (
-              <div key={item.user?._id || idx} className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+            const displayItems = [...rankedActive, ...eliminatedItems];
+
+            return displayItems.map((item, idx) => (
+              <div key={item.user?._id || idx} className={`p-3 rounded-xl border space-y-2 transition ${
+                item.isEliminated ? 'bg-slate-950/40 border-slate-900 opacity-50' : 'bg-slate-950 border-slate-800'
+              }`}>
                 <div className="flex justify-between items-center text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="font-black text-amber-400 text-[11px]">#{idx + 1}</span>
+                    <span className={`font-black text-[11px] ${item.isEliminated ? 'text-slate-600' : 'text-amber-400'}`}>#{idx + 1}</span>
                     <span className="font-bold text-white text-xs">{item.user?.name || 'Игрок'}</span>
                   </div>
-                  <span className="text-amber-400 font-extrabold text-xs">{item.chance}%</span>
+                  {item.isEliminated ? (
+                    <span className="text-[10px] bg-slate-900 text-slate-500 border border-slate-800 px-2 py-0.5 rounded-full font-bold">
+                      ❌ Выбыл
+                    </span>
+                  ) : (
+                    <span className="text-amber-400 font-extrabold text-xs">{item.chance}%</span>
+                  )}
                 </div>
 
                 <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
                   <div 
-                    className="bg-gradient-to-r from-amber-500 to-yellow-400 h-full rounded-full transition-all duration-500"
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      item.isEliminated ? 'bg-slate-800' : 'bg-gradient-to-r from-amber-500 to-yellow-400'
+                    }`}
                     style={{ width: `${item.chance}%` }}
                   />
                 </div>
 
                 <div className="flex justify-between items-center text-[10px] text-slate-500">
                   <span>{item.elo} ELO</span>
-                  <span>{item.points} Очков ({item.wins} Побед)</span>
+                  <span>{item.isEliminated ? 'Выбыл из борьбы за 1 место' : `${item.points} Очков (${item.wins} Побед)`}</span>
                 </div>
               </div>
             ));
