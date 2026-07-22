@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 
+const calcEloProb = (elo1 = 1000, elo2 = 1000) => {
+  const diff = (Number(elo1) || 1000) - (Number(elo2) || 1000);
+  const prob = 0.5 + (diff / 4000);
+  const clamped = Math.max(0.10, Math.min(0.90, prob));
+  return Math.round(clamped * 100);
+};
+
 export default function JackpotTournament({ currentUser }) {
   const [tournament, setTournament] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -233,6 +240,14 @@ export default function JackpotTournament({ currentUser }) {
         >
           🎁 Призы (40%/25%/10%)
         </button>
+        <button
+          onClick={() => setActiveTab('rules')}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition ${
+            activeTab === 'rules' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+          }`}
+        >
+          📜 Правила и Математика
+        </button>
       </div>
 
       {/* TAB 1: GROUP STANDINGS */}
@@ -318,6 +333,9 @@ export default function JackpotTournament({ currentUser }) {
               const isReported = match.status === 'reported';
               const hasUserConfirmed = currentUserId && match.confirmedBy?.includes(currentUserId);
 
+              const prob1 = calcEloProb(p1?.eloRating, p2?.eloRating);
+              const prob2 = 100 - prob1;
+
               return (
                 <div key={match._id} className={`p-4 rounded-2xl border transition ${
                   isConfirmed ? 'bg-slate-900/40 border-slate-800 opacity-80' :
@@ -325,9 +343,14 @@ export default function JackpotTournament({ currentUser }) {
                 }`}>
                   <div className="flex justify-between items-center text-[10px] uppercase font-bold text-slate-400 mb-2">
                     <span className="text-amber-400">{stageLabels[match.stage] || match.stage}</span>
-                    <span className="bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/20">
-                      {match.winsRequired === 3 ? 'Bo5 (до 3 побед)' : 'Bo3 (до 2 побед)'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500 text-[10px]" title="Математический шанс на победу по ELO">
+                        Шанс ELO: <b className="text-amber-300">{prob1}% / {prob2}%</b>
+                      </span>
+                      <span className="bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/20">
+                        {match.winsRequired === 3 ? 'Bo5 (до 3 побед)' : 'Bo3 (до 2 побед)'}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex justify-between items-center my-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
@@ -467,6 +490,72 @@ export default function JackpotTournament({ currentUser }) {
             <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
               <div className="text-slate-400 font-black">🎗 6-е место — 7.5%</div>
               <div className="text-white text-lg font-black mt-1">{Math.round(tournament.jackpotPool * 0.075)} ✧</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: RULES & ELO MATH COMMENTARY */}
+      {activeTab === 'rules' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-6">
+          <div>
+            <h3 className="text-base font-black text-amber-400 uppercase tracking-wider flex items-center gap-2 mb-1">
+              <span>📜 Правила Турнирного Джекпота и Математика Вероятностей</span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              Пожалуйста, ознакомьтесь с правилами проведения матчей, форматом серий и формулой расчета шансов на победу.
+            </p>
+          </div>
+
+          {/* Section 1: Elo Math Formula */}
+          <div className="bg-slate-950 border border-amber-500/30 rounded-xl p-4 space-y-3">
+            <h4 className="text-xs font-black text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
+              <span>🧮 Математическая формула вероятностей (ELO)</span>
+            </h4>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              В основе исхода партий лежит базовая вероятность <b>50% на 50%</b>, которая корректируется в зависимости от рейтинга ELO каждого игрока. Чем выше ваш ELO по сравнению с соперником, тем выше ваш шанс на победу в партии.
+            </p>
+            <div className="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center font-mono text-xs text-amber-400 font-bold">
+              Шанс победы P₁ = 50% + (ELO₁ - ELO₂) / 40% &nbsp; [Ограничение: от 10% до 90%]
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
+              <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-center">
+                <div className="text-slate-400 font-bold text-[11px]">Равный ELO (1000 vs 1000)</div>
+                <div className="text-amber-400 font-black text-sm mt-1">50% vs 50%</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Абсолютно равные шансы</div>
+              </div>
+              <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-center">
+                <div className="text-slate-400 font-bold text-[11px]">Разница 500 ELO (1500 vs 1000)</div>
+                <div className="text-amber-400 font-black text-sm mt-1">62.5% vs 37.5%</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Умеренное преимущество</div>
+              </div>
+              <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-center">
+                <div className="text-slate-400 font-bold text-[11px]">Разница 1000 ELO (2000 vs 1000)</div>
+                <div className="text-amber-400 font-black text-sm mt-1">75.0% vs 25.0%</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Высокий шанс фаворита</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Tournament Rules */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+              <div className="font-bold text-amber-400 uppercase text-[11px]">⚔️ Формат серий матчей</div>
+              <ul className="list-disc list-inside space-y-1 text-slate-300 text-[11px]">
+                <li><b>Групповой этап, 1/2 и 3-е место:</b> серии до 2-х побед (<b>Bo3</b>).</li>
+                <li><b>🏆 ФИНАЛ:</b> серия до 3-х побед (<b>Bo5</b>).</li>
+                <li>Турнирные дуэли абсолютно бесплатны (0 кармы на входе).</li>
+              </ul>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+              <div className="font-bold text-amber-400 uppercase text-[11px]">🤝 Взаимное подтверждение</div>
+              <ul className="list-disc list-inside space-y-1 text-slate-300 text-[11px]">
+                <li>Оба игрока проводят дуэль и отмечают победителя партии.</li>
+                <li>Соперник подтверждает результат в приложении.</li>
+                <li>Результаты мгновенно публикуются в Telegram-группу!</li>
+              </ul>
             </div>
           </div>
         </div>

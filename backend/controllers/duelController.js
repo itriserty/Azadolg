@@ -3,6 +3,7 @@ const Transaction = require('../models/Transaction');
 const Duel = require('../models/Duel');
 const SystemState = require('../models/SystemState');
 const tg = require('../services/telegramService');
+const { calculateEloWinProbability } = require('../utils/eloHelper');
 
 // Найти или создать глобальное состояние системы
 async function getOrCreateSystemState() {
@@ -117,9 +118,10 @@ async function respondToDuel(req, res) {
       }
     }
 
-    // ── Запуск Coinflip (50/50) ──
+    // ── Запуск Coinflip с учетом ELO рейтинга ──
+    const challengerProb = calculateEloWinProbability(duel.challenger.eloRating, duel.opponent.eloRating);
     const roll = Math.random();
-    const winner = roll < 0.5 ? duel.challenger : duel.opponent;
+    const winner = roll < challengerProb ? duel.challenger : duel.opponent;
     const loser = winner._id.toString() === duel.challenger._id.toString() ? duel.opponent : duel.challenger;
 
     let duelResult = '';
