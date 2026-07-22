@@ -52,9 +52,20 @@ async function startTournament(req, res) {
   }
 }
 
+async function cancelTournament(req, res) {
+  try {
+    const result = await tournamentService.cancelActiveTournament();
+    res.status(200).json({ message: `Турнир отменён! ${result.restoredPool} ✧ Кармы возвращено в джекпот-пул.`, result });
+  } catch (error) {
+    console.error('[tournamentController/cancelTournament]', error);
+    res.status(500).json({ error: error.message || 'Ошибка отмены турнира' });
+  }
+}
+
 module.exports = {
   getActiveTournament,
   reportMatch,
   confirmMatch,
-  startTournament
+  startTournament,
+  cancelTournament
 };

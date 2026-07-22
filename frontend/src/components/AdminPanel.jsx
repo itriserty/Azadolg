@@ -276,6 +276,20 @@ export default function AdminPanel({ token }) {
     }
   };
 
+  const doCancelTournament = async () => {
+    if (!window.confirm('Отменить активный турнир и вернуть джекпот-пул?')) return;
+    setLoading(true);
+    const res = await safeFetch(`${API}/api/tournament/admin/cancel`, {
+      method: 'POST'
+    });
+    setLoading(false);
+    if (res.ok) {
+      flash(res.data?.message || 'Турнир успешно отменён, средства возвращены в джекпот!');
+    } else {
+      flash(res.data?.error || res.error || 'Ошибка отмены турнира', 'err');
+    }
+  };
+
   const doDistributeKarma = async () => {
     if (!distKarmaAmt || Number(distKarmaAmt) <= 0) {
       return flash('Укажите корректную сумму Кармы', 'err');
@@ -532,6 +546,13 @@ export default function AdminPanel({ token }) {
                 className="bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black px-5 py-2.5 rounded-xl transition text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-40"
               >
                 {loading ? 'Запуск...' : '🏆 Запустить Турнир'}
+              </button>
+              <button 
+                onClick={doCancelTournament}
+                disabled={loading}
+                className="bg-rose-600/90 hover:bg-rose-500 text-white font-bold px-4 py-2.5 rounded-xl transition text-xs uppercase tracking-wider shadow active:scale-95 disabled:opacity-40 ml-1"
+              >
+                🛑 Отменить (Откат)
               </button>
             </div>
           </div>

@@ -139,6 +139,23 @@ export default function JackpotTournament({ currentUser }) {
     final: '🏆 ФИНАЛ'
   };
 
+  const handleCancelTournament = async () => {
+    if (!window.confirm('Вы действительно хотите отменить активный турнир? Выделенный призовой фонд будет возвращен в накопительный джекпот-пул.')) {
+      return;
+    }
+    try {
+      setActionLoading(true);
+      setMessage(null);
+      const res = await api.cancelTournamentAdmin();
+      setMessage({ type: 'success', text: res.message || 'Турнир отменен, средства возвращены в джекпот!' });
+      await fetchTournament();
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Ошибка отмены турнира' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="bg-slate-950 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl text-slate-100 space-y-6">
       {/* Header / Pool Banner */}
@@ -159,9 +176,19 @@ export default function JackpotTournament({ currentUser }) {
             <span className="text-amber-400 font-extrabold">{tournament.jackpotPool.toLocaleString('ru')} ✧</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            6 игроков • 2 группы по 3 человека • 2 круга дуэлей • Плей-офф & Финал
+            6 обычных игроков • 2 группы по 3 человека • Bo3 в группах • Bo5 в Финале
           </p>
         </div>
+
+        {isAdmin && tournament.status !== 'completed' && (
+          <button
+            onClick={handleCancelTournament}
+            disabled={actionLoading}
+            className="bg-rose-600/90 hover:bg-rose-500 text-white font-bold px-4 py-2 rounded-xl text-xs uppercase tracking-wider shadow transition active:scale-95 disabled:opacity-40"
+          >
+            🛑 Отменить турнир (Откат)
+          </button>
+        )}
       </div>
 
       {message && (

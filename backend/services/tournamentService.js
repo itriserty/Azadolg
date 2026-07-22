@@ -12,22 +12,32 @@ class TournamentService {
   async createTournament(playerIds = null, customPool = null) {
     let participants = [];
 
-    // Исключаем админов при поиске пользователей
-    const query = {
-      username: { $exists: true, $ne: null },
-      isBanned: { $ne: true },
-      role: { $ne: 'admin' }
-    };
-
     if (playerIds && Array.isArray(playerIds) && playerIds.length === 6) {
       participants = playerIds;
     } else {
-      const users = await User.find(query).select('_id');
-      if (users.length < 6) {
-        throw new Error(`Для турнира требуется минимум 6 обычных игроков (без админов). Найдено в БД: ${users.length}`);
+      // Находим всех активных пользователей и строго фильтруем админов
+      const allUsers = await User.find({
+        username: { $exists: true, $ne: null },
+        isBanned: { $ne: true }
+      }).select('_id name username role');
+
+      const regularUsers = allUsers.filter(u => 
+        u.role !== 'admin' && 
+        !u.username?.toLowerCase().includes('admin') &&
+        !u.name?.toLowerCase().includes('admin')
+      );
+
+      if (regularUsers.length < 6) {
+        throw new Error(`Для турнира требуется минимум 6 обычных игроков (без админов). Найдено в БД: ${regularUsers.length}`);
       }
-      const shuffled = users.sort(() => 0.5 - Math.random());
+      const shuffled = regularUsers.sort(() => 0.5 - Math.random());
       participants = shuffled.slice(0, 6).map(u => u._id);
+    }
+
+    // Проверяем, есть ли уже незавершённый турнир
+    const existingActive = await JackpotTournament.findOne({ status: { $ne: 'completed' } });
+    if (existingActive) {
+      throw new Error('Уже есть активный турнир! Сначала отмените текущий турнир.');
     }
 
     // Определяем призовой фонд турнира и вычитаем из накопительного пула
@@ -39,8 +49,12 @@ class TournamentService {
 
     let pool = Number(customPool);
     if (!isNaN(pool) && pool > 0) {
-      pool = Math.min(pool, state.jackpotPool || pool);
-      state.jackpotPool = Math.max(0, (state.jackpotPool || 0) - pool);
+      pool = Math.min(pool, state.jackpotPool > 0 ? state.jackpotPool : pool);
+      if (state.jackpotPool >= pool) {
+        state.jackpotPool -= pool;
+      } else {
+        state.jackpotPool = 0;
+      }
     } else {
       pool = state.jackpotPool || 1000;
       state.jackpotPool = 0;
@@ -127,11 +141,42 @@ class TournamentService {
     return tournament;
   }
 
+  /**
+   * Отмена активного турнира с возвратом призового фонда в накопительный пул
+   */
+  async cancelActiveTournament() {
+    const tournament = await JackpotTournament.findOne({ status: { $ne: 'completed' } });
+    if (!tournament) {
+      throw new Error('Нет активного турнира для отмены');
+    }
+
+    const pool = tournament.jackpotPool || 0;
+
+    if (pool > 0) {
+      let state = await SystemState.findOne();
+      if (!state) {
+        state = new SystemState();
+      }
+      state.jackpotPool = (state.jackpotPool || 0) + pool;
+      await state.save();
+    }
+
+    tournament.status = 'completed';
+    await tournament.save();
+
+    const cancelMsg = `⚠️ <b>АКТИВНЫЙ ТУРНИР ОТМЕНЁН АДМИНИСТРАТОРОМ!</b> ⚠️\n\n` +
+      `Призовой фонд <b>${pool} ✧ Кармы</b> возвращён в накопительный джекпот-пул.`;
+
+    tg.sendMessage(cancelMsg);
+
+    return { tournament, restoredPool: pool };
+  }
+
   async getActiveTournament() {
     let tournament = await JackpotTournament.findOne({ status: { $ne: 'completed' } })
-      .populate('participants', 'name username avatar avatar_url eloRating karma')
-      .populate('groups.groupA', 'name username avatar avatar_url eloRating karma')
-      .populate('groups.groupB', 'name username avatar avatar_url eloRating karma')
+      .populate('participants', 'name username avatar avatar_url eloRating karma role')
+      .populate('groups.groupA', 'name username avatar avatar_url eloRating karma role')
+      .populate('groups.groupB', 'name username avatar avatar_url eloRating karma role')
       .populate('matches.player1', 'name username avatar avatar_url')
       .populate('matches.player2', 'name username avatar avatar_url')
       .populate('matches.winner', 'name username')
@@ -142,9 +187,9 @@ class TournamentService {
 
     if (!tournament) {
       tournament = await JackpotTournament.findOne().sort({ createdAt: -1 })
-        .populate('participants', 'name username avatar avatar_url eloRating karma')
-        .populate('groups.groupA', 'name username avatar avatar_url eloRating karma')
-        .populate('groups.groupB', 'name username avatar avatar_url eloRating karma')
+        .populate('participants', 'name username avatar avatar_url eloRating karma role')
+        .populate('groups.groupA', 'name username avatar avatar_url eloRating karma role')
+        .populate('groups.groupB', 'name username avatar avatar_url eloRating karma role')
         .populate('matches.player1', 'name username avatar avatar_url')
         .populate('matches.player2', 'name username avatar avatar_url')
         .populate('matches.winner', 'name username')
@@ -244,7 +289,6 @@ class TournamentService {
 
       const loserId = match.winner.toString() === p1 ? p2 : p1;
 
-      // Очки в группе
       if (['group_A', 'group_B'].includes(match.stage)) {
         const groupKey = match.stage === 'group_A' ? 'groupA' : 'groupB';
         const standingsList = tournament.standings[groupKey];
@@ -265,7 +309,6 @@ class TournamentService {
         `⚔️ <b>${winnerUser.name}</b> победил <b>${loserUser.name}</b> со счётом <b>${match.winsP1} : ${match.winsP2}</b>!\n` +
         `Этап: <i>${match.stage.replace('_', ' ').toUpperCase()}</i>`;
     } else {
-      // Идет серия (например 1:1 в Bo3 или 2:1 в Bo5)
       match.status = 'pending';
       match.currentLegStatus = 'pending';
       match.reportedWinner = null;
@@ -284,7 +327,6 @@ class TournamentService {
     await tournament.save();
     tg.sendMessage(finishMsg);
 
-    // Проверяем прогресс этапов
     if (tournament.status === 'group_stage') {
       const groupMatches = tournament.matches.filter(m => ['group_A', 'group_B'].includes(m.stage));
       const allGroupDone = groupMatches.every(m => m.status === 'confirmed');
@@ -327,7 +369,6 @@ class TournamentService {
     const b1 = groupBStandings[0].user;
     const b2 = groupBStandings[1].user;
 
-    // Полуфинал 1: 1A vs 2B (Bo3: до 2 побед)
     tournament.matches.push({
       stage: 'semi_final_1',
       round: 3,
@@ -340,7 +381,6 @@ class TournamentService {
       currentLegStatus: 'pending'
     });
 
-    // Полуфинал 2: 1B vs 2A (Bo3: до 2 побед)
     tournament.matches.push({
       stage: 'semi_final_2',
       round: 3,
@@ -379,7 +419,6 @@ class TournamentService {
     const sf2Winner = sf2.winner;
     const sf2Loser  = sf2.winner.toString() === sf2.player1.toString() ? sf2.player2 : sf2.player1;
 
-    // Матч за 3-е место (Bo3: до 2 побед)
     tournament.matches.push({
       stage: 'third_place',
       round: 4,
@@ -392,7 +431,6 @@ class TournamentService {
       currentLegStatus: 'pending'
     });
 
-    // ФИНАЛ (Bo5: до 3-х побед!)
     tournament.matches.push({
       stage: 'final',
       round: 4,
@@ -400,7 +438,7 @@ class TournamentService {
       player2: sf2Winner,
       winsP1: 0,
       winsP2: 0,
-      winsRequired: 3, // <--- До 3-х побед в Финале!
+      winsRequired: 3,
       status: 'pending',
       currentLegStatus: 'pending'
     });
