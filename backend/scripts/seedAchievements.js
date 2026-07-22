@@ -105,6 +105,122 @@ const defaultAchievements = [
     isRepeatable: false,
     isActive: true,
     createdByAdmin: false
+  },
+
+  // ── Турнирные серии побед (Win Streaks) ──────────────────────────────
+  {
+    slug: 'tourney_win_streak_3',
+    emoji: '🥊',
+    title: 'Костолом',
+    description: 'Выиграл 3 дуэли в турнире подряд. Выбил зубы трём лохам и даже не вспотел.',
+    rarity: 'common',
+    trigger: 'tournament_win_streak',
+    threshold: 3,
+    karmaReward: 10,
+    isSecret: false,
+    isRepeatable: false,
+    isActive: true,
+    createdByAdmin: false
+  },
+  {
+    slug: 'tourney_win_streak_5',
+    emoji: '🩸',
+    title: 'Безжалостный мясник',
+    description: '5 побед подряд в турнире. Ты размазал соперников по арене, как дешёвую грязь.',
+    rarity: 'rare',
+    trigger: 'tournament_win_streak',
+    threshold: 5,
+    karmaReward: 15,
+    isSecret: false,
+    isRepeatable: false,
+    isActive: true,
+    createdByAdmin: false
+  },
+  {
+    slug: 'tourney_win_streak_7',
+    emoji: '☠️',
+    title: 'Серийный палач',
+    description: '7 побед подряд в турнире. Они умоляли о пощаде, но ты просто затаптывал их в бетон.',
+    rarity: 'epic',
+    trigger: 'tournament_win_streak',
+    threshold: 7,
+    karmaReward: 20,
+    isSecret: false,
+    isRepeatable: false,
+    isActive: true,
+    createdByAdmin: false
+  },
+  {
+    slug: 'tourney_win_streak_10',
+    emoji: '👑',
+    title: 'Владыка говна и крови',
+    description: '10 побед подряд в турнире. Непобедимый монстр, сокрушивший турнир и превративший соперников в пыль.',
+    rarity: 'legendary',
+    trigger: 'tournament_win_streak',
+    threshold: 10,
+    karmaReward: 50,
+    isSecret: false,
+    isRepeatable: false,
+    isActive: true,
+    createdByAdmin: false
+  },
+
+  // ── Турнирные серии поражений (Loss Streaks) ─────────────────────────
+  {
+    slug: 'tourney_loss_streak_3',
+    emoji: '📉',
+    title: 'Мальчик для битья',
+    description: 'Проиграл 3 дуэли в турнире подряд. Лежишь на полу и глотаешь собственную соплю.',
+    rarity: 'common',
+    trigger: 'tournament_loss_streak',
+    threshold: 3,
+    karmaReward: 10,
+    isSecret: false,
+    isRepeatable: false,
+    isActive: true,
+    createdByAdmin: false
+  },
+  {
+    slug: 'tourney_loss_streak_5',
+    emoji: '🧻',
+    title: 'Позорная тряпка',
+    description: '5 поражений подряд в турнире. О тебя вытерли ноги все кому не лень. Смирись, ты дно.',
+    rarity: 'rare',
+    trigger: 'tournament_loss_streak',
+    threshold: 5,
+    karmaReward: 15,
+    isSecret: false,
+    isRepeatable: false,
+    isActive: true,
+    createdByAdmin: false
+  },
+  {
+    slug: 'tourney_loss_streak_7',
+    emoji: '🗑️',
+    title: 'Ходячий мусор',
+    description: '7 поражений подряд в турнире. Полный разгром, от тебя воняет сливом на всю арену.',
+    rarity: 'epic',
+    trigger: 'tournament_loss_streak',
+    threshold: 7,
+    karmaReward: 20,
+    isSecret: false,
+    isRepeatable: false,
+    isActive: true,
+    createdByAdmin: false
+  },
+  {
+    slug: 'tourney_loss_streak_10',
+    emoji: '🕳️',
+    title: 'Опущенный на дно',
+    description: '10 поражений подряд в турнире. Абсолютный ноль, пробивший самое глубокое днище в истории.',
+    rarity: 'legendary',
+    trigger: 'tournament_loss_streak',
+    threshold: 10,
+    karmaReward: 50,
+    isSecret: false,
+    isRepeatable: false,
+    isActive: true,
+    createdByAdmin: false
   }
 ];
 

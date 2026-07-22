@@ -20,8 +20,11 @@ const RARITY_KARMA = {
  * @param {string} triggerType - Тип триггера
  * @param {number} [currentValue] - Текущее значение показателя (опционально)
  */
+const mongoose = require('mongoose');
+
 async function checkAndAward(userId, triggerType, currentValue = null) {
   try {
+    if (mongoose.connection.readyState !== 1) return;
     const user = await User.findById(userId);
     if (!user) return;
 
@@ -63,6 +66,10 @@ async function checkAndAward(userId, triggerType, currentValue = null) {
         val = 1;
       } else if (triggerType === 'negative_karma') {
         val = user.karma < 0 ? 1 : 0;
+      } else if (triggerType === 'tournament_win_streak') {
+        val = user.tourneyWinStreak || 0;
+      } else if (triggerType === 'tournament_loss_streak') {
+        val = user.tourneyLossStreak || 0;
       }
     }
 
@@ -78,7 +85,7 @@ async function checkAndAward(userId, triggerType, currentValue = null) {
       if (val >= ach.threshold) {
         // Начисляем Карму за достижение
         const rarityKey = (ach.rarity || '').toUpperCase();
-        let karmaReward = RARITY_KARMA[rarityKey] || 0;
+        let karmaReward = ach.karmaReward > 0 ? ach.karmaReward : (RARITY_KARMA[rarityKey] || 0);
         if (ach.slug === 'set_avatar') {
           karmaReward = 25;
         }

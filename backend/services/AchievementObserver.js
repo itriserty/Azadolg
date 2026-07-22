@@ -211,7 +211,7 @@ class AchievementObserver {
 
           // Начисляем Карму
           const rarityKey = (ach.rarity || '').toUpperCase();
-          let karmaReward = RARITY_KARMA[rarityKey] || 0;
+          let karmaReward = ach.karmaReward > 0 ? ach.karmaReward : (RARITY_KARMA[rarityKey] || 0);
 
           if (ach.slug === 'set_avatar') {
             karmaReward = 25;

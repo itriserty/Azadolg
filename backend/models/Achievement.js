@@ -28,7 +28,11 @@ const AchievementSchema = new mongoose.Schema({
     enum: ['common', 'rare', 'epic', 'legendary', 'seasonal'],
     default: 'common'
   },
-  // Тип тригера (для автоматической выдачи)
+  karmaReward: {
+    type: Number,
+    default: 0
+  },
+  // Тип триггера (для автоматической выдачи)
   trigger: {
     type: String,
     enum: [
@@ -48,6 +52,8 @@ const AchievementSchema = new mongoose.Schema({
       'blind_kitten',           // выдал долг без свидетеля на сумму больше X
       'witness_decline',        // отказался быть свидетелем N раз
       'avatar_set',             // установил аватарку
+      'tournament_win_streak',  // победы подряд в турнире
+      'tournament_loss_streak', // поражения подряд в турнире
       'custom'                  // выдаётся вручную администратором
     ],
     default: 'custom'

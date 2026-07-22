@@ -34,7 +34,7 @@ async function runTournamentTest() {
       then: (resolve) => resolve(list)
     };
   };
-  User.findById = (id) => Promise.resolve({ _id: id, name: `Player_${id.toString().slice(-4)}` });
+  User.findById = (id) => Promise.resolve({ _id: id, name: `Player_${id.toString().slice(-4)}`, achievements: [], replenishBalance: () => {}, save: () => Promise.resolve() });
   User.findByIdAndUpdate = () => Promise.resolve();
 
   const SystemState = require('../models/SystemState');

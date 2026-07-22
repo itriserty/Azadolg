@@ -5,6 +5,7 @@ const SystemState = require('../models/SystemState');
 const BalanceLog = require('../models/BalanceLog');
 const tg = require('./telegramService');
 const { calculateEloWinProbability } = require('../utils/eloHelper');
+const { checkAndAward } = require('../utils/achievementHelper');
 
 class TournamentService {
   /**
@@ -294,6 +295,24 @@ class TournamentService {
       legLoserUser = u1;
       match.winsP2 += 1;
     }
+
+    // Обновляем серии побед и поражений в турнире
+    legWinnerUser.tourneyWinStreak = (legWinnerUser.tourneyWinStreak || 0) + 1;
+    legWinnerUser.tourneyLossStreak = 0;
+
+    legLoserUser.tourneyLossStreak = (legLoserUser.tourneyLossStreak || 0) + 1;
+    legLoserUser.tourneyWinStreak = 0;
+
+    if (typeof legWinnerUser.save === 'function') {
+      await Promise.all([
+        legWinnerUser.save(),
+        legLoserUser.save()
+      ]);
+    }
+
+    // Проверяем выдачу достижений за серии
+    await checkAndAward(legWinnerUser._id, 'tournament_win_streak', legWinnerUser.tourneyWinStreak);
+    await checkAndAward(legLoserUser._id, 'tournament_loss_streak', legLoserUser.tourneyLossStreak);
 
     const targetWins = match.winsRequired || 2;
     const isSeriesFinished = match.winsP1 >= targetWins || match.winsP2 >= targetWins;
