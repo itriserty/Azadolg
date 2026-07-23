@@ -212,33 +212,6 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
   return (
     <div className="space-y-8 pb-12 animate-fadeIn relative">
       
-      {/* Overlay Анимации Подбрасывания Монетки */}
-      {activeDuelId && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center">
-          <div className="text-center space-y-8 max-w-md px-6">
-            <h3 className="text-3xl font-extrabold text-white tracking-widest uppercase">Coinflip Duel 🪙</h3>
-            
-            <div className={`w-36 h-36 mx-auto rounded-full bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-300 border-4 border-yellow-200 flex items-center justify-center text-6xl shadow-2xl shadow-yellow-500/20 ${coinFlipped && !duelWinnerId ? 'animate-bounce animate-spin' : ''}`}>
-              {duelWinnerId ? (duelWinnerId === user._id ? '👑' : '💀') : '💰'}
-            </div>
-
-            {!duelWinnerId ? (
-              <div className="text-yellow-400 font-bold text-xl animate-pulse">Монетка крутится...</div>
-            ) : (
-              <div className="space-y-4 animate-scaleUp">
-                <div className="text-2xl font-black text-white">
-                  {duelWinnerId === user._id ? '🎉 ВЫ ВЫИГРАЛИ! 🎉' : '😢 ВЫ ПРОИГРАЛИ!'}
-                </div>
-                <div 
-                  className="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-slate-300 text-sm leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: duelResultText }}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* MODAL: АКТИВНАЯ ИГРА 21 ОЧКО */}
       {activeTwentyOneDuel && (
         <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md overflow-y-auto p-4 sm:p-6 flex items-center justify-center">
@@ -345,7 +318,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
                         {isMyTurn ? (
                           <span className="text-emerald-400 animate-pulse">👉 ВАШ ХОД! Выберите действие ниже.</span>
                         ) : (
-                          <span className="text-slate-400">⏳ Ход соперника ({oppUser.name})...</span>
+                          <span className="text-slate-400">⏳ Ход соперника ({oppName})...</span>
                         )}
                       </div>
                     )}
@@ -356,7 +329,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
                     <div className="flex justify-between items-center">
                       <div className="flex items-center space-x-2">
                         <span className="text-lg">👑</span>
-                        <span className="font-bold text-white text-sm">ВЫ ({user.name})</span>
+                        <span className="font-bold text-white text-sm">ВЫ ({user?.name || 'Вы'})</span>
                         {myPassed && <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-bold">ПАС</span>}
                         {mySum > 21 && <span className="text-[10px] bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded font-bold">ПЕРЕБОР</span>}
                       </div>
@@ -428,7 +401,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
         <div className="mt-4 md:mt-0 flex items-center space-x-4 bg-slate-800/50 px-6 py-3 rounded-xl border border-slate-700/50">
           <div>
             <div className="text-xs text-slate-400 uppercase tracking-wider">Игровая Валюта</div>
-            <div className="text-2xl font-black text-emerald-400">{user.karma} ₸ Кармы</div>
+            <div className="text-2xl font-black text-emerald-400">{user?.karma ?? 0} ₸ Кармы</div>
           </div>
         </div>
       </div>
