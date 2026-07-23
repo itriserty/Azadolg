@@ -597,7 +597,12 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
             ) : (
               <div className="space-y-4">
                 {friendsDebts.map(d => {
-                  const hasBetOnThis = myBets.some(b => b.debtId?._id === d._id);
+                  if (!d || !d.debtor || !d.creditor) return null;
+                  const debtorName = d.debtor.name || 'Игрок';
+                  const creditorName = d.creditor.name || 'Игрок';
+                  const debtorElo = d.debtor.eloRating ?? 1000;
+                  const creditorElo = d.creditor.eloRating ?? 1000;
+                  const hasBetOnThis = myBets.some(b => b.debtId?._id === d._id || b.debtId === d._id);
                   
                   return (
                     <div key={d._id} className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3">
@@ -605,9 +610,9 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
                         <div>
                           <div className="text-xs text-slate-500">Долг друга:</div>
                           <h4 className="text-sm font-bold text-white mt-0.5">
-                            {d.debtor.name} → {d.creditor.name}
+                            {debtorName} → {creditorName}
                           </h4>
-                          <p className="text-xs text-slate-400 italic mt-0.5">"{d.description}"</p>
+                          <p className="text-xs text-slate-400 italic mt-0.5">"{d.description || ''}"</p>
                         </div>
                         <span className="text-emerald-400 font-extrabold text-sm bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                           {d.amount} ₸
@@ -616,8 +621,8 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
 
                       {/* Лимиты по ELO коэффициентов */}
                       <div className="flex justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-800/50">
-                        <span>Должник ELO: <b className="text-slate-300">{d.debtor.eloRating}</b></span>
-                        <span>Кредитор ELO: <b className="text-slate-300">{d.creditor.eloRating}</b></span>
+                        <span>Должник ELO: <b className="text-slate-300">{debtorElo}</b></span>
+                        <span>Кредитор ELO: <b className="text-slate-300">{creditorElo}</b></span>
                       </div>
 
                       {hasBetOnThis ? (
@@ -629,8 +634,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
                           <button
                             onClick={() => {
                               setBettingPredictions({ ...bettingPredictions, [d._id]: true });
-                              // Триггерим ставку мгновенно после выбора
-                              setTimeout(() => handlePlaceBet(d._id), 100);
+                              setTimeout(() => handlePlaceBet(d._id, true), 100);
                             }}
                             className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
                               bettingPredictions[d._id] === true
@@ -643,7 +647,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
                           <button
                             onClick={() => {
                               setBettingPredictions({ ...bettingPredictions, [d._id]: false });
-                              setTimeout(() => handlePlaceBet(d._id), 100);
+                              setTimeout(() => handlePlaceBet(d._id, false), 100);
                             }}
                             className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
                               bettingPredictions[d._id] === false
@@ -676,7 +680,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
                   <div key={b._id} className="bg-slate-950/60 border border-slate-800 p-3 rounded-lg flex items-center justify-between text-xs">
                     <div>
                       <div className="font-semibold text-white">
-                        {b.debtId?.debtor?.name} vs {b.debtId?.creditor?.name}
+                        {b.debtId?.debtor?.name || 'Игрок'} vs {b.debtId?.creditor?.name || 'Игрок'}
                       </div>
                       <div className="text-slate-400 mt-0.5">
                         Прогноз: <b className={b.prediction ? 'text-emerald-400' : 'text-red-400'}>{b.prediction ? 'Вовремя' : 'С просрочкой'}</b>
