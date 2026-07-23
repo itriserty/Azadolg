@@ -1,3 +1,23 @@
+const User = require('../models/User');
+const Transaction = require('../models/Transaction');
+const Duel = require('../models/Duel');
+const SystemState = require('../models/SystemState');
+const tg = require('../services/telegramService');
+const mongoose = require('mongoose');
+const { calculateEloWinProbability } = require('../utils/eloHelper');
+
+async function getOrCreateSystemState(session = null) {
+  const query = SystemState.findOne();
+  if (session) query.session(session);
+  let state = await query;
+  if (!state) {
+    state = new SystemState();
+    if (session) await state.save({ session });
+    else await state.save();
+  }
+  return state;
+}
+
 // ── 21 Очко: генерация колоды и подсчет суммы ────────────────────────────────
 function generateTwentyOneDeck() {
   const suits = ['red', 'blue'];
@@ -138,6 +158,10 @@ async function createDuelChallenge(req, res) {
   try {
     const { opponentId, debtId, wager, gameType = 'coinflip' } = req.body;
     const challengerId = req.user;
+
+    if (!opponentId || !mongoose.Types.ObjectId.isValid(opponentId)) {
+      return res.status(400).json({ error: 'Укажите верный ID оппонента для вызова' });
+    }
 
     if (challengerId.toString() === opponentId.toString()) {
       return res.status(400).json({ error: 'Нельзя бросить вызов самому себе' });
