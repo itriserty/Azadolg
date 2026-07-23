@@ -6,7 +6,7 @@ const {
   resetUserPassword, getAdminLogs, grantKarma,
   getAchievements, createAchievement, updateAchievement, deleteAchievement,
   distributeKarma,
-  adjustKarma, adjustElo, resetJackpot, getGlobalStats,
+  adjustKarma, adjustElo, resetUserElo, resetUserKarma, resetJackpot, getGlobalStats,
   getUsersWithQuests,
   distributeJackpot
 } = require('../controllers/adminController');
@@ -28,6 +28,8 @@ router.post('/users/:id/reset-password',   resetUserPassword);
 router.post('/users/:id/grant-karma',      grantKarma);
 router.post('/users/:id/adjust-karma',     adjustKarma);
 router.post('/users/:id/adjust-elo',       adjustElo);
+router.post('/users/:id/reset-elo',        resetUserElo);
+router.post('/users/:id/reset-karma',      resetUserKarma);
 
 // ── Джекпот и Статистика ────────────────────────────────────────────────────
 router.post('/system/jackpot/reset',       resetJackpot);

@@ -348,6 +348,32 @@ export default function AdminPanel({ token }) {
     }
   };
 
+  const doResetElo = async (id, name) => {
+    if (!window.confirm(`Сбросить ELO пользователя "${name}" до начального уровня (1000)?`)) return;
+    setLoading(true);
+    const res = await safeFetch(`${API}/api/admin/users/${id}/reset-elo`, { method: 'POST' });
+    setLoading(false);
+    if (res.ok) {
+      flash(res.data?.message || 'Рейтинг ELO сброшен до 1000');
+      fetchUsers();
+    } else {
+      flash(res.data?.error || res.error || 'Ошибка сброса ELO', 'err');
+    }
+  };
+
+  const doResetKarma = async (id, name) => {
+    if (!window.confirm(`Обнулить Карму пользователя "${name}" (установить 0 ✧)?`)) return;
+    setLoading(true);
+    const res = await safeFetch(`${API}/api/admin/users/${id}/reset-karma`, { method: 'POST' });
+    setLoading(false);
+    if (res.ok) {
+      flash(res.data?.message || 'Карма обнулена (0 ✧)');
+      fetchUsers();
+    } else {
+      flash(res.data?.error || res.error || 'Ошибка обнуления Кармы', 'err');
+    }
+  };
+
   const openCreateAchModal = () => {
     setAchForm({
       slug: '', title: '', description: '', emoji: '🏆', rarity: 'common',
@@ -674,31 +700,49 @@ export default function AdminPanel({ token }) {
                                   <Ban className="w-3 h-3" /> Бан
                                 </button>
                               )}
-                              <button 
-                                onClick={() => { setGrantModal({ userId: u._id, name: u.name, type: 'karma' }); setGrantAmt(''); setGrantReason(''); }} 
-                                className={`${btn} bg-cyan-600/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-600/20`}
-                              >
-                                ✧ Карма
-                              </button>
-                              <button 
-                                onClick={() => { setGrantModal({ userId: u._id, name: u.name, type: 'elo' }); setGrantAmt(''); setGrantReason(''); }} 
-                                className={`${btn} bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20`}
-                              >
-                                🔥 ELO
-                              </button>
-                              <button 
-                                onClick={() => { setPwModal(u._id); setNewPw(''); }} 
-                                className={`${btn} bg-slate-800 text-gray-300 border border-slate-700/80 hover:bg-slate-700`}
-                              >
-                                <Key className="w-3 h-3" /> Пароль
-                              </button>
-                              <button 
-                                onClick={() => doDeleteUser(u._id, u.name)} 
-                                className={`${btn} bg-slate-800 text-gray-500 hover:bg-red-950/20 hover:text-red-400 border border-transparent hover:border-red-900/35`}
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
                             </>
+                          )}
+                          <button 
+                            onClick={() => { setGrantModal({ userId: u._id, name: u.name, type: 'karma' }); setGrantAmt(''); setGrantReason(''); }} 
+                            className={`${btn} bg-cyan-600/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-600/20`}
+                            title="Изменить Карму"
+                          >
+                            ✧ Карма
+                          </button>
+                          <button 
+                            onClick={() => doResetKarma(u._id, u.name)}
+                            className={`${btn} bg-cyan-950/40 text-cyan-400 border border-cyan-800/40 hover:bg-cyan-900/40`}
+                            title="Обнулить Карму до 0"
+                          >
+                            <RotateCcw className="w-3 h-3 text-cyan-400" /> 0 ✧
+                          </button>
+                          <button 
+                            onClick={() => { setGrantModal({ userId: u._id, name: u.name, type: 'elo' }); setGrantAmt(''); setGrantReason(''); }} 
+                            className={`${btn} bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20`}
+                            title="Изменить ELO"
+                          >
+                            🔥 ELO
+                          </button>
+                          <button 
+                            onClick={() => doResetElo(u._id, u.name)}
+                            className={`${btn} bg-amber-950/40 text-amber-400 border border-amber-800/40 hover:bg-amber-900/40`}
+                            title="Сбросить ELO до 1000"
+                          >
+                            <RotateCcw className="w-3 h-3 text-amber-400" /> 1000
+                          </button>
+                          <button 
+                            onClick={() => { setPwModal(u._id); setNewPw(''); }} 
+                            className={`${btn} bg-slate-800 text-gray-300 border border-slate-700/80 hover:bg-slate-700`}
+                          >
+                            <Key className="w-3 h-3" /> Пароль
+                          </button>
+                          {u.role !== 'admin' && (
+                            <button 
+                              onClick={() => doDeleteUser(u._id, u.name)} 
+                              className={`${btn} bg-slate-800 text-gray-500 hover:bg-red-950/20 hover:text-red-400 border border-transparent hover:border-red-900/35`}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -1198,7 +1242,7 @@ export default function AdminPanel({ token }) {
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <button 
                   onClick={doGrantFunds} 
                   disabled={loading}
@@ -1206,9 +1250,26 @@ export default function AdminPanel({ token }) {
                 >
                   Выполнить
                 </button>
+                {grantModal.type === 'karma' ? (
+                  <button 
+                    type="button" 
+                    onClick={() => { doResetKarma(grantModal.userId, grantModal.name); setGrantModal(null); }}
+                    className="bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-400 border border-cyan-800/60 font-bold px-3 py-2.5 rounded-xl text-xs transition uppercase active:scale-95 flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" /> Обнулить (0 ✧)
+                  </button>
+                ) : (
+                  <button 
+                    type="button" 
+                    onClick={() => { doResetElo(grantModal.userId, grantModal.name); setGrantModal(null); }}
+                    className="bg-amber-950/60 hover:bg-amber-900/60 text-amber-400 border border-amber-800/60 font-bold px-3 py-2.5 rounded-xl text-xs transition uppercase active:scale-95 flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" /> Сбросить (1000)
+                  </button>
+                )}
                 <button 
                   onClick={() => setGrantModal(null)} 
-                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-gray-300 font-bold py-2.5 rounded-xl text-xs transition uppercase active:scale-95"
+                  className="bg-slate-800 hover:bg-slate-700 text-gray-300 font-bold px-4 py-2.5 rounded-xl text-xs transition uppercase active:scale-95"
                 >
                   Отмена
                 </button>

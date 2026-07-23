@@ -523,6 +523,48 @@ async function adjustElo(req, res) {
   }
 }
 
+// ── Сброс ELO пользователя до базовых 1000 ────────────────────────────────────
+async function resetUserElo(req, res) {
+  try {
+    const { id }  = req.params;
+    const adminId = req.user;
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    user.eloRating = 1000;
+    user._eloReason = 'admin_reset';
+    await user.save();
+
+    await logAction(adminId, 'reset_elo', id, 'User', 'Сброс ELO до 1000 администратором');
+    res.status(200).json({ message: `Рейтинг ELO пользователя ${user.name} сброшен до 1000`, newElo: 1000 });
+  } catch (err) {
+    console.error('[admin/resetUserElo]', err);
+    res.status(500).json({ error: 'Ошибка сброса ELO' });
+  }
+}
+
+// ── Обнуление Кармы пользователя (до 0 ✧) ───────────────────────────────────
+async function resetUserKarma(req, res) {
+  try {
+    const { id }  = req.params;
+    const adminId = req.user;
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    user.karma = 0;
+    user._karmaReason = 'admin_reset';
+    await user.save();
+
+    await logAction(adminId, 'reset_karma', id, 'User', 'Обнуление Кармы администратором (0 ✧)');
+    res.status(200).json({ message: `Карма пользователя ${user.name} успешно обнулена (0 ✧)`, newKarma: 0 });
+  } catch (err) {
+    console.error('[admin/resetUserKarma]', err);
+    res.status(500).json({ error: 'Ошибка обнуления Кармы' });
+  }
+}
+
 // ── Обнуление Джекпота ────────────────────────────────────────────────────────
 async function resetJackpot(req, res) {
   try {
@@ -673,7 +715,7 @@ module.exports = {
   resetUserPassword, getAdminLogs, grantKarma,
   getAchievements, createAchievement, updateAchievement, deleteAchievement,
   distributeKarma,
-  adjustKarma, adjustElo, resetJackpot, getGlobalStats,
+  adjustKarma, adjustElo, resetUserElo, resetUserKarma, resetJackpot, getGlobalStats,
   getUsersWithQuests,
   distributeJackpot
 };
