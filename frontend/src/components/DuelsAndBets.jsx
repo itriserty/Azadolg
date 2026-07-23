@@ -169,10 +169,10 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
     }
   };
 
-  const handlePlaceBet = async (debtId) => {
+  const handlePlaceBet = async (debtId, customPrediction) => {
     setError('');
     setSuccess('');
-    const pred = bettingPredictions[debtId];
+    const pred = customPrediction !== undefined ? customPrediction : bettingPredictions[debtId];
     if (pred === undefined) return setError('Выберите ваш прогноз на долг');
     
     const wager = Number(bettingWager);
@@ -199,7 +199,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
   };
 
   // Вспомогательный подсчет суммы
-  const calcSum = (hand) => (hand || []).reduce((acc, c) => acc + (c.value || 0), 0);
+  const calcSum = (hand) => (hand || []).reduce((acc, c) => acc + (c?.value || 0), 0);
 
   return (
     <div className="space-y-8 pb-12 animate-fadeIn relative">
@@ -270,7 +270,8 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
 
             {/* Игровое поле: Руки игроков */}
             {(() => {
-              const isChallenger = activeTwentyOneDuel.challenger._id === user._id;
+              const challengerId = activeTwentyOneDuel.challenger?._id || activeTwentyOneDuel.challenger;
+              const isChallenger = challengerId?.toString() === user._id.toString();
               const myHand = isChallenger ? activeTwentyOneDuel.gameState?.challengerHand : activeTwentyOneDuel.gameState?.opponentHand;
               const oppHand = isChallenger ? activeTwentyOneDuel.gameState?.opponentHand : activeTwentyOneDuel.gameState?.challengerHand;
 
@@ -278,6 +279,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
               const oppPassed = isChallenger ? activeTwentyOneDuel.gameState?.opponentPassed : activeTwentyOneDuel.gameState?.challengerPassed;
 
               const oppUser = isChallenger ? activeTwentyOneDuel.opponent : activeTwentyOneDuel.challenger;
+              const oppName = oppUser?.name || 'Соперник';
               const mySum = calcSum(myHand);
               const oppSum = calcSum(oppHand);
 
@@ -292,7 +294,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
                     <div className="flex justify-between items-center">
                       <div className="flex items-center space-x-2">
                         <span className="text-lg">👤</span>
-                        <span className="font-bold text-white text-sm">{oppUser.name}</span>
+                        <span className="font-bold text-white text-sm">{oppName}</span>
                         {oppPassed && <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-bold">ПАС</span>}
                         {oppSum > 21 && <span className="text-[10px] bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded font-bold">ПЕРЕБОР</span>}
                       </div>
@@ -497,8 +499,13 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
             ) : (
               <div className="space-y-3">
                 {myDuels.map(duel => {
-                  const isChallenger = duel.challenger._id === user._id;
+                  if (!duel || !duel.challenger || !duel.opponent) return null;
+                  const challengerId = duel.challenger._id || duel.challenger;
+                  const isChallenger = challengerId?.toString() === user._id.toString();
                   const otherUser = isChallenger ? duel.opponent : duel.challenger;
+                  if (!otherUser) return null;
+                  const otherName = otherUser.name || 'Пользователь';
+                  const otherUsername = otherUser.username || 'user';
                   const is21 = duel.gameType === 'twenty_one';
                   const isAccepted = duel.status === 'accepted';
                   
@@ -515,7 +522,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
                         </div>
 
                         <div className="font-bold text-white mt-1">
-                          {otherUser.name} (@{otherUser.username})
+                          {otherName} (@{otherUsername})
                         </div>
 
                         <div className="text-xs text-indigo-400 mt-0.5">
