@@ -26,10 +26,13 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    fetchInitialData();
-  }, []);
+    if (user && user._id) {
+      fetchInitialData();
+    }
+  }, [user?._id]);
 
   const fetchInitialData = async () => {
+    if (!user || !user._id) return;
     try {
       setLoading(true);
       const [friendsList, ownDebts, pendingDuels, activeBets, allUsersList] = await Promise.all([
@@ -40,28 +43,30 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
         api.getUsers().catch(() => [])
       ]);
 
-      const friendsSet = new Set((friendsList || []).map(f => f._id));
+      const validFriends = (friendsList || []).filter(Boolean);
+      const friendsSet = new Set(validFriends.map(f => f._id));
       const combinedOpponents = (allUsersList || [])
-        .filter(u => u._id !== user._id && u.username !== 'dealer_bot')
+        .filter(u => u && u._id && u._id !== user._id && u.username !== 'dealer_bot')
         .map(u => ({
           ...u,
           isFriend: friendsSet.has(u._id)
         }));
 
-      setFriends(combinedOpponents.length > 0 ? combinedOpponents : (friendsList || []));
+      setFriends(combinedOpponents.length > 0 ? combinedOpponents : validFriends);
       setMyDebts(ownDebts || []);
       setMyDuels(pendingDuels || []);
       setMyBets(activeBets || []);
 
       // Проверяем, есть ли текущая активная игра 21 Очко
-      const active21 = (pendingDuels || []).find(d => d.gameType === 'twenty_one' && d.status === 'accepted');
+      const active21 = (pendingDuels || []).find(d => d && d.gameType === 'twenty_one' && d.status === 'accepted');
       if (active21) {
         setActiveTwentyOneDuel(active21);
       }
 
       // Загружаем активные долги пользователей для ставок (тотализатор)
-      const targetList = combinedOpponents.length > 0 ? combinedOpponents : (friendsList || []);
-      const debtsPromises = targetList.map(friend => 
+      const targetList = combinedOpponents.length > 0 ? combinedOpponents : validFriends;
+      const validTargets = targetList.filter(f => f && f._id);
+      const debtsPromises = validTargets.map(friend => 
         api.getDebts(friend._id).catch(() => [])
       );
       const debtsResults = await Promise.all(debtsPromises);
@@ -72,7 +77,10 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
       for (const d of allDebts) {
         if (d && d._id && !seenIds.has(d._id)) {
           seenIds.add(d._id);
-          const isParticipant = d.debtor?._id === user._id || d.creditor?._id === user._id;
+          const debtorId = d.debtor?._id || d.debtor;
+          const creditorId = d.creditor?._id || d.creditor;
+          const isParticipant = (debtorId && debtorId.toString() === user._id.toString()) || 
+                                (creditorId && creditorId.toString() === user._id.toString());
           if (!isParticipant) {
             uniqueDebts.push(d);
           }
