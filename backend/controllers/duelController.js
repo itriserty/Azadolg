@@ -156,8 +156,12 @@ function checkAndResolveTwentyOneRound(duel) {
 // Создать вызов на дуэль
 async function createDuelChallenge(req, res) {
   try {
-    const { opponentId, debtId, wager, gameType = 'coinflip' } = req.body;
+    const { opponentId, debtId, wager, gameType = 'twenty_one' } = req.body;
     const challengerId = req.user;
+
+    if (gameType !== 'twenty_one') {
+      return res.status(400).json({ error: 'Поддерживаются только дуэли 21 Очко' });
+    }
 
     if (!opponentId || !mongoose.Types.ObjectId.isValid(opponentId)) {
       return res.status(400).json({ error: 'Укажите верный ID оппонента для вызова' });
@@ -180,34 +184,25 @@ async function createDuelChallenge(req, res) {
       return res.status(403).json({ error: 'Один из участников заблокирован' });
     }
 
-    // Разрешены только ставки на Карму (или 0 для 21 очко)
     if (debtId) {
       return res.status(400).json({ error: 'Дуэли на долг запрещены.' });
     }
 
     const wagerNum = parseInt(wager || 0, 10);
-    if (gameType !== 'twenty_one' && wagerNum <= 0) {
-      return res.status(400).json({ error: 'Ставка на Карму обязательна и должна быть больше нуля' });
-    }
-
-    if (wagerNum > 0 && challenger.karma < wagerNum) {
-      return res.status(400).json({ error: `Недостаточно Кармы для ставки. Требуется: ${wagerNum} ₸, у вас: ${challenger.karma} ₸.` });
-    }
 
     const newDuel = new Duel({
       challenger: challengerId,
       opponent: opponentId,
       debtId: null,
       wager: wagerNum,
-      gameType,
+      gameType: 'twenty_one',
       status: 'pending'
     });
     await newDuel.save();
 
     // 📣 Telegram: уведомление о вызове
-    const gameTitle = gameType === 'twenty_one' ? '🃏 21 Очко' : '🪙 Монетка (Coinflip)';
+    const gameTitle = '🃏 21 Очко';
     const challengeText = `⚔️ <b>${challenger.name}</b> бросил вызов <b>${opponent.name}</b> на дуэль (${gameTitle})!\n` +
-      `🪙 Ставка: <b>${wagerNum} ₸ Кармы</b>\n` +
       `🎯 Примите вызов в приложении Azadolg!`;
     
     if (opponent.telegramId) {
@@ -216,7 +211,7 @@ async function createDuelChallenge(req, res) {
       tg.sendMessage(challengeText);
     }
 
-    res.status(201).json({ message: 'Вызов на дуэль успешно отправлен!', duel: newDuel });
+    res.status(201).json({ message: 'Вызов на дуэль 21 Очко успешно отправлен!', duel: newDuel });
   } catch (error) {
     console.error('Ошибка создания дуэли:', error);
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -250,89 +245,23 @@ async function respondToDuel(req, res) {
       return res.status(400).json({ error: 'Неверное действие' });
     }
 
-    // ЕЛИ ЭТО ДУЭЛЬ 21 ОЧКО: ИНИЦИАЛИЗИРУЕМ ИГРУ КАРТ
-    if (duel.gameType === 'twenty_one') {
-      duel.status = 'accepted';
-      const deck = generateTwentyOneDeck();
-      duel.gameState = {
-        deck,
-        challengerHand: [deck.pop(), deck.pop()],
-        opponentHand: [deck.pop(), deck.pop()],
-        challengerPassed: false,
-        opponentPassed: false,
-        currentTurn: duel.challenger._id,
-        isBotMatch: false,
-        lastAction: 'Игра началась! Раздача 2 карт каждому.',
-        replayMessage: ''
-      };
-      await duel.save();
-      return res.status(200).json({
-        message: 'Дуэль 21 Очко началась!',
-        duel
-      });
-    }
-
-    // Проверяем балансы перед принятием (для ставок на карму в Coinflip)
-    if (duel.wager > 0) {
-      if (duel.challenger.karma < duel.wager) {
-        duel.status = 'rejected';
-        await duel.save();
-        return res.status(400).json({ error: 'У бросившего вызов больше нет нужного количества Кармы. Дуэль отменена.' });
-      }
-      if (duel.opponent.karma < duel.wager) {
-        return res.status(400).json({ error: `У вас недостаточно Кармы. Нужно: ${duel.wager} ₸, у вас: ${duel.opponent.karma} ₸.` });
-      }
-    }
-
-    // ── Запуск Coinflip с учетом ELO рейтинга ──
-    const challengerProb = calculateEloWinProbability(duel.challenger.eloRating, duel.opponent.eloRating);
-    const roll = Math.random();
-    const winner = roll < challengerProb ? duel.challenger : duel.opponent;
-    const loser = winner._id.toString() === duel.challenger._id.toString() ? duel.opponent : duel.challenger;
-
-    let duelResult = '';
-
-    if (duel.wager > 0) {
-      winner.karma -= duel.wager;
-      loser.karma -= duel.wager;
-
-      const totalPot = duel.wager * 2;
-      const commission = Math.round(totalPot * 0.01);
-      const netWin = totalPot - commission;
-
-      winner.karma += netWin;
-      winner.stats.totalKarmaEarned += netWin;
-
-      winner._karmaReason = 'duel_result';
-      winner._karmaRelatedEntityId = duel._id;
-      loser._karmaReason = 'duel_result';
-      loser._karmaRelatedEntityId = duel._id;
-
-      const systemState = await getOrCreateSystemState();
-      systemState.jackpotPool += commission;
-      await systemState.save();
-
-      await Promise.all([winner.save(), loser.save()]);
-
-      duelResult = `🪙 Победитель получил <b>+${netWin} ₸ Кармы</b> (с учетом комиссии 1% в Джекпот: ${commission} ₸)`;
-    }
-
-    duel.status = 'finished';
-    duel.winner = winner._id;
+    // ИНИЦИАЛИЗИРУЕМ ИГРУ КАРТ 21 ОЧКО
+    duel.status = 'accepted';
+    const deck = generateTwentyOneDeck();
+    duel.gameState = {
+      deck,
+      challengerHand: [deck.pop(), deck.pop()],
+      opponentHand: [deck.pop(), deck.pop()],
+      challengerPassed: false,
+      opponentPassed: false,
+      currentTurn: duel.challenger._id,
+      isBotMatch: false,
+      lastAction: 'Игра началась! Раздача 2 карт каждому.',
+      replayMessage: ''
+    };
     await duel.save();
-
-    const duelText = `🎰 <b>Результаты дуэли Azadolg Coinflip!</b>\n\n` +
-      `⚔️ Участники: <b>${duel.challenger.name}</b> vs <b>${duel.opponent.name}</b>\n` +
-      `👑 Победитель: 🎉 <b>${winner.name}</b> 🎉\n\n` +
-      `📝 ${duelResult}`;
-
-    tg.sendMessage(duelText);
-
-    res.status(200).json({
-      message: 'Дуэль состоялась!',
-      roll,
-      winner: winner._id,
-      duelResult,
+    return res.status(200).json({
+      message: 'Дуэль 21 Очко началась!',
       duel
     });
   } catch (error) {

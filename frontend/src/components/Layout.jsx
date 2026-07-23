@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { 
-  Rss, CreditCard, Sparkles, Trophy, ShoppingBag, 
+  Rss, CreditCard, Sparkles, 
   User, ShieldAlert, LogOut, Flame, Coins, Shield
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -11,8 +11,6 @@ const NAV_ITEMS = [
   { path: '/feed',       label: 'Лента',     icon: Rss,          color: 'hover:text-cyan-400' },
   { path: '/debts',      label: 'Долги',     icon: CreditCard,   color: 'hover:text-purple-400' },
   { path: '/casino',     label: 'Казино',    icon: Sparkles,     color: 'hover:text-amber-400' },
-  { path: '/battlepass', label: 'BP Pass',   icon: Trophy,       color: 'hover:text-yellow-400' },
-  { path: '/shop',       label: 'Магазин',   icon: ShoppingBag,  color: 'hover:text-emerald-400' },
   { path: '/profile',    label: 'Профиль',   icon: User,         color: 'hover:text-indigo-400' }
 ];
 

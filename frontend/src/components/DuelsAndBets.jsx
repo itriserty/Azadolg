@@ -10,7 +10,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
   
   // Состояния форм
   const [selectedOpponent, setSelectedOpponent] = useState('');
-  const [gameType, setGameType] = useState('twenty_one'); // 'twenty_one' | 'coinflip'
+  const gameType = 'twenty_one';
   const [karmaWager, setKarmaWager] = useState(0);
   
   // Состояния для 21 Очко
@@ -20,12 +20,6 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
   // Состояния для ставок (тотализатора)
   const [bettingWager, setBettingWager] = useState(50);
   const [bettingPredictions, setBettingPredictions] = useState({}); // { debtId: true/false }
-
-  // Анимация Coinflip дуэли
-  const [activeDuelId, setActiveDuelId] = useState(null);
-  const [coinFlipped, setCoinFlipped] = useState(false);
-  const [duelWinnerId, setDuelWinnerId] = useState(null);
-  const [duelResultText, setDuelResultText] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -102,15 +96,11 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
       setLoading(true);
       const wagerValue = Number(karmaWager);
 
-      if (gameType === 'coinflip' && wagerValue <= 0) {
-        return setError('Ставка кармы для Монетки должна быть больше нуля');
-      }
-
       const res = await api.createDuelChallenge(
         selectedOpponent,
         null,
         wagerValue,
-        gameType
+        'twenty_one'
       );
       setSuccess(res.message);
       setKarmaWager(0);
@@ -142,7 +132,6 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
   const handleRespondToDuel = async (duelId, action) => {
     setError('');
     setSuccess('');
-    const targetDuel = myDuels.find(d => d._id === duelId);
     try {
       setLoading(true);
       if (action === 'reject') {
@@ -150,38 +139,13 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
         setSuccess(res.message);
         await fetchInitialData();
       } else {
-        if (targetDuel && targetDuel.gameType === 'twenty_one') {
-          const res = await api.respondToDuel(duelId, 'accept');
-          setSuccess(res.message || 'Дуэль 21 Очко началась!');
-          setActiveTwentyOneDuel(res.duel);
-          await fetchInitialData();
-        } else {
-          // Coinflip
-          setActiveDuelId(duelId);
-          setCoinFlipped(true);
-          setDuelWinnerId(null);
-          setDuelResultText('');
-
-          await new Promise(resolve => setTimeout(resolve, 2500));
-
-          const res = await api.respondToDuel(duelId, 'accept');
-          setDuelWinnerId(res.winner);
-          setDuelResultText(res.duelResult);
-          
-          const profile = await api.getMe();
-          onUpdateUser(profile);
-
-          await new Promise(resolve => setTimeout(resolve, 3500));
-          
-          setActiveDuelId(null);
-          setCoinFlipped(false);
-          await fetchInitialData();
-        }
+        const res = await api.respondToDuel(duelId, 'accept');
+        setSuccess(res.message || 'Дуэль 21 Очко началась!');
+        setActiveTwentyOneDuel(res.duel);
+        await fetchInitialData();
       }
     } catch (err) {
       setError(err.message || 'Ошибка обработки дуэли');
-      setActiveDuelId(null);
-      setCoinFlipped(false);
     } finally {
       setLoading(false);
     }
@@ -448,8 +412,8 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
       {/* Личный баланс */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-slate-900/60 border border-slate-800/80 backdrop-blur-md rounded-2xl p-6 shadow-xl">
         <div>
-          <h2 className="text-3xl font-extrabold text-white tracking-wide">Арена: Дуэли и Ставки</h2>
-          <p className="text-slate-400 mt-1">Вызывайте друзей на дуэль в 21 Очко или Монетку, а также играйте против Дилер Бота.</p>
+          <h2 className="text-3xl font-extrabold text-white tracking-wide">Арена: Дуэли 21 Очко и Ставки</h2>
+          <p className="text-slate-400 mt-1">Вызывайте друзей на дуэль в 21 Очко, а также играйте против Дилер Бота.</p>
         </div>
         <div className="mt-4 md:mt-0 flex items-center space-x-4 bg-slate-800/50 px-6 py-3 rounded-xl border border-slate-700/50">
           <div>
@@ -481,7 +445,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
             <div className="flex justify-between items-center">
               <h3 className="text-2xl font-bold text-white flex items-center space-x-2">
                 <span>⚔️</span>
-                <span>Бросить вызов</span>
+                <span>Бросить вызов в 21 Очко</span>
               </h3>
 
               {/* Кнопка Бот-Матча для быстрого теста */}
@@ -496,38 +460,6 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
             </div>
 
             <form onSubmit={handleChallenge} className="space-y-4">
-              
-              {/* Режим игры */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Вид дуэли</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setGameType('twenty_one')}
-                    className={`py-3 px-4 rounded-xl border text-xs font-extrabold flex items-center justify-center space-x-2 transition-all ${
-                      gameType === 'twenty_one'
-                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <span>🃏 21 Очко (Карты)</span>
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-normal">Тест</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setGameType('coinflip')}
-                    className={`py-3 px-4 rounded-xl border text-xs font-extrabold flex items-center justify-center space-x-2 transition-all ${
-                      gameType === 'coinflip'
-                        ? 'bg-amber-600 border-amber-500 text-white shadow-lg shadow-amber-600/20'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <span>🪙 Монетка (Coinflip)</span>
-                  </button>
-                </div>
-              </div>
-
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Оппонент (Друг)</label>
                 <select
@@ -544,26 +476,12 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
                 </select>
               </div>
 
-              {gameType === 'coinflip' && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Размер ставки (Карма)</label>
-                  <input
-                    type="number"
-                    value={karmaWager}
-                    onChange={(e) => setKarmaWager(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:border-indigo-500 focus:outline-none"
-                    placeholder="Например, 100"
-                    min="1"
-                  />
-                </div>
-              )}
-
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-bold text-sm transition-all transform hover:-translate-y-0.5 shadow-lg"
               >
-                {gameType === 'twenty_one' ? 'Бросить вызов в 21 Очко 🃏' : 'Бросить вызов в Coinflip 🪙'}
+                Бросить вызов в 21 Очко 🃏
               </button>
             </form>
           </div>

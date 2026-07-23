@@ -4,11 +4,9 @@ import { api, setSuccessCallback, setUnauthorizedCallback } from './utils/api';
 import Layout         from './components/Layout';
 import Feed           from './components/Feed';
 import Casino         from './components/Casino';
-import Shop           from './components/Shop';
 import Profile        from './components/Profile';
 import DebtForm       from './components/DebtForm';
 import DebtList       from './components/DebtList';
-import BattlePass     from './components/BattlePass';
 import AdminPanel     from './components/AdminPanel';
 import { LogOut, Lock, Mail, User as UserIcon, Shield } from 'lucide-react';
 
@@ -345,26 +343,6 @@ function AppRoutes({
             <Casino 
               user={currentUser} 
               onUpdateUser={handleUserUpdate} 
-            />
-          }
-        />
-
-        <Route 
-          path="battlepass" 
-          element={
-            <BattlePass 
-              user={currentUser} 
-            />
-          }
-        />
-
-        <Route 
-          path="shop" 
-          element={
-            <Shop 
-              user={currentUser} 
-              onUpdateUser={handleUserUpdate} 
-              onViewProfile={(id) => navigate(`/profile/${id}`)}
             />
           }
         />

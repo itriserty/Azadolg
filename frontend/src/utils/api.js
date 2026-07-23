@@ -115,7 +115,7 @@ export const api = {
   pullGacha:         () => request('/gacha/pull', { method: 'POST' }),
 
   // Дуэли и Ставки
-  createDuelChallenge: (opponentId, debtId, wager, gameType = 'coinflip') => request('/duel/challenge', { method: 'POST', body: JSON.stringify({ opponentId, debtId, wager, gameType }) }),
+  createDuelChallenge: (opponentId, debtId, wager, gameType = 'twenty_one') => request('/duel/challenge', { method: 'POST', body: JSON.stringify({ opponentId, debtId, wager, gameType }) }),
   respondToDuel:       (duelId, action) => request('/duel/respond', { method: 'POST', body: JSON.stringify({ duelId, action }) }),
   createTwentyOneBotDuel: () => request('/duel/twenty-one/bot', { method: 'POST' }),
   twentyOneAction:     (duelId, action) => request('/duel/twenty-one/action', { method: 'POST', body: JSON.stringify({ duelId, action }) }),
