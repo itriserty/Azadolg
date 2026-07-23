@@ -38,26 +38,36 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [friendsList, ownDebts, pendingDuels, activeBets] = await Promise.all([
-        api.getFriends(),
-        api.getDebts(user._id),
-        api.getMyDuels(),
-        api.getMyBets()
+      const [friendsList, ownDebts, pendingDuels, activeBets, allUsersList] = await Promise.all([
+        api.getFriends().catch(() => []),
+        api.getDebts(user._id).catch(() => []),
+        api.getMyDuels().catch(() => []),
+        api.getMyBets().catch(() => []),
+        api.getUsers().catch(() => [])
       ]);
 
-      setFriends(friendsList);
-      setMyDebts(ownDebts);
-      setMyDuels(pendingDuels);
-      setMyBets(activeBets);
+      const friendsSet = new Set((friendsList || []).map(f => f._id));
+      const combinedOpponents = (allUsersList || [])
+        .filter(u => u._id !== user._id && u.username !== 'dealer_bot')
+        .map(u => ({
+          ...u,
+          isFriend: friendsSet.has(u._id)
+        }));
+
+      setFriends(combinedOpponents.length > 0 ? combinedOpponents : (friendsList || []));
+      setMyDebts(ownDebts || []);
+      setMyDuels(pendingDuels || []);
+      setMyBets(activeBets || []);
 
       // Проверяем, есть ли текущая активная игра 21 Очко
-      const active21 = pendingDuels.find(d => d.gameType === 'twenty_one' && d.status === 'accepted');
+      const active21 = (pendingDuels || []).find(d => d.gameType === 'twenty_one' && d.status === 'accepted');
       if (active21) {
         setActiveTwentyOneDuel(active21);
       }
 
-      // Загружаем активные долги друзей для ставок (тотализатор)
-      const debtsPromises = friendsList.map(friend => 
+      // Загружаем активные долги пользователей для ставок (тотализатор)
+      const targetList = combinedOpponents.length > 0 ? combinedOpponents : (friendsList || []);
+      const debtsPromises = targetList.map(friend => 
         api.getDebts(friend._id).catch(() => [])
       );
       const debtsResults = await Promise.all(debtsPromises);
@@ -66,9 +76,9 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
       const uniqueDebts = [];
       const seenIds = new Set();
       for (const d of allDebts) {
-        if (!seenIds.has(d._id)) {
+        if (d && d._id && !seenIds.has(d._id)) {
           seenIds.add(d._id);
-          const isParticipant = d.debtor._id === user._id || d.creditor._id === user._id;
+          const isParticipant = d.debtor?._id === user._id || d.creditor?._id === user._id;
           if (!isParticipant) {
             uniqueDebts.push(d);
           }
@@ -76,8 +86,7 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
       }
       setFriendsDebts(uniqueDebts);
     } catch (err) {
-      console.error(err);
-      setError('Ошибка загрузки данных дуэлей и ставок');
+      console.error('Ошибка загрузки данных:', err);
     } finally {
       setLoading(false);
     }
@@ -526,9 +535,11 @@ export default function DuelsAndBets({ user, onUpdateUser }) {
                   onChange={(e) => setSelectedOpponent(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:border-indigo-500 focus:outline-none"
                 >
-                  <option value="">Выберите из списка друзей...</option>
+                  <option value="">Выберите оппонента для дуэли...</option>
                   {friends.map(friend => (
-                    <option key={friend._id} value={friend._id}>{friend.name} (@{friend.username})</option>
+                    <option key={friend._id} value={friend._id}>
+                      {friend.name} (@{friend.username}){friend.isFriend ? ' ⭐ Друг' : ''}
+                    </option>
                   ))}
                 </select>
               </div>

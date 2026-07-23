@@ -152,9 +152,8 @@ async function createDuelChallenge(req, res) {
       return res.status(404).json({ error: 'Игрок не найден' });
     }
 
-    // Проверяем дружбу
-    if (!challenger.friends.includes(opponentId) || !opponent.friends.includes(challengerId)) {
-      return res.status(400).json({ error: 'Бросить вызов можно только другу' });
+    if (challenger.isBanned || opponent.isBanned) {
+      return res.status(403).json({ error: 'Один из участников заблокирован' });
     }
 
     // Разрешены только ставки на Карму (или 0 для 21 очко)
