@@ -98,5 +98,6 @@ async function addXP(user, amount) {
 }
 
 module.exports = {
-  addXP
+  addXP,
+  grantBattlePassReward
 };

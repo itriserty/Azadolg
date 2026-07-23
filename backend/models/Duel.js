@@ -20,6 +20,34 @@ const DuelSchema = new mongoose.Schema({
     type: Number,
     default: 0 // Ставка в Карме
   },
+  gameType: {
+    type: String,
+    enum: ['coinflip', 'twenty_one'],
+    default: 'coinflip'
+  },
+  gameState: {
+    deck: [{
+      suit: { type: String, enum: ['red', 'blue'] },
+      value: { type: Number, min: 3, max: 11 },
+      id: String
+    }],
+    challengerHand: [{
+      suit: { type: String, enum: ['red', 'blue'] },
+      value: { type: Number, min: 3, max: 11 },
+      id: String
+    }],
+    opponentHand: [{
+      suit: { type: String, enum: ['red', 'blue'] },
+      value: { type: Number, min: 3, max: 11 },
+      id: String
+    }],
+    challengerPassed: { type: Boolean, default: false },
+    opponentPassed: { type: Boolean, default: false },
+    currentTurn: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    isBotMatch: { type: Boolean, default: false },
+    lastAction: { type: String, default: '' },
+    replayMessage: { type: String, default: '' }
+  },
   status: {
     type: String,
     enum: ['pending', 'accepted', 'rejected', 'finished'],

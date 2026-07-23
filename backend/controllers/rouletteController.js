@@ -16,6 +16,7 @@ const User        = require('../models/User');
 const SystemState = require('../models/SystemState');
 const tg          = require('../services/telegramService');
 const mongoose    = require('mongoose');
+const crypto      = require('crypto');
 
 /**
  * Начисляет опыт и повышает уровни игрока
@@ -38,60 +39,67 @@ const TIERS = {
     cost: 500,
     label: 'Суперрулетка',
     prizes: [
-      { win: 0,    weight: 25, label: '0 Кармы',    emoji: '💀', rarity: 'Пусто',     tag: 'zero'     },
-      { win: 250,  weight: 36, label: '+250 Кармы', emoji: '🪙', rarity: 'Кэшбек',    tag: 'cashback' },
-      { win: 500,  weight: 32, label: '+500 Кармы', emoji: '✅', rarity: 'Выход в 0', tag: 'break_even' },
-      { win: 1000, weight: 5,  label: '+1000 Кармы',emoji: '💎', rarity: 'Удвоение',  tag: 'double'   },
-      { win: 2500, weight: 2,  label: '+2500 Кармы',emoji: '🏆', rarity: 'ДЖЕКПОТ',   tag: 'jackpot'  },
+      { win: 0,    weight: 15, label: '0 Кармы',    emoji: '💀', rarity: 'Пусто',     tag: 'zero'     },
+      { win: 250,  weight: 30, label: '+250 Кармы', emoji: '🪙', rarity: 'Кэшбек',    tag: 'cashback' },
+      { win: 500,  weight: 35, label: '+500 Кармы', emoji: '✅', rarity: 'Выход в 0', tag: 'break_even' },
+      { win: 1000, weight: 12, label: '+1000 Кармы',emoji: '💎', rarity: 'Удвоение',  tag: 'double'   },
+      { win: 2500, weight: 8,  label: '+2500 Кармы',emoji: '🏆', rarity: 'ДЖЕКПОТ',   tag: 'jackpot'  },
     ],
   },
   100: {
     cost: 100,
     label: 'Тир 1',
     prizes: [
-      { win: 0,   weight: 25, label: '0 Кармы',   emoji: '💀', rarity: 'Пусто',     tag: 'zero'     },
-      { win: 50,  weight: 36, label: '+50 Кармы',  emoji: '🪙', rarity: 'Кэшбек',    tag: 'cashback' },
-      { win: 100, weight: 32, label: '+100 Кармы', emoji: '✅', rarity: 'Выход в 0', tag: 'break_even' },
-      { win: 200, weight: 5,  label: '+200 Кармы', emoji: '💎', rarity: 'Удвоение',  tag: 'double'   },
-      { win: 500, weight: 2,  label: '+500 Кармы', emoji: '🏆', rarity: 'ДЖЕКПОТ',   tag: 'jackpot'  },
+      { win: 0,   weight: 15, label: '0 Кармы',   emoji: '💀', rarity: 'Пусто',     tag: 'zero'     },
+      { win: 50,  weight: 30, label: '+50 Кармы',  emoji: '🪙', rarity: 'Кэшбек',    tag: 'cashback' },
+      { win: 100, weight: 35, label: '+100 Кармы', emoji: '✅', rarity: 'Выход в 0', tag: 'break_even' },
+      { win: 200, weight: 12, label: '+200 Кармы', emoji: '💎', rarity: 'Удвоение',  tag: 'double'   },
+      { win: 500, weight: 8,  label: '+500 Кармы', emoji: '🏆', rarity: 'ДЖЕКПОТ',   tag: 'jackpot'  },
     ],
   },
   50: {
     cost: 50,
     label: 'Тир 2',
     prizes: [
-      { win: 0,   weight: 25, label: '0 Кармы',   emoji: '💀', rarity: 'Пусто',     tag: 'zero'     },
-      { win: 25,  weight: 36, label: '+25 Кармы',  emoji: '🪙', rarity: 'Кэшбек',    tag: 'cashback' },
-      { win: 50,  weight: 32, label: '+50 Кармы',  emoji: '✅', rarity: 'Выход в 0', tag: 'break_even' },
-      { win: 100, weight: 5,  label: '+100 Кармы', emoji: '💎', rarity: 'Удвоение',  tag: 'double'   },
-      { win: 250, weight: 2,  label: '+250 Кармы', emoji: '🏆', rarity: 'ДЖЕКПОТ',   tag: 'jackpot'  },
+      { win: 0,   weight: 15, label: '0 Кармы',   emoji: '💀', rarity: 'Пусто',     tag: 'zero'     },
+      { win: 25,  weight: 30, label: '+25 Кармы',  emoji: '🪙', rarity: 'Кэшбек',    tag: 'cashback' },
+      { win: 50,  weight: 35, label: '+50 Кармы',  emoji: '✅', rarity: 'Выход в 0', tag: 'break_even' },
+      { win: 100, weight: 12, label: '+100 Кармы', emoji: '💎', rarity: 'Удвоение',  tag: 'double'   },
+      { win: 250, weight: 8,  label: '+250 Кармы', emoji: '🏆', rarity: 'ДЖЕКПОТ',   tag: 'jackpot'  },
     ],
   },
   25: {
     cost: 25,
     label: 'Тир 3',
     prizes: [
-      { win: 0,   weight: 25, label: '0 Кармы',   emoji: '💀', rarity: 'Пусто',     tag: 'zero'     },
-      { win: 15,  weight: 40, label: '+15 Кармы',  emoji: '🪙', rarity: 'Кэшбек',    tag: 'cashback' },
-      { win: 25,  weight: 28, label: '+25 Кармы',  emoji: '✅', rarity: 'Выход в 0', tag: 'break_even' },
-      { win: 50,  weight: 5,  label: '+50 Кармы',  emoji: '💎', rarity: 'Удвоение',  tag: 'double'   },
-      { win: 100, weight: 2,  label: '+100 Кармы', emoji: '🏆', rarity: 'ДЖЕКПОТ',   tag: 'jackpot'  },
+      { win: 0,   weight: 15, label: '0 Кармы',   emoji: '💀', rarity: 'Пусто',     tag: 'zero'     },
+      { win: 15,  weight: 30, label: '+15 Кармы',  emoji: '🪙', rarity: 'Кэшбек',    tag: 'cashback' },
+      { win: 25,  weight: 35, label: '+25 Кармы',  emoji: '✅', rarity: 'Выход в 0', tag: 'break_even' },
+      { win: 50,  weight: 12, label: '+50 Кармы',  emoji: '💎', rarity: 'Удвоение',  tag: 'double'   },
+      { win: 100, weight: 8,  label: '+100 Кармы', emoji: '🏆', rarity: 'ДЖЕКПОТ',   tag: 'jackpot'  },
     ],
   },
 };
 
 /**
- * Выбрать случайный приз из пула с учётом весов.
- * Сервер — единственный источник рандома.
+ * Выбрать случайный приз из пула с учётом весов и Pity-системы.
+ * Используется криптографически стойкий генератор рандома (crypto.randomInt).
  */
-function selectPrize(prizes) {
-  const total = prizes.reduce((s, p) => s + p.weight, 0);
-  let r = Math.random() * total;
-  for (const prize of prizes) {
-    r -= prize.weight;
-    if (r <= 0) return prize;
+function selectPrize(prizes, lossStreak = 0) {
+  let activePrizes = prizes;
+  // Pity system: если игрок проиграл (или получил кэшбек < стоимости) 3 раза подряд,
+  // исключаем 0 и заставляем выдать минимум Выход в 0, Удвоение или Джекпот!
+  if (lossStreak >= 3) {
+    activePrizes = prizes.filter(p => p.tag === 'break_even' || p.tag === 'double' || p.tag === 'jackpot');
   }
-  return prizes[prizes.length - 1];
+
+  const total = activePrizes.reduce((s, p) => s + p.weight, 0);
+  let r = crypto.randomInt(0, total);
+  for (const prize of activePrizes) {
+    if (r < prize.weight) return prize;
+    r -= prize.weight;
+  }
+  return activePrizes[activePrizes.length - 1];
 }
 
 /**
@@ -99,53 +107,70 @@ function selectPrize(prizes) {
  * body: { tier: 500 | 100 | 50 | 25 }
  */
 async function spin(req, res) {
-  // Открываем MongoDB-сессию для ACID-транзакции
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  let session = null;
+  let useTransaction = false;
+
+  try {
+    session = await mongoose.startSession();
+    session.startTransaction();
+    useTransaction = true;
+  } catch (err) {
+    // В случаях когда MongoDB запущен без репликасета, транзакции не поддерживаются
+    if (session) {
+      try { session.endSession(); } catch (e) {}
+      session = null;
+    }
+    useTransaction = false;
+  }
 
   try {
     const userId = req.user;
     const tierKey = parseInt(req.body.tier, 10);
 
     if (!userId) {
-      await session.abortTransaction();
-      session.endSession();
+      if (useTransaction) { await session.abortTransaction(); session.endSession(); }
       return res.status(401).json({ error: 'Не авторизован' });
     }
 
     const tier = TIERS[tierKey];
     if (!tier) {
-      await session.abortTransaction();
-      session.endSession();
+      if (useTransaction) { await session.abortTransaction(); session.endSession(); }
       return res.status(400).json({ error: 'Недопустимый тир. Доступны: 500, 100, 50, 25.' });
     }
 
-    // Загружаем пользователя ВНУТРИ транзакции
-    const users = await User.find({ _id: userId }).session(session);
-    const user = users[0];
+    // Загружаем пользователя
+    const userQuery = User.findById(userId);
+    if (useTransaction) userQuery.session(session);
+    const user = await userQuery;
+
     if (!user) {
-      await session.abortTransaction();
-      session.endSession();
+      if (useTransaction) { await session.abortTransaction(); session.endSession(); }
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
     if (user.isBanned) {
-      await session.abortTransaction();
-      session.endSession();
+      if (useTransaction) { await session.abortTransaction(); session.endSession(); }
       return res.status(403).json({ error: 'Ваш аккаунт заблокирован. Вы не можете крутить рулетку.' });
     }
 
     // Проверка баланса
     if ((user.karma || 0) < tier.cost) {
-      await session.abortTransaction();
-      session.endSession();
+      if (useTransaction) { await session.abortTransaction(); session.endSession(); }
       return res.status(400).json({
         error: `Недостаточно Кармы. Нужно ${tier.cost} ✧, у вас ${user.karma || 0} ✧.`
       });
     }
 
-    // ── Выбираем приз (рандом только на сервере!) ───────────────────────────
-    const prize = selectPrize(tier.prizes);
+    // ── Выбираем приз с учётом защиты от неудач ────────────────────────────
+    const lossStreak = user.rouletteLossStreak || 0;
+    const prize = selectPrize(tier.prizes, lossStreak);
+
+    // Обновляем счетчик серии проигрышей
+    if (prize.win < tier.cost) {
+      user.rouletteLossStreak = lossStreak + 1;
+    } else {
+      user.rouletteLossStreak = 0;
+    }
 
     // Вычисляем ELO и EXP на основе тира и тега приза
     const rate = tier.cost / 100;
@@ -179,7 +204,7 @@ async function spin(req, res) {
     const eloGained = Math.round(baseElo * rate);
     const expGained = Math.round(baseExp * rate);
 
-    // ── Атомарное обновление баланса через метод модели ───────────────────────
+    // ── Атомарное обновление баланса ──────────────────────────────────────────
     // 1. Вычитаем ставку
     user.replenishBalance('karma', -tier.cost, 'roulette_spin');
     // 2. Зачисляем выигрыш (если он больше нуля)
@@ -187,7 +212,7 @@ async function spin(req, res) {
       user.replenishBalance('karma', prize.win, 'roulette_spin');
     }
 
-    // 3. Зачисляем ELO через replenishBalance (для автоматического логирования)
+    // 3. Зачисляем ELO
     if (eloGained > 0) {
       user.replenishBalance('elo', eloGained, 'roulette_spin');
     }
@@ -218,18 +243,23 @@ async function spin(req, res) {
 
     // ── Джекпот-пул: 30% от ставки уходит в пул (house edge = 30%) ──────────
     const jackpotContrib = Math.floor(tier.cost * 0.30);
-    let systemState = await SystemState.findOne().session(session);
+    const sysQuery = SystemState.findOne();
+    if (useTransaction) sysQuery.session(session);
+    let systemState = await sysQuery;
     if (!systemState) {
       systemState = new SystemState();
     }
     systemState.jackpotPool = (systemState.jackpotPool || 0) + jackpotContrib;
 
-    await systemState.save({ session });
-    await user.save({ session });
-
-    // ── Коммитим транзакцию ──────────────────────────────────────────────────
-    await session.commitTransaction();
-    session.endSession();
+    if (useTransaction) {
+      await systemState.save({ session });
+      await user.save({ session });
+      await session.commitTransaction();
+      session.endSession();
+    } else {
+      await systemState.save();
+      await user.save();
+    }
 
     // ── Telegram-уведомление при джекпоте ───────────────────────────────────
     if (prize.tag === 'jackpot') {
@@ -298,8 +328,10 @@ async function spin(req, res) {
       newlyAwarded
     });
   } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
+    if (useTransaction && session) {
+      try { await session.abortTransaction(); } catch(e){}
+      session.endSession();
+    }
     console.error('[rouletteController.spin] Ошибка:', err);
     return res.status(500).json({ error: 'Внутренняя ошибка сервера при спине рулетки' });
   }
