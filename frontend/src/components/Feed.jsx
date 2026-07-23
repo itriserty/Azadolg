@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { 
   Send, Heart, MessageSquare, Trash2, Shield, Flame, 
-  User, Check, Plus, UserPlus, Users, X, Clock, HelpCircle
+  User, Check, Plus, UserPlus, Users, X, Clock, HelpCircle, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Leaderboard from './Leaderboard';
@@ -37,6 +37,98 @@ export default function Feed({ user, onUpdateUser, onViewProfile, leaderboardUse
       setFeedError('Не удалось загрузить данные сообщества');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMorePosts = async () => {
+    if (fetchingMore || !hasMore) return;
+    setFetchingMore(true);
+    try {
+      const nextPage = page + 1;
+      const postsList = await api.request(`/feed?page=${nextPage}&limit=10`);
+      if (postsList.length > 0) {
+        setPosts(prev => [...prev, ...postsList]);
+        setPage(nextPage);
+        setHasMore(postsList.length === 10);
+      } else {
+        setHasMore(false);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки дополнительных постов ленты:', err);
+    } finally {
+      setFetchingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFeedData();
+  }, []);
+
+  const handleCreatePost = async (e) => {
+    e.preventDefault();
+    if (!postContent.trim()) return;
+    try {
+      const newPost = await api.request('/posts', {
+        method: 'POST',
+        body: JSON.stringify({ content: postContent })
+      });
+      setPosts(prev => [newPost, ...prev]);
+      setPostContent('');
+    } catch (err) {
+      alert(err.message || 'Ошибка создания поста');
+    }
+  };
+
+  const handleLikePost = async (postId) => {
+    try {
+      const res = await api.request(`/posts/${postId}/like`, { method: 'POST' });
+      setPosts(prev => prev.map(p => {
+        if (p._id === postId) {
+          const currentLikes = p.likes || [];
+          let updatedLikes = [...currentLikes];
+          if (res.liked) {
+            updatedLikes.push(user._id);
+          } else {
+            updatedLikes = updatedLikes.filter(id => id !== user._id);
+          }
+          return { ...p, likes: updatedLikes };
+        }
+        return p;
+      }));
+    } catch (err) {
+      console.error('Ошибка лайка:', err);
+    }
+  };
+
+  const handleCommentSubmit = async (e, postId) => {
+    e.preventDefault();
+    const text = commentContent[postId];
+    if (!text || !text.trim()) return;
+
+    try {
+      const newComment = await api.request(`/posts/${postId}/comment`, {
+        method: 'POST',
+        body: JSON.stringify({ content: text })
+      });
+      setPosts(prev => prev.map(p => {
+        if (p._id === postId) {
+          return { ...p, comments: [...(p.comments || []), newComment] };
+        }
+        return p;
+      }));
+      setCommentContent(prev => ({ ...prev, [postId]: '' }));
+    } catch (err) {
+      alert(err.message || 'Ошибка отправки комментария');
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm('Удалить этот пост?')) return;
+    try {
+      await api.request(`/posts/${postId}`, { method: 'DELETE' });
+      setPosts(prev => prev.filter(p => p._id !== postId));
+    } catch (err) {
+      alert(err.message || 'Ошибка удаления поста');
     }
   };
 
