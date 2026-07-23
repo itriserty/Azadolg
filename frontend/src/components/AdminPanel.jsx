@@ -290,23 +290,37 @@ export default function AdminPanel({ token }) {
     }
   };
 
+  const doForceConfirmDebt = async (id) => {
+    if (!window.confirm('Принудительно подтвердить этот долг? Он перейдет в статус "active" и кредитору начислится ELO.')) return;
+    setLoading(true);
+    const res = await safeFetch(`${API}/api/admin/debts/${id}/force-confirm`, { method: 'POST' });
+    setLoading(false);
+    if (res.ok) {
+      flash(res.data?.message || 'Долг успешно принудительно подтверждён');
+      fetchDebts();
+    } else {
+      flash(res.data?.error || res.error || 'Ошибка принудительного подтверждения долга', 'err');
+    }
+  };
+
   const doDistributeKarma = async () => {
-    if (!distKarmaAmt || Number(distKarmaAmt) <= 0) {
-      return flash('Укажите корректную сумму Кармы', 'err');
+    const amt = Number(distKarmaAmt);
+    if (!distKarmaAmt || isNaN(amt) || amt === 0) {
+      return flash('Укажите корректную сумму Кармы (например 50 или -50)', 'err');
     }
     setLoading(true);
     const res = await safeFetch(`${API}/api/admin/users/distribute-karma`, {
       method: 'POST',
-      body: JSON.stringify({ amount: Number(distKarmaAmt), reason: distKarmaReason })
+      body: JSON.stringify({ amount: amt, reason: distKarmaReason })
     });
     setLoading(false);
     if (res.ok) {
-      flash(res.data?.message || 'Карма распределена');
+      flash(res.data?.message || 'Карма успешно обработана');
       setDistKarmaAmt('');
       setDistKarmaReason('');
       fetchUsers();
     } else {
-      flash(res.data?.error || res.error || 'Ошибка массовой раздачи кармы', 'err');
+      flash(res.data?.error || res.error || 'Ошибка массового изменения кармы', 'err');
     }
   };
 
@@ -316,9 +330,6 @@ export default function AdminPanel({ token }) {
       return flash('Укажите корректное количество (ненулевое число)', 'err');
     }
     const modalType = grantModal.type || 'karma';
-    if (modalType === 'karma' && amount <= 0) {
-      return flash('Нельзя отнять Карму. Укажите положительное число', 'err');
-    }
     setLoading(true);
     const endpoint = modalType === 'elo' ? 'adjust-elo' : 'adjust-karma';
     const res = await safeFetch(`${API}/api/admin/users/${grantModal.userId}/${endpoint}`, {
@@ -557,22 +568,22 @@ export default function AdminPanel({ token }) {
             </div>
           </div>
 
-          {/* Mass Karma Distribution banner */}
+          {/* Mass Karma Distribution / Reduction banner */}
           <div className="bg-gradient-to-br from-[#131b2e] to-[#0d1715] border border-cyan-500/25 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
             <div>
               <h3 className="font-black text-cyan-400 flex items-center gap-1.5 text-sm uppercase tracking-wide">
-                <span>🎁 Массовая раздача Кармы</span>
+                <span>🎁 Массовая раздача / Списание Кармы</span>
               </h3>
-              <p className="text-gray-400 text-[10px] mt-0.5">Равномерно начислить Карму всем активным (незабаненным) игрокам</p>
+              <p className="text-gray-400 text-[10px] mt-0.5">Укажите положительное (начисление) или отрицательное (списание) число Кармы для всех игроков</p>
             </div>
             
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               <input 
                 type="number" 
-                placeholder="Сумма Кармы" 
+                placeholder="Напр. 50 или -50" 
                 value={distKarmaAmt}
                 onChange={e => setDistKarmaAmt(e.target.value)}
-                className="bg-[#060b0b] border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 w-32 font-bold" 
+                className="bg-[#060b0b] border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 w-36 font-bold" 
               />
               <input 
                 type="text" 
@@ -586,7 +597,7 @@ export default function AdminPanel({ token }) {
                 disabled={loading}
                 className="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-black px-4 py-2.5 rounded-xl transition text-xs uppercase tracking-wider active:scale-95 disabled:opacity-40"
               >
-                Раздать
+                Применить
               </button>
             </div>
           </div>
@@ -746,6 +757,15 @@ export default function AdminPanel({ token }) {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1.5 justify-end">
+                          {d.status !== 'active' && d.status !== 'paid' && d.status !== 'declined' && d.status !== 'forgiven' && (
+                            <button 
+                              onClick={() => doForceConfirmDebt(d._id)} 
+                              title="Принудительно подтвердить долг"
+                              className={`${btn} bg-emerald-650/15 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-650/25`}
+                            >
+                              <CheckCircle className="w-3 h-3" /> Подтвердить
+                            </button>
+                          )}
                           {d.status === 'paid' && (
                             <button 
                               onClick={() => doCancelTransaction(d._id)} 
@@ -1155,13 +1175,13 @@ export default function AdminPanel({ token }) {
               <div className="space-y-4 mb-5">
                 <div>
                   <label className="text-[9px] uppercase font-bold text-gray-500 block mb-1">
-                    {grantModal.type === 'elo' ? 'Сумма / Количество (со знаком + или -)' : 'Количество Кармы (только положительное)'}
+                    {grantModal.type === 'elo' ? 'Сумма / Количество (со знаком + или -)' : 'Количество Кармы (со знаком + или -)'}
                   </label>
                   <input 
                     type="number" 
                     value={grantAmt} 
                     onChange={e => setGrantAmt(e.target.value)}
-                    placeholder={grantModal.type === 'elo' ? 'Например, +50 или -20' : 'Например, 1000'}
+                    placeholder={grantModal.type === 'elo' ? 'Например, +50 или -20' : 'Например, +100 или -50'}
                     className="w-full bg-[#060b0b] border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold" 
                   />
                 </div>

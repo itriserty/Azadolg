@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const {
   getUsers, banUser, unbanUser, deleteUser,
-  getAllDebts, deleteDebt, cancelTransaction,
+  getAllDebts, deleteDebt, cancelTransaction, forceConfirmDebt,
   resetUserPassword, getAdminLogs, grantKarma,
   getAchievements, createAchievement, updateAchievement, deleteAchievement,
   distributeKarma,
@@ -35,9 +35,10 @@ router.post('/jackpot/distribute',         distributeJackpot);
 router.get('/stats',                       getGlobalStats);
 
 // ── Долги ─────────────────────────────────────────────────────────────────────
-router.get('/debts',               getAllDebts);
-router.delete('/debts/:id',        deleteDebt);
-router.post('/debts/:id/cancel',   cancelTransaction);
+router.get('/debts',                       getAllDebts);
+router.delete('/debts/:id',                deleteDebt);
+router.post('/debts/:id/cancel',           cancelTransaction);
+router.post('/debts/:id/force-confirm',     forceConfirmDebt);
 
 // ── Достижения (Achievements CRUD) ──────────────────────────────────────────
 router.get('/achievements',        getAchievements);

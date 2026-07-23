@@ -4,6 +4,7 @@ const Quest       = require('../models/Quest');
 const AdminLog    = require('../models/AdminLog');
 const bcrypt      = require('bcryptjs');
 const tg          = require('../services/telegramService');
+const { calculateEloReward } = require('../utils/debtHelper');
 
 // Вспомогательная функция — логирование действий
 async function logAction(adminId, action, targetId, targetModel, reason = '', meta = {}) {
@@ -168,6 +169,68 @@ async function cancelTransaction(req, res) {
   }
 }
 
+// ── Принудительное подтверждение долга администратором ───────────────────────
+async function forceConfirmDebt(req, res) {
+  try {
+    const { id }  = req.params;
+    const adminId = req.user;
+
+    const tx = await Transaction.findById(id).populate('creditor debtor witness');
+    if (!tx) return res.status(404).json({ error: 'Долг не найден' });
+
+    if (['paid', 'declined', 'forgiven'].includes(tx.status)) {
+      return res.status(400).json({ error: `Нельзя подтвердить долг со статусом "${tx.status}"` });
+    }
+
+    if (tx.status === 'active') {
+      return res.status(400).json({ error: 'Долг уже активен' });
+    }
+
+    tx.status = 'active';
+    if (tx.witness) {
+      tx.witnessStatus = 'approved';
+    }
+
+    let eloReward = 0;
+    if (!tx.eloAwardedToCreditor) {
+      eloReward = calculateEloReward(tx.originalAmount);
+      tx.eloAwardedToCreditor = eloReward;
+
+      const creditor = await User.findById(tx.creditor?._id || tx.creditor);
+      if (creditor) {
+        creditor.eloRating = (creditor.eloRating || 1000) + eloReward;
+        creditor._eloReason = 'debt_issued_admin';
+        creditor._eloRelatedEntityId = tx._id;
+        await creditor.save();
+      }
+    }
+
+    await tx.save();
+
+    await logAction(adminId, 'force_confirm_debt', id, 'Transaction', 'Принудительное подтверждение долга администратором', {
+      creditor: tx.creditor?.name,
+      debtor: tx.debtor?.name,
+      amount: tx.originalAmount,
+      eloReward
+    });
+
+    const notifyText = `⚡ <b>Долг принудительно подтверждён администратором!</b>\n\n` +
+      `👤 Кредитор: <b>${tx.creditor?.name || 'Пользователь'}</b>\n` +
+      `👤 Должник: <b>${tx.debtor?.name || 'Пользователь'}</b>\n` +
+      `💰 Сумма: <b>${tx.originalAmount} ₸</b>\n\n` +
+      `Долг активирован в ELO-системе.`;
+
+    tg.sendMessage(notifyText);
+    if (tx.debtor?.telegramId)   tg.sendMessage(notifyText, tx.debtor.telegramId);
+    if (tx.creditor?.telegramId) tg.sendMessage(notifyText, tx.creditor.telegramId);
+
+    res.status(200).json({ message: 'Долг успешно подтверждён администратором!', transaction: tx });
+  } catch (err) {
+    console.error('[admin/forceConfirmDebt]', err);
+    res.status(500).json({ error: 'Ошибка принудительного подтверждения долга' });
+  }
+}
+
 // ── Сброс пароля (admin → задаёт временный пароль) ───────────────────────────
 async function resetUserPassword(req, res) {
   try {
@@ -218,29 +281,32 @@ async function getAdminLogs(req, res) {
   }
 }
 
-// ── Ручное начисление Кармы пользователю ─────────────────────────────────────
+// ── Ручное изменение Кармы пользователю (начисление / списание) ────────────
 async function grantKarma(req, res) {
   try {
     const { id }     = req.params;
     const { amount, reason } = req.body;
     const adminId    = req.user;
 
-    if (!amount || Number(amount) <= 0)
-      return res.status(400).json({ error: 'Укажите положительную сумму Кармы (больше 0)' });
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount === 0)
+      return res.status(400).json({ error: 'Укажите ненулевую сумму Кармы' });
 
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
 
-    user.karma += Number(amount);
+    user.karma = (user.karma || 0) + numAmount;
     user._karmaReason = 'admin_adjustment';
     await user.save();
 
-
-    await logAction(adminId, 'manual_karma_grant', id, 'User', reason, { amount });
-    res.status(200).json({ message: `+${amount} Кармы начислено ${user.name}`, newKarma: user.karma });
+    await logAction(adminId, 'manual_karma_grant', id, 'User', reason, { amount: numAmount });
+    const msg = numAmount > 0 
+      ? `+${numAmount} Кармы начислено ${user.name}` 
+      : `-${Math.abs(numAmount)} Кармы списано у ${user.name}`;
+    res.status(200).json({ message: msg, newKarma: user.karma });
   } catch (err) {
     console.error('[admin/grantKarma]', err);
-    res.status(500).json({ error: 'Ошибка начисления кармы' });
+    res.status(500).json({ error: 'Ошибка изменения кармы' });
   }
 }
 
@@ -342,41 +408,61 @@ async function deleteAchievement(req, res) {
   }
 }
 
-// ── Массовая раздача Кармы всем пользователям ─────────────────────────────────
+// ── Массовая раздача / списание Кармы всем пользователям ──────────────────────
 async function distributeKarma(req, res) {
   try {
     const { amount, reason } = req.body;
     const adminId = req.user;
 
     const karmaAmount = Math.round(Number(amount));
-    if (isNaN(karmaAmount) || karmaAmount <= 0)
-      return res.status(400).json({ error: 'Нельзя отнять Карму. Укажите число больше 0' });
+    if (isNaN(karmaAmount) || karmaAmount === 0)
+      return res.status(400).json({ error: 'Укажите ненулевое число Кармы (например 50 или -50)' });
 
-    // Массово начисляем карму всем активным (незаблокированным) пользователям
+    const isPositive = karmaAmount > 0;
+    const updateObj = isPositive
+      ? { $inc: { karma: karmaAmount, "stats.totalKarmaEarned": karmaAmount } }
+      : { $inc: { karma: karmaAmount } };
+
+    // Изменяем карму всем активным (незаблокированным) пользователям
     const result = await User.updateMany(
       { isBanned: { $ne: true } },
-      { $inc: { karma: karmaAmount, "stats.totalKarmaEarned": karmaAmount } }
+      updateObj
     );
 
-    await logAction(adminId, 'distribute_karma', adminId, 'User', reason || 'Массовая раздача кармы', { amount: karmaAmount, modifiedCount: result.modifiedCount });
+    await logAction(
+      adminId, 
+      'distribute_karma', 
+      adminId, 
+      'User', 
+      reason || (isPositive ? 'Массовая раздача кармы' : 'Массовое списание кармы'), 
+      { amount: karmaAmount, modifiedCount: result.modifiedCount }
+    );
+
+    const icon = isPositive ? '🎁' : '⚠️';
+    const actionTitle = isPositive ? 'Массовая раздача Кармы!' : 'Массовое списание Кармы!';
+    const detailText = isPositive
+      ? `✧ Всем пользователям начислено по <b>${karmaAmount} Кармы</b>.`
+      : `✧ У всех пользователей списано по <b>${Math.abs(karmaAmount)} Кармы</b>.`;
 
     tg.sendMessage(
-      `🎁 <b>Массовая раздача Кармы!</b>\n\n` +
-      `✧ Всем пользователям начислено по <b>${karmaAmount} Кармы</b>.\n` +
-      `📝 Описание: ${reason || 'Подарок от администрации'}`
+      `${icon} <b>${actionTitle}</b>\n\n` +
+      `${detailText}\n` +
+      `📝 Описание: ${reason || 'Решение администрации'}`
     );
 
     res.status(200).json({
-      message: `Успешно начислено по ${karmaAmount} Кармы для ${result.modifiedCount} пользователей.`,
+      message: isPositive
+        ? `Успешно начислено по ${karmaAmount} Кармы для ${result.modifiedCount} пользователей.`
+        : `Успешно списано по ${Math.abs(karmaAmount)} Кармы у ${result.modifiedCount} пользователей.`,
       modifiedCount: result.modifiedCount
     });
   } catch (err) {
     console.error('[admin/distributeKarma]', err);
-    res.status(500).json({ error: 'Ошибка раздачи кармы' });
+    res.status(500).json({ error: 'Ошибка изменения кармы' });
   }
 }
 
-// ── Редактирование баланса Кармы (только позитивное начисление) ─────────────
+// ── Редактирование баланса Кармы (прибавить / списать) ──────────────────────
 async function adjustKarma(req, res) {
   try {
     const { id } = req.params;
@@ -384,8 +470,8 @@ async function adjustKarma(req, res) {
     const adminId = req.user;
 
     const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount <= 0)
-      return res.status(400).json({ error: 'Нельзя отнять или списать Карму. Укажите положительное число (больше 0)' });
+    if (isNaN(numAmount) || numAmount === 0)
+      return res.status(400).json({ error: 'Укажите ненулевое число Кармы (например 50 или -50)' });
 
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
@@ -396,7 +482,12 @@ async function adjustKarma(req, res) {
     await user.save();
 
     await logAction(adminId, 'manual_karma_grant', id, 'User', reason || 'Корректировка баланса', { amount: numAmount });
-    res.status(200).json({ message: `Баланс Кармы пополнен на +${numAmount}. Текущий: ${user.karma}`, newKarma: user.karma });
+
+    const resultMsg = numAmount > 0
+      ? `Баланс Кармы пополнен на +${numAmount}. Текущий: ${user.karma}`
+      : `Списано ${Math.abs(numAmount)} Кармы. Текущий баланс: ${user.karma}`;
+
+    res.status(200).json({ message: resultMsg, newKarma: user.karma });
   } catch (err) {
     console.error('[admin/adjustKarma]', err);
     res.status(500).json({ error: 'Ошибка изменения баланса Кармы' });
@@ -578,7 +669,7 @@ async function distributeJackpot(req, res) {
 
 module.exports = {
   getUsers, banUser, unbanUser, deleteUser,
-  getAllDebts, deleteDebt, cancelTransaction,
+  getAllDebts, deleteDebt, cancelTransaction, forceConfirmDebt,
   resetUserPassword, getAdminLogs, grantKarma,
   getAchievements, createAchievement, updateAchievement, deleteAchievement,
   distributeKarma,
